@@ -86,7 +86,7 @@ export function Terms() {
                   5. الإشراف، الإبلاغ وإدارة التخزين السحابي
                 </h2>
                 <p>
-                  يحق لفريق الإشراف مراجعة أي إعلان وتعديله أو حذفه فورا إذا تبينت مخالفته لهذه الشروط. عند قيام المستخدم بتحديث صوره الشخصية أو حذف إعلاناته، يتم حذف الوسائط فوراً ونهائياً من خوادم التخزين السحابي المحمي (Cloudflare R2) حفاظاً على النظافة البيئية والموارد الرقمية.
+                  يحق لفريق الإشراف مراجعة أي إعلان وتعديله أو حذفه فورا إذا تبينت مخالفته لهذه الشروط. عند قيام المستخدم بتحديث صوره الشخصية أو حذف إعلاناته، يتم حذف الوسائط فوراً ونهائياً من خوادم التخزين السحابي المحمي حفاظاً على النظافة البيئية والموارد الرقمية.
                 </p>
               </section>
 
@@ -148,7 +148,7 @@ export function Terms() {
                   5. Modération et gestion stricte des médias
                 </h2>
                 <p>
-                  L'équipe de modération se réserve le droit de retirer toute annonce ou de suspendre un compte ne respectant pas ces directives. Dans le cadre de notre engagement pour une gestion responsable des ressources, toute suppression d'annonce ou modification de photo de profil entraîne le déréférencement et la purge immédiate des fichiers associés sur notre infrastructure Cloudflare R2.
+                  L'équipe de modération se réserve le droit de retirer toute annonce ou de suspendre un compte ne respectant pas ces directives. Dans le cadre de notre engagement pour une gestion responsable des ressources, toute suppression d'annonce ou modification de photo de profil entraîne le déréférencement et la purge immédiate des fichiers associés de nos serveurs sécurisés.
                 </p>
               </section>
 

@@ -1,4 +1,5 @@
 import type {
+  ItemType,
   ListingCondition,
   ListingDetail,
   ListingImage,
@@ -18,6 +19,7 @@ export interface ListingRow {
   price_da: number;
   negotiable: number;
   condition: ListingCondition;
+  item_type?: ItemType;
   status: ListingStatus;
   created_at: string;
   updated_at: string;
@@ -53,7 +55,7 @@ export interface ListingRow {
 
 const SUMMARY_SELECT = `
   SELECT
-    l.id, l.seller_id, l.title, l.description, l.price_da, l.negotiable, l.condition, l.status,
+    l.id, l.seller_id, l.title, l.description, l.price_da, l.negotiable, l.condition, l.item_type, l.status,
     l.created_at, l.updated_at, l.published_at, l.view_count,
     l.wilaya_id, w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
     l.category_id, c.slug AS category_slug, c.name_fr AS category_name_fr, c.name_ar AS category_name_ar,
@@ -84,6 +86,7 @@ export function rowToSummary(row: ListingRow): ListingSummary {
     originalPriceDa: row.original_price_da ?? null,
     negotiable: row.negotiable === 1,
     condition: row.condition,
+    itemType: (row.item_type ?? "PRODUCT") as ItemType,
     status: row.status,
     wilaya: { id: row.wilaya_id, nameFr: row.wilaya_name_fr, nameAr: row.wilaya_name_ar },
     category: {
@@ -190,6 +193,10 @@ export async function searchListings(
   if (query.condition) {
     where.push("l.condition = ?");
     params.push(query.condition);
+  }
+  if (query.itemType) {
+    where.push("l.item_type = ?");
+    params.push(query.itemType);
   }
   if (query.q) {
     const term = `%${escapeLike(query.q)}%`;

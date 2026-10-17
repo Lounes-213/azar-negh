@@ -64,13 +64,13 @@ export function Privacy() {
 
               <section>
                 <h2 style={{ fontSize: "var(--text-lg)", color: "var(--ink)", marginBottom: 8 }}>
-                  3. التخزين الذكي والتنظيف الفوري (Cloudflare R2)
+                  3. التخزين الذكي والتنظيف الفوري للبيانات
                 </h2>
                 <p>
                   حرصاً على حماية بياناتكم وتحسين أداء التطبيق، نعتمد سياسة الحذف الفوري:
                 </p>
                 <ul style={{ paddingInlineStart: 24, marginTop: 8 }}>
-                  <li>عند قيامك بتغيير صورتك الشخصية، يتم حذف الصورة القديمة فوراً وبشكل دائم من خوادم التخزين السحابي المحمي (R2).</li>
+                  <li>عند قيامك بتغيير صورتك الشخصية، يتم حذف الصورة القديمة فوراً وبشكل دائم وتفريغ مساحتها التخزينية.</li>
                   <li>عند حذف إعلان أو تعديل صوره، يتم تطهير جميع الملفات المرتبطة به دون ترك أي نسخ متبقية في السحابة.</li>
                 </ul>
               </section>
@@ -120,13 +120,13 @@ export function Privacy() {
 
               <section>
                 <h2 style={{ fontSize: "var(--text-lg)", color: "var(--ink)", marginBottom: 8 }}>
-                  3. Gestion responsable du stockage Cloudflare R2
+                  3. Gestion responsable et nettoyage du stockage
                 </h2>
                 <p>
                   Nous appliquons une politique stricte d'éviction des données obsolètes :
                 </p>
                 <ul style={{ paddingInlineStart: 24, marginTop: 8 }}>
-                  <li>Lorsque vous modifiez ou supprimez votre photo de profil, l'ancien fichier stocké sur notre infrastructure Cloudflare R2 est instantanément et définitivement supprimé.</li>
+                  <li>Lorsque vous modifiez ou supprimez votre photo de profil, l'ancien fichier est instantanément et définitivement supprimé.</li>
                   <li>La suppression ou la mise à jour des images d'une annonce entraîne la purge systématique des anciens visuels de notre compartiment de stockage cloud.</li>
                 </ul>
               </section>

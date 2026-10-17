@@ -58,6 +58,8 @@ export function Search({ mode }: { mode: Mode }) {
   const effectiveWilaya =
     mode === "wilaya" ? wilayaFromSlug?.id : Number(params.get("wilaya")) || undefined;
 
+  const currentItemType = params.get("itemType") ?? "";
+
   const [draft, setDraft] = useState({
     q: params.get("q") ?? "",
     category: effectiveCategory ? String(effectiveCategory) : "",
@@ -65,6 +67,7 @@ export function Search({ mode }: { mode: Mode }) {
     minPrice: params.get("minPrice") ?? "",
     maxPrice: params.get("maxPrice") ?? "",
     condition: params.get("condition") ?? "",
+    itemType: currentItemType,
   });
 
   useEffect(() => {
@@ -75,6 +78,7 @@ export function Search({ mode }: { mode: Mode }) {
       minPrice: params.get("minPrice") ?? "",
       maxPrice: params.get("maxPrice") ?? "",
       condition: params.get("condition") ?? "",
+      itemType: params.get("itemType") ?? "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.toString(), effectiveCategory, effectiveWilaya]);
@@ -90,6 +94,7 @@ export function Search({ mode }: { mode: Mode }) {
     if (params.get("minPrice")) query.set("minPrice", params.get("minPrice")!);
     if (params.get("maxPrice")) query.set("maxPrice", params.get("maxPrice")!);
     if (params.get("condition")) query.set("condition", params.get("condition")!);
+    if (params.get("itemType")) query.set("itemType", params.get("itemType")!);
     query.set("sort", sort);
     query.set("page", String(page));
     query.set("perPage", "24");
@@ -122,6 +127,7 @@ export function Search({ mode }: { mode: Mode }) {
     if (draft.minPrice) next.set("minPrice", draft.minPrice);
     if (draft.maxPrice) next.set("maxPrice", draft.maxPrice);
     if (draft.condition) next.set("condition", draft.condition);
+    if (draft.itemType) next.set("itemType", draft.itemType);
     if (sort !== "newest") next.set("sort", sort);
     setParams(next);
     setShowFilters(false);
@@ -131,6 +137,14 @@ export function Search({ mode }: { mode: Mode }) {
     const next = new URLSearchParams(params);
     if (value === "newest") next.delete("sort");
     else next.set("sort", value);
+    next.delete("page");
+    setParams(next);
+  };
+
+  const updateItemType = (type: string) => {
+    const next = new URLSearchParams(params);
+    if (!type) next.delete("itemType");
+    else next.set("itemType", type);
     next.delete("page");
     setParams(next);
   };
@@ -187,6 +201,61 @@ export function Search({ mode }: { mode: Mode }) {
             aria-expanded={showFilters}
           >
             <Icon name="filter" size={16} /> {t("common.filters")}
+          </button>
+        </div>
+      </div>
+
+      {/* Modern Type Filter Chips with Smooth Scroll & Gradient Indicators */}
+      <div
+        className="scroll-indicator-wrap mb-4"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 6,
+            paddingTop: 2,
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <button
+            type="button"
+            className={`btn btn-sm ${!currentItemType ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateItemType("")}
+            style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
+          >
+            {lang === "ar" ? "كل العروض" : "Tous les types"}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${currentItemType === "PRODUCT" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateItemType("PRODUCT")}
+            style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
+          >
+            📦 {lang === "ar" ? "المنتجات" : "Produits"}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${currentItemType === "SERVICE" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateItemType("SERVICE")}
+            style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
+          >
+            🛠️ {lang === "ar" ? "الخدمات" : "Services"}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${currentItemType === "DIGITAL" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => updateItemType("DIGITAL")}
+            style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
+          >
+            💾 {lang === "ar" ? "منتجات رقمية" : "Produits numériques"}
           </button>
         </div>
       </div>
@@ -288,6 +357,20 @@ export function Search({ mode }: { mode: Mode }) {
                   </option>
                 ),
               )}
+            </select>
+          </Field>
+
+          <Field label={lang === "ar" ? "نوع العرض" : "Type d'offre"} htmlFor="filter-item-type">
+            <select
+              id="filter-item-type"
+              className="select"
+              value={draft.itemType}
+              onChange={(event) => setDraft({ ...draft, itemType: event.target.value })}
+            >
+              <option value="">{lang === "ar" ? "كل الأنواع" : "Tous les types"}</option>
+              <option value="PRODUCT">📦 {lang === "ar" ? "منتجات مادية" : "Produits physiques"}</option>
+              <option value="SERVICE">🛠️ {lang === "ar" ? "خدمات" : "Services"}</option>
+              <option value="DIGITAL">💾 {lang === "ar" ? "منتجات رقمية" : "Produits numériques"}</option>
             </select>
           </Field>
 

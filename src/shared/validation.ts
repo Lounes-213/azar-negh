@@ -66,11 +66,15 @@ export const listingInputSchema = z.object({
   wilayaId: z.coerce.number().int().min(1).max(58),
   priceDa: z.coerce.number().int().min(0).max(1_000_000_000),
   negotiable: z.boolean().default(false),
-  condition: z.enum(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"]),
+  condition: z.enum(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"]).default("NEW"),
+  itemType: z.enum(["PRODUCT", "SERVICE", "DIGITAL"]).default("PRODUCT"),
   contactPhone: phoneSchema.optional().nullable(),
   contactPhonePublic: z.boolean().default(true),
   contactWhatsapp: z.boolean().default(false),
-  imageIds: z.array(z.string().uuid()).max(6).optional().default([]),
+  imageIds: z
+    .array(z.string().uuid())
+    .max(3, "3 images maximum par annonce.")
+    .default([]),
 });
 
 export type ListingInput = z.infer<typeof listingInputSchema>;
@@ -82,6 +86,7 @@ export const searchQuerySchema = z.object({
   minPrice: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
   maxPrice: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
   condition: z.enum(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"]).optional(),
+  itemType: z.enum(["PRODUCT", "SERVICE", "DIGITAL"]).optional(),
   sort: z.enum(["newest", "oldest", "price_asc", "price_desc"]).default("newest"),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   perPage: z.coerce.number().int().min(1).max(48).default(24),

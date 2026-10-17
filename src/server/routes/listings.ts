@@ -147,9 +147,9 @@ listingRoutes.post("/listings", async (c) => {
   const now = nowIso();
   await c.env.DB.prepare(
     `INSERT INTO listings
-      (id, seller_id, category_id, wilaya_id, title, description, price_da, negotiable, condition,
+      (id, seller_id, category_id, wilaya_id, title, description, price_da, negotiable, condition, item_type,
        status, contact_phone, contact_phone_public, contact_whatsapp, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -161,6 +161,7 @@ listingRoutes.post("/listings", async (c) => {
       input.priceDa,
       input.negotiable ? 1 : 0,
       input.condition as ListingCondition,
+      input.itemType,
       input.contactPhone ?? null,
       input.contactPhonePublic ? 1 : 0,
       input.contactWhatsapp ? 1 : 0,
@@ -205,7 +206,7 @@ listingRoutes.patch("/listings/:id", async (c) => {
   await c.env.DB.prepare(
     `UPDATE listings SET
        category_id = ?, wilaya_id = ?, title = ?, description = ?, price_da = ?, negotiable = ?,
-       condition = ?, contact_phone = ?, contact_phone_public = ?, contact_whatsapp = ?,
+       condition = ?, item_type = ?, contact_phone = ?, contact_phone_public = ?, contact_whatsapp = ?,
        status = ?, submitted_at = NULL, last_decision_reason = NULL, updated_at = ?
      WHERE id = ? AND seller_id = ?`,
   )
@@ -217,6 +218,7 @@ listingRoutes.patch("/listings/:id", async (c) => {
       input.priceDa,
       input.negotiable ? 1 : 0,
       input.condition as ListingCondition,
+      input.itemType,
       input.contactPhone ?? null,
       input.contactPhonePublic ? 1 : 0,
       input.contactWhatsapp ? 1 : 0,

@@ -273,7 +273,12 @@ export function ListingDetail() {
                 <Icon name="eye" size={15} /> {listing.viewCount} {t("listing.views")}
               </span>
               <span>
-                <Icon name="tag" size={15} /> {t(`cond.${listing.condition}`)}
+                <Icon name="tag" size={15} />{" "}
+                {listing.itemType === "SERVICE"
+                  ? (lang === "ar" ? "🛠️ خدمة" : "🛠️ Service")
+                  : listing.itemType === "DIGITAL"
+                    ? (lang === "ar" ? "💾 منتج رقمي" : "💾 Produit numérique")
+                    : t(`cond.${listing.condition}`)}
               </span>
             </div>
           </section>
@@ -284,7 +289,11 @@ export function ListingDetail() {
         <aside className="detail-aside">
           <div className="card" style={{ padding: 16 }}>
             <div className="seller-card">
-              <Avatar name={listing.seller.storeName || listing.seller.displayName} size="lg" />
+              <Avatar
+                name={listing.seller.storeName || listing.seller.displayName}
+                size="lg"
+                withGreenRing={true}
+              />
               <div className="grow">
                 <Link
                   to={`/vendeurs/${listing.seller.storeSlug || listing.seller.id}`}

@@ -277,6 +277,71 @@ authRoutes.get("/me", (c) => {
   return c.json({ user: serializeUser(user, csrfToken) });
 });
 
+authRoutes.get("/account/stats", async (c) => {
+  const user = requireUser(c);
+  const [listings, favorites, followers, following, reviews] = await Promise.all([
+    c.env.DB.prepare("SELECT COUNT(*) AS count FROM listings WHERE seller_id = ?").bind(user.id).first<{ count: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS count FROM favorites WHERE user_id = ?").bind(user.id).first<{ count: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS count FROM store_follows WHERE seller_id = ?").bind(user.id).first<{ count: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS count FROM store_follows WHERE user_id = ?").bind(user.id).first<{ count: number }>(),
+    c.env.DB.prepare(
+      "SELECT COUNT(*) AS count, COALESCE(CAST(ROUND(AVG(rating)) AS INTEGER), 5) AS avg_rating FROM store_reviews WHERE store_seller_id = ?",
+    ).bind(user.id).first<{ count: number; avg_rating: number }>(),
+  ]);
+
+  return c.json({
+    listingsCount: listings?.count ?? 0,
+    favoritesCount: favorites?.count ?? 0,
+    followersCount: followers?.count ?? 0,
+    followingCount: following?.count ?? 0,
+    reviewsCount: reviews?.count ?? 0,
+    avgRating: reviews?.avg_rating ?? 5,
+  });
+});
+
+authRoutes.get("/account/follows", async (c) => {
+  const user = requireUser(c);
+  const [followers, following] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT u.id, u.avatar_url, sp.display_name, sp.store_name, sp.store_slug
+       FROM store_follows sf
+       JOIN users u ON u.id = sf.user_id
+       LEFT JOIN seller_profiles sp ON sp.user_id = u.id
+       WHERE sf.seller_id = ?
+       LIMIT 50`,
+    )
+      .bind(user.id)
+      .all<{
+        id: string;
+        avatar_url: string | null;
+        display_name: string | null;
+        store_name: string | null;
+        store_slug: string | null;
+      }>(),
+    c.env.DB.prepare(
+      `SELECT u.id, u.avatar_url, sp.display_name, sp.store_name, sp.store_slug
+       FROM store_follows sf
+       JOIN users u ON u.id = sf.seller_id
+       LEFT JOIN seller_profiles sp ON sp.user_id = u.id
+       WHERE sf.user_id = ?
+       LIMIT 50`,
+    )
+      .bind(user.id)
+      .all<{
+        id: string;
+        avatar_url: string | null;
+        display_name: string | null;
+        store_name: string | null;
+        store_slug: string | null;
+      }>(),
+  ]);
+
+  return c.json({
+    followers: followers.results ?? [],
+    following: following.results ?? [],
+  });
+});
+
 authRoutes.get("/sessions", async (c) => {
   const user = requireUser(c);
   const current = c.get("session");

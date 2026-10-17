@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import type { ListingDetail, MetaResponse } from "../../shared/types";
+import type { ItemType, ListingDetail, MetaResponse } from "../../shared/types";
 import { Alert, Button, Field, Input, Select, Spinner, Textarea, useToast } from "../components/ui";
 import { Icon } from "../components/Icons";
 import { api, errorMessage, fieldErrors } from "../lib/api";
@@ -40,6 +40,7 @@ export function Sell() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const [itemType, setItemType] = useState<ItemType>("PRODUCT");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("1");
@@ -54,6 +55,7 @@ export function Sell() {
   useEffect(() => {
     if (!existing.data || loaded) return;
     const { listing } = existing.data;
+    setItemType(listing.itemType ?? "PRODUCT");
     setTitle(listing.title);
     setDescription(listing.description);
     setCategoryId(String(listing.category.id));
@@ -94,9 +96,9 @@ export function Sell() {
 
   const uploadFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const maxImages = meta.data?.maxImages ?? 6;
+    const maxImages = meta.data?.maxImages ?? 3;
     if (images.length + files.length > maxImages) {
-      setError(`${maxImages} photos maximum par annonce.`);
+      setError(lang === "ar" ? "3 صور كحد أقصى لكل إعلان." : `${maxImages} photos maximum par annonce.`);
       return;
     }
     setUploading(true);
@@ -143,6 +145,12 @@ export function Sell() {
     if (description.trim().length < 20)
       next.description = "Description trop courte (20 caractères minimum).";
     if (!priceDa || Number(priceDa) < 0) next.priceDa = "Indiquez un prix valide.";
+    if (images.length === 0) {
+      next.images = lang === "ar" ? "يجب إضافة صورة واحدة على الأقل للإعلان (إلزامية)." : "Au moins une photo est obligatoire pour publier l'annonce.";
+    }
+    if (images.length > 3) {
+      next.images = lang === "ar" ? "3 صور كحد أقصى لكل إعلان." : "3 photos maximum par annonce.";
+    }
     setFields(next);
     return Object.keys(next).length === 0;
   };
@@ -155,6 +163,7 @@ export function Sell() {
     priceDa: Number(priceDa || 0),
     negotiable,
     condition,
+    itemType,
     contactPhone: contactPhone.trim() || null,
     contactPhonePublic,
     contactWhatsapp,
@@ -163,7 +172,11 @@ export function Sell() {
 
   const save = async (submit: boolean) => {
     if (!validate()) {
-      setStep(1);
+      if (images.length === 0 && title.trim().length >= 8 && description.trim().length >= 20) {
+        setStep(2);
+      } else {
+        setStep(1);
+      }
       return;
     }
     setBusy(true);
@@ -257,12 +270,71 @@ export function Sell() {
 
           {step === 1 ? (
             <div className="panel stack">
+              <div>
+                <label className="field-label" style={{ fontWeight: 600, marginBottom: 8, display: "block" }}>
+                  {lang === "ar" ? "نوع العرض" : "Type d'offre"} <span style={{ color: "var(--danger)" }}>*</span>
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === "PRODUCT" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setItemType("PRODUCT")}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "12px 8px",
+                      height: "auto",
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.3rem" }}>📦</span>
+                    <span style={{ fontWeight: 600 }}>{lang === "ar" ? "منتج مادي" : "Produit"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === "SERVICE" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setItemType("SERVICE")}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "12px 8px",
+                      height: "auto",
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.3rem" }}>🛠️</span>
+                    <span style={{ fontWeight: 600 }}>{lang === "ar" ? "خدمة" : "Service"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === "DIGITAL" ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setItemType("DIGITAL")}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "12px 8px",
+                      height: "auto",
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.3rem" }}>💾</span>
+                    <span style={{ fontWeight: 600 }}>{lang === "ar" ? "رقمي" : "Numérique"}</span>
+                  </button>
+                </div>
+              </div>
+
               <Field
-                label="Titre de l'annonce"
+                label={lang === "ar" ? "عنوان الإعلان" : "Titre de l'annonce"}
                 htmlFor="sell-title"
                 error={fields.title}
                 required
-                hint="8 à 100 caractères. Soyez précis : marque, modèle, état."
+                hint={lang === "ar" ? "من 8 إلى 100 حرف. كن دقيقاً في الوصف." : "8 à 100 caractères. Soyez précis."}
               >
                 <Input
                   id="sell-title"
@@ -418,9 +490,15 @@ export function Sell() {
               <div>
                 <h2 style={{ fontSize: "var(--text-md)" }}>{t("sell.images")}</h2>
                 <p className="small muted">
-                  {meta.data?.maxImages ?? 6} photos maximum, 5 Mo par image. JPEG, PNG ou WebP.
+                  {lang === "ar"
+                    ? "3 صور كحد أقصى • 5 ميغابايت لكل صورة • صورة واحدة على الأقل إلزامية."
+                    : "3 photos maximum • 5 Mo max par photo • 1 photo obligatoire."}
                 </p>
               </div>
+
+              {fields.images ? (
+                <Alert tone="danger">{fields.images}</Alert>
+              ) : null}
 
               <div className="upload-grid">
                 {images.map((image) => (
@@ -436,10 +514,10 @@ export function Sell() {
                     </button>
                   </div>
                 ))}
-                {images.length < (meta.data?.maxImages ?? 6) ? (
+                {images.length < 3 ? (
                   <label className="upload-add">
                     {uploading ? <span className="spinner" /> : <Icon name="camera" size={22} />}
-                    <span>{uploading ? "Envoi…" : t("sell.addImages")}</span>
+                    <span>{uploading ? (lang === "ar" ? "جار الرفع…" : "Envoi…") : t("sell.addImages")}</span>
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -457,7 +535,9 @@ export function Sell() {
 
               {images.length === 0 ? (
                 <Alert tone="warning">
-                  Au moins une photo est obligatoire pour soumettre l'annonce à la modération.
+                  {lang === "ar"
+                    ? "يجب إضافة صورة واحدة على الأقل لإمكانية نشر الإعلان."
+                    : "Au moins une photo est obligatoire pour soumettre l'annonce."}
                 </Alert>
               ) : null}
 
@@ -465,7 +545,17 @@ export function Sell() {
                 <Button type="button" variant="secondary" onClick={() => setStep(1)}>
                   {t("common.back")}
                 </Button>
-                <Button type="button" onClick={() => setStep(3)}>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (images.length === 0) {
+                      setError(lang === "ar" ? "يجب إضافة صورة واحدة على الأقل للمتابعة." : "Au moins une photo est obligatoire pour continuer.");
+                      return;
+                    }
+                    setError(null);
+                    setStep(3);
+                  }}
+                >
                   {t("common.next")} <Icon name="arrow-right" size={16} />
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy}>

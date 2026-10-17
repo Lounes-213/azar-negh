@@ -65,7 +65,7 @@
     "APP_ENV": "production",
     "PUBLIC_ORIGIN": "https://azar-neg.azar-neg.workers.dev",
     "SESSION_TTL_DAYS": "14",
-    "MAX_IMAGES_PER_LISTING": "6",
+    "MAX_IMAGES_PER_LISTING": "3",
     "MAX_IMAGE_BYTES": "5242880",
     "SESSION_SECRET": "db6e88694f1c59dc605eeca9a97c7150011bbd288b81df0ad021576c342c8c3a",
     "GOOGLE_CLIENT_ID": "212127731962-a293tlj87fojunsjt9h2rlhd3285n1fg.apps.googleusercontent.com",

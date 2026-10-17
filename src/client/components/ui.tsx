@@ -430,10 +430,12 @@ export function Avatar({
   name,
   imageUrl,
   size,
+  withGreenRing = false,
 }: {
   name: string | null | undefined;
   imageUrl?: string | null;
   size?: "lg" | "xl";
+  withGreenRing?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
   const initials = (name ?? "?")
@@ -443,11 +445,26 @@ export function Avatar({
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
+  const ringStyle: React.CSSProperties = withGreenRing
+    ? {
+        boxShadow: "0 0 0 3px #10b981, 0 0 0 6px rgba(16, 185, 129, 0.22)",
+        border: "2px solid #ffffff",
+        transition: "box-shadow 0.2s ease",
+      }
+    : {};
+
   if (imageUrl && !imgError) {
     return (
       <span
         className={`avatar ${size === "xl" ? "avatar-xl" : size === "lg" ? "avatar-lg" : ""}`}
-        style={{ padding: 0, overflow: "hidden", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+        style={{
+          padding: 0,
+          overflow: "hidden",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          ...ringStyle,
+        }}
       >
         <img
           src={imageUrl}
@@ -462,6 +479,7 @@ export function Avatar({
   return (
     <span
       className={`avatar ${size === "xl" ? "avatar-xl" : size === "lg" ? "avatar-lg" : ""}`}
+      style={ringStyle}
       aria-hidden="true"
     >
       {initials || "?"}

@@ -2,9 +2,12 @@ export type Role = "USER" | "MODERATOR" | "ADMIN";
 export type UserStatus = "ACTIVE" | "SUSPENDED";
 export type ListingStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "SOLD" | "ARCHIVED";
 export type ListingCondition = "NEW" | "LIKE_NEW" | "GOOD" | "FAIR" | "FOR_PARTS";
+export type ItemType = "PRODUCT" | "SERVICE" | "DIGITAL";
 export type ReportReason = "FRAUD" | "PROHIBITED" | "WRONG_CATEGORY" | "SPAM" | "OTHER";
 export type ReportStatus = "OPEN" | "REVIEWED" | "DISMISSED";
 export type SortOption = "newest" | "oldest" | "price_asc" | "price_desc";
+
+export const ITEM_TYPES: ItemType[] = ["PRODUCT", "SERVICE", "DIGITAL"];
 
 export const LISTING_STATUSES: ListingStatus[] = [
   "DRAFT",
@@ -133,6 +136,7 @@ export interface ListingSummary {
   sellerDisplayName: string;
   storeName?: string | null;
   storeSlug?: string | null;
+  itemType?: ItemType;
   isFavorite?: boolean;
   rejectionReason?: string | null;
   callClicks?: number;
@@ -244,5 +248,6 @@ export interface MetaResponse {
   categories: Category[];
   wilayas: Wilaya[];
   conditions: ListingCondition[];
+  itemTypes?: ItemType[];
   maxImages: number;
 }

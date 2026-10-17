@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import type { Category, Wilaya } from "../../shared/types";
-import { CONDITIONS } from "../../shared/types";
+import { CONDITIONS, ITEM_TYPES } from "../../shared/types";
 import { HttpError } from "../lib/http";
 
 export const metaRoutes = new Hono<AppEnv>();
@@ -75,7 +75,8 @@ metaRoutes.get("/meta", async (c) => {
       }),
     ),
     conditions: CONDITIONS,
-    maxImages: Number(c.env.MAX_IMAGES_PER_LISTING || "6"),
+    itemTypes: ITEM_TYPES,
+    maxImages: Number(c.env.MAX_IMAGES_PER_LISTING || "3"),
   };
   c.header("Cache-Control", "public, max-age=300");
   return c.json(response);

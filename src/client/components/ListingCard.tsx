@@ -107,9 +107,19 @@ export function ListingCard({
 
         {/* Floating Top Badges */}
         <div className="ali-top-badges">
-          <span className={`ali-cond-badge ${listing.condition === "NEW" ? "is-new" : ""}`}>
-            {conditionLabel}
-          </span>
+          {listing.itemType === "SERVICE" ? (
+            <span className="ali-cond-badge" style={{ background: "#0284c7", color: "#fff", fontWeight: 700 }}>
+              🛠️ {lang === "ar" ? "خدمة" : "Service"}
+            </span>
+          ) : listing.itemType === "DIGITAL" ? (
+            <span className="ali-cond-badge" style={{ background: "#7c3aed", color: "#fff", fontWeight: 700 }}>
+              💾 {lang === "ar" ? "رقمي" : "Numérique"}
+            </span>
+          ) : (
+            <span className={`ali-cond-badge ${listing.condition === "NEW" ? "is-new" : ""}`}>
+              {conditionLabel}
+            </span>
+          )}
           {showStatus ? (
             <span className="ali-status-badge">
               <StatusBadge status={listing.status} />
