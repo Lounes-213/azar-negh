@@ -1,0 +1,4 @@
+# Copy to .dev.vars and set a random 64-char hex value.
+# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# In production set it with: wrangler secret put SESSION_SECRET
+SESSION_SECRET=replace-with-a-random-64-char-hex-value

@@ -1,0 +1,5 @@
+{
+  "name": "bench",
+  "main": "scripts/bench-hash-worker.ts",
+  "compatibility_date": "2026-10-17"
+}

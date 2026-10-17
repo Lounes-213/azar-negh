@@ -1,0 +1,93 @@
+:root {
+  /* Brand — light "market green" sampled from the reference screens (docs/web_view.png) */
+  --brand-950: #08321f;
+  --brand-900: #0c4529;
+  --brand-800: #105c34;
+  --brand-700: #14833f;
+  --brand-600: #1b9b51;
+  --brand-500: #2bbd62;
+  --brand-400: #57d386;
+  --brand-300: #8ee7ad;
+  --brand-200: #c2f2d3;
+  --brand-100: #dcf8e5;
+  --brand-50: #e8f7ee;
+
+  /* Surfaces */
+  --bg: #f9fbfa;
+  --surface: #ffffff;
+  --surface-muted: #f2f7f4;
+  --sand: #f4f7f4;
+  --line: #e5eee8;
+  --line-strong: #cfdcd3;
+  --ink: #0f1f18;
+  --ink-soft: #2f453b;
+  --muted: #5f746a;
+  --muted-strong: #455b51;
+
+  /* Functional */
+  --accent: #f0a020;
+  --accent-soft: #fff6e3;
+  --danger: #d13b30;
+  --danger-soft: #fdeceb;
+  --warning: #b4740c;
+  --warning-soft: #fdf5e3;
+  --info: #2179c9;
+  --info-soft: #eaf3fd;
+  --success: #12864a;
+  --success-soft: #e6f8ee;
+
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(15, 44, 30, 0.05);
+  --shadow-sm: 0 2px 8px rgba(15, 44, 30, 0.06), 0 1px 2px rgba(15, 44, 30, 0.04);
+  --shadow-md: 0 10px 26px rgba(15, 44, 30, 0.08), 0 2px 6px rgba(15, 44, 30, 0.04);
+  --shadow-lg: 0 22px 55px rgba(15, 44, 30, 0.12);
+
+  /* Gradients */
+  --grad-hero: linear-gradient(135deg, #2bbd62 0%, #1b9b51 58%, #14833f 100%);
+  --grad-soft: linear-gradient(180deg, #f1fdf6 0%, #ffffff 100%);
+
+  /* Self-hosted via @fontsource (see src/client/main.tsx) — geometric rounded
+     sans matching the reference screens. */
+  --font-sans:
+    "Poppins", "Cairo", "Noto Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+  --font-arabic: "Cairo", "Poppins", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 2.875rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --container: 1180px;
+  --sidebar-width: 244px;
+  --header-height: 68px;
+  --tabbar-height: 64px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Arabic locale switches to the Arabic-first stack (Cairo pairs with Poppins). */
+html[lang="ar"] {
+  --font-sans: var(--font-arabic);
+}

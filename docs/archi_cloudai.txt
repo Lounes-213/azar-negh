@@ -1,0 +1,30 @@
+azar-neg/
+├─ app/
+│  ├─ routes/            # pages + loaders/actions
+│  │  ├─ _index.tsx
+│  │  ├─ annonces.tsx            # search + filtres
+│  │  ├─ annonces.$id.tsx        # détail
+│  │  ├─ c.$category.tsx  w.$wilaya.tsx
+│  │  ├─ vendeur.$id.tsx
+│  │  ├─ compte/ (profil, annonces, favoris, notifications)
+│  │  ├─ vendre/ (nouvelle, edit, aperçu)
+│  │  ├─ mod/ (queue, reports, historique)
+│  │  ├─ admin/ (users, categories, listings, stats, audit)
+│  │  └─ api.ws.ts, img.$key.ts
+│  ├─ components/ui/     # Button, Input, Dialog, Dropdown, ProductCard, StatusBadge, Pagination, Toast
+│  ├─ components/layout/ # Sidebar (desktop), BottomTabs (mobile), Header
+│  ├─ styles/tokens.css
+│  └─ i18n/ (fr.json, ar.json)
+├─ server/
+│  ├─ index.ts            # Worker entry + export DO
+│  ├─ auth/               # hash, sessions, csrf, guards
+│  ├─ services/           # listings, moderation, notifications, images...
+│  ├─ repositories/       # SQL prepared statements (D1) kolha hna
+│  ├─ policies/           # rôles + transitions dyal statut
+│  ├─ validation/         # schemas Zod
+│  └─ realtime/NotificationHub.ts   # Durable Object
+├─ migrations/            # 0001_init.sql, 0002_seed_wilayas.sql ...
+├─ scripts/               # bootstrap-admin.ts
+├─ tests/
+├─ docs/                  # ARCHITECTURE, DATABASE, API, SECURITY, DEPLOYMENT, TESTING, FREE_TIER_LIMITS + screens/
+└─ wrangler.jsonc

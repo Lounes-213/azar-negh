@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /compte
+Disallow: /mod
+Disallow: /admin
+Disallow: /api

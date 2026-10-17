@@ -1,0 +1,72 @@
+/**
+ * Azar Neɣ — Cloudflare Workers configuration.
+ *
+ * Placeholders that MUST be replaced before deploying (see docs/DEPLOYMENT.md):
+ *   - d1_databases[0].database_id  -> output of `wrangler d1 create azar-neg-db`
+ *   - r2_buckets[0].bucket_name    -> the bucket you create (or keep this name)
+ *
+ * Everything else works locally with `wrangler dev`.
+ */
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "azar-neg",
+  "main": "src/server/index.ts",
+  "compatibility_date": "2026-10-17",
+  "compatibility_flags": [],
+
+  "observability": {
+    "enabled": true,
+  },
+
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "azar-neg-db",
+      "database_id": "3ffc8718-9061-4321-9d62-cb9a84d06777",
+      "migrations_dir": "migrations",
+    },
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "azar-neg-images",
+    },
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NOTIFICATIONS",
+        "class_name": "NotificationHub",
+      },
+    ],
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["NotificationHub"],
+    },
+  ],
+
+  "triggers": {
+    "crons": ["17 3 * * *"],
+  },
+
+  "vars": {
+    "APP_ENV": "production",
+    "PUBLIC_ORIGIN": "https://azar-neg.azar-neg.workers.dev",
+    "SESSION_TTL_DAYS": "14",
+    "MAX_IMAGES_PER_LISTING": "6",
+    "MAX_IMAGE_BYTES": "5242880",
+    "SESSION_SECRET": "db6e88694f1c59dc605eeca9a97c7150011bbd288b81df0ad021576c342c8c3a",
+  },
+}

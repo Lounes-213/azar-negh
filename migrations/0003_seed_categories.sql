@@ -1,0 +1,27 @@
+-- Category hierarchy. Admin-editable afterwards; these are sensible defaults.
+INSERT INTO categories (id, slug, name_fr, name_ar, parent_id, icon, sort_order) VALUES
+  (1,  'electronique',        'Électronique',              'إلكترونيات',             NULL, 'cpu',        10),
+  (2,  'telephones',          'Téléphones & accessoires',  'هواتف وملحقاتها',        NULL, 'smartphone', 20),
+  (3,  'informatique',        'Informatique',              'إعلاميات',               NULL, 'laptop',     30),
+  (4,  'vehicules',           'Véhicules',                 'مركبات',                 NULL, 'car',        40),
+  (5,  'immobilier',          'Immobilier',                'عقارات',                 NULL, 'home',       50),
+  (6,  'maison-meubles',      'Maison & meubles',          'منزل وأثاث',             NULL, 'sofa',       60),
+  (7,  'mode',                'Mode',                      'أزياء',                  NULL, 'shirt',      70),
+  (8,  'sport-loisirs',       'Sport & loisirs',           'رياضة وترفيه',           NULL, 'bike',       80),
+  (9,  'equipement-pro',      'Équipement professionnel',  'تجهيزات مهنية',          NULL, 'briefcase',  90),
+  (10, 'autre',               'Autre',                     'أخرى',                   NULL, 'tag',       100),
+
+  (11, 'smartphones',         'Smartphones',               'هواتف ذكية',             2,    'smartphone', 10),
+  (12, 'accessoires-telephone','Accessoires',               'ملحقات الهواتف',         2,    'headphones', 20),
+  (13, 'ordinateurs-portables','Ordinateurs portables',     'حواسيب محمولة',          3,    'laptop',     10),
+  (14, 'composants',          'Composants & périphériques','مكونات وملحقات',         3,    'cpu',        20),
+  (15, 'voitures',            'Voitures',                  'سيارات',                 4,    'car',        10),
+  (16, 'motos',               'Motos & scooters',          'دراجات نارية',           4,    'bike',       20),
+  (17, 'pieces-auto',         'Pièces & accessoires auto', 'قطع غيار السيارات',       4,    'wrench',     30),
+  (18, 'appartements',        'Appartements',              'شقق',                    5,    'building',   10),
+  (19, 'maisons-villas',      'Maisons & villas',          'منازل وفيلات',           5,    'home',       20),
+  (20, 'terrains',            'Terrains',                  'أراضي',                  5,    'map',        30),
+  (21, 'electromenager',      'Électroménager',            'أجهزة كهرومنزلية',       6,    'plug',       10),
+  (22, 'meubles',             'Meubles',                   'أثاث',                   6,    'sofa',       20),
+  (23, 'vetements',           'Vêtements',                 'ملابس',                  7,    'shirt',      10),
+  (24, 'chaussures',          'Chaussures',                'أحذية',                  7,    'footprints', 20);

@@ -1,0 +1,481 @@
+# AZAR NEɣ — COMPLETE MARKETPLACE PROJECT
+
+Act as a senior software architect, Cloudflare engineer, security engineer, UI/UX designer, and QA engineer.
+
+Build a complete, production-oriented Algerian marketplace named **Azar Neɣ**, from zero to deployment.
+
+Do not merely create a landing page or a static mockup. Implement the real application, database, authentication, APIs, image storage, moderation, tests, and real-time features.
+
+Work directly in the current workspace.
+
+# 1. NON-NEGOTIABLE REQUIREMENTS
+
+- Country: Algeria only.
+- Product: classified marketplace for buying and selling.
+- Interface: French by default, with Arabic and RTL readiness.
+- Currency: DZD / DA.
+- Geography: all 58 Algerian wilayas, with correct French and Arabic names.
+- Payments: no integrated payments.
+- Buyer and seller communicate directly.
+- New listings require moderator approval before public publication.
+- Free-tier-first deployment.
+- Use Cloudflare services only for hosting, database, storage, and real-time backend.
+- No Neon, Supabase, Firebase, Vercel, external database hosting, or paid APIs.
+- Never assume a free service has unlimited capacity.
+- Never invent credentials, API responses, completed deployments, or successful tests.
+
+# 2. REQUIRED COMPATIBILITY AUDIT
+
+Before installing dependencies:
+
+1. Inspect Node.js, npm, operating system, and workspace.
+2. Read current official Cloudflare documentation.
+3. Verify the recommended framework and deployment adapter for a new application.
+4. Verify compatibility with Workers runtime, D1, R2, Durable Objects, WebSockets, authentication libraries, and testing tools.
+5. Check whether the chosen framework or adapter is beta, experimental, or has unsupported features.
+6. Select the most reliable Cloudflare-native implementation for this project.
+7. If using Next.js, check the current Cloudflare-recommended vinext path and its compatibility limitations before adoption.
+8. Do not use deprecated instructions or install libraries without verifying their compatibility.
+9. Record the chosen architecture and dependency versions in `docs/ARCHITECTURE.md`.
+
+If a proposed technology is incompatible, replace it with a compatible alternative and explain why.
+
+# 3. TECHNOLOGY ARCHITECTURE
+
+Use the following architecture where compatibility is verified:
+
+- Frontend: TypeScript, React, and a Cloudflare-compatible full-stack framework.
+- Runtime and hosting: Cloudflare Workers.
+- Database: Cloudflare D1 with SQL migrations.
+- Image storage: Cloudflare R2.
+- Real-time events: Durable Objects with WebSockets.
+- Validation: a maintained schema-validation library compatible with Workers.
+- Styling: plain CSS or CSS Modules.
+- Testing: compatible unit and integration testing tools.
+- Version control: Git.
+
+Prefer the simplest maintainable architecture. Avoid unnecessary dependencies and microservices.
+
+Do not use Prisma unless its current D1 compatibility, migration workflow, and transaction behavior are explicitly verified. Native D1 prepared statements and SQL migrations are acceptable.
+
+Use Cloudflare bindings for D1 and R2. Never expose storage credentials, session secrets, or private environment variables to the browser.
+
+# 4. BRAND AND DESIGN SYSTEM
+
+Product name: Azar Neɣ.
+
+Design a modern, trustworthy Algerian marketplace.
+
+Visual direction:
+- Clean, contemporary, premium marketplace.
+- Light background with restrained dark text.
+- Distinctive primary brand color.
+- Consistent spacing and typography.
+- Beautiful product photography.
+- Rounded cards with subtle borders and shadows.
+- Clear visual hierarchy.
+- Responsive desktop, tablet, and mobile layouts.
+- Accessible contrast and keyboard navigation.
+- Skeleton loading, empty states, error states, and success feedback.
+
+Avoid:
+- Cluttered dashboards.
+- Excessive gradients.
+- Oversized decorative sections.
+- Fake metrics and fake customer reviews.
+- Buttons that do nothing.
+- Placeholder data presented as real listings.
+
+Create reusable design tokens, buttons, inputs, dialogs, dropdowns, product cards, status labels, pagination, and notification components.
+
+# 5. PUBLIC MARKETPLACE
+
+Implement:
+
+- Homepage with search, category navigation, recently published approved listings, and popular categories.
+- Search by keyword.
+- Filters for category, wilaya, price range, and condition.
+- Sorting by newest and price.
+- Pagination.
+- Product detail pages with image gallery.
+- Seller profile pages.
+- Related listings.
+- Category pages.
+- Wilaya-specific pages.
+- Responsive navigation.
+- Contact seller actions.
+- Report listing action.
+- Custom not-found and error pages.
+
+Only approved, active listings may appear publicly.
+
+Use server-side filtering and parameterized database queries. Do not load the entire database into the browser.
+
+# 6. ACCOUNTS AND AUTHENTICATION
+
+Implement real authentication using a verified Workers-compatible approach.
+
+Features:
+- Registration.
+- Login.
+- Logout.
+- Secure session handling.
+- Account profile.
+- Profile editing.
+- Seller display name.
+- Phone number with Algeria-friendly formatting.
+- Optional public contact information.
+- Session expiration and revocation.
+
+Security requirements:
+- Hash passwords using an appropriate password-hashing implementation verified for the Workers runtime.
+- Never store plaintext passwords.
+- Use HttpOnly, Secure in production, and appropriate SameSite cookies.
+- Validate sessions server-side.
+- Prevent unauthorized role changes.
+- Rate-limit authentication attempts using an appropriate Cloudflare mechanism.
+- Never expose password hashes or session secrets.
+- Protect state-changing requests against CSRF where applicable.
+- Validate every input on the server.
+
+Do not claim email verification, SMS verification, or password recovery works unless a supported delivery mechanism is actually configured.
+
+Provide an honest, documented account-recovery strategy for the Cloudflare-only constraint.
+
+# 7. LISTING MANAGEMENT
+
+A seller can:
+- Create a listing.
+- Edit their own listing.
+- Upload multiple images.
+- Select a category and wilaya.
+- Set title, description, price, condition, and contact preferences.
+- Preview a listing before submission.
+- Submit it for moderation.
+- View moderation status.
+- Request review after a rejection.
+- Mark an approved listing as sold.
+- Archive their listing.
+- Delete or deactivate their listing according to documented rules.
+
+Listing statuses:
+- DRAFT
+- PENDING
+- APPROVED
+- REJECTED
+- SOLD
+- ARCHIVED
+
+Enforce status transitions on the server.
+
+New listings and material edits must not become public before approval.
+
+Never trust a status or seller ID supplied by the browser.
+
+# 8. CATEGORIES AND WILAYAS
+
+Create a maintainable category hierarchy with examples such as:
+
+- Electronics.
+- Phones and accessories.
+- Computers.
+- Vehicles.
+- Real estate.
+- Home and furniture.
+- Fashion.
+- Sports and leisure.
+- Professional equipment.
+- Other.
+
+Categories must be database-managed, with active/inactive states.
+
+Seed all 58 Algerian wilayas using verified names and official numbering. Include French and Arabic display names where available.
+
+Do not invent geographic information.
+
+# 9. DATABASE DESIGN
+
+Create versioned SQL migrations for the core entities:
+
+- users
+- sessions
+- seller_profiles
+- categories
+- wilayas
+- listings
+- listing_images
+- favorites
+- reports
+- moderation_reviews
+- notifications
+- audit_logs
+
+Use:
+- Primary keys.
+- Foreign keys.
+- Unique constraints.
+- Appropriate indexes.
+- Timestamps.
+- Consistent naming.
+- Explicit cascade and deletion policies.
+- Pagination-friendly queries.
+
+Store money as integer DA values where appropriate.
+
+Use UTC timestamps in storage and display dates appropriately to users.
+
+Add seed scripts for categories and wilayas.
+
+Never put real user credentials or production data into seed files.
+
+# 10. IMAGE STORAGE WITH R2
+
+Implement actual R2 image upload and retrieval.
+
+Requirements:
+- Private server-side R2 binding.
+- Validate file type and actual image content.
+- Restrict file size and image count.
+- Generate random object keys.
+- Prevent path traversal and executable uploads.
+- Enforce ownership and authorization.
+- Handle failed uploads and cleanup.
+- Avoid exposing private storage credentials.
+- Store image metadata in D1.
+- Delete abandoned uploads when safely possible.
+
+Choose a documented image-delivery strategy compatible with the free-tier goal. Do not assume a private R2 bucket has a public URL automatically.
+
+# 11. REAL-TIME FEATURES
+
+Use Durable Objects and WebSockets only where needed.
+
+Implement real-time updates for:
+- Moderator notification when a listing is submitted.
+- Seller notification when a listing is approved or rejected.
+- User notification when relevant listing status changes.
+- Optional live notification badge.
+
+Requirements:
+- Authenticated WebSocket connections.
+- Authorization for every subscription.
+- Validate messages and payload sizes.
+- Never broadcast private user data.
+- Handle disconnects and reconnects.
+- Implement heartbeats where appropriate.
+- Clean up stale subscriptions.
+- Avoid one global object becoming a scalability bottleneck.
+- Persist important notifications in D1 so offline users can see them later.
+- Use an explicit room or routing strategy.
+
+Do not build a fake real-time demo. Verify actual communication between two separate sessions.
+
+Do not implement full chat unless explicitly justified; direct buyer-seller contact is the product requirement.
+
+# 12. MODERATION AND ADMIN DASHBOARD
+
+Implement role-based authorization:
+
+- VISITOR
+- USER
+- MODERATOR
+- ADMIN
+
+Public registration must never grant moderator or administrator access.
+
+Moderator features:
+- Queue of pending listings.
+- Listing details and image inspection.
+- Approve or reject.
+- Mandatory rejection reason.
+- Review history.
+- Reports queue.
+
+Admin features:
+- User management.
+- Category management.
+- Listing oversight.
+- Moderator management.
+- Basic operational statistics.
+- Audit log inspection.
+
+Create the first administrator through a documented secure bootstrap process using a one-time setup command or protected setup workflow. Never hardcode an administrator password.
+
+Record important moderation and administration actions in audit logs.
+
+# 13. FAVORITES, REPORTS, AND NOTIFICATIONS
+
+Implement:
+- Add/remove favorites.
+- Paginated favorites page.
+- Report a suspicious or prohibited listing.
+- Duplicate report prevention where appropriate.
+- Persistent in-app notifications.
+- Read/unread notification states.
+- Real-time delivery to authorized connected users.
+
+All database writes must enforce ownership and permissions.
+
+# 14. SECURITY
+
+Use defense in depth.
+
+Implement:
+- Server-side validation.
+- Prepared statements.
+- Authentication and authorization middleware or equivalent.
+- CSRF protections where applicable.
+- Rate limiting.
+- Safe error messages.
+- Security headers.
+- XSS protection through safe rendering.
+- Upload validation.
+- Access control for unpublished listings.
+- Protection against mass assignment.
+- Pagination and query limits.
+- No secrets committed to Git.
+- No sensitive information in logs.
+- Dependency audit and lockfile.
+- Abuse-report handling.
+
+Do not claim the application is fully secure solely because these controls exist. Document remaining risks and perform security tests.
+
+# 15. API DESIGN
+
+Create consistent APIs or framework-native server actions with equivalent validation and authorization.
+
+Include operations for:
+- Authentication.
+- Current user and profile.
+- Listing search and details.
+- Listing creation, editing, submission, and status transitions.
+- Image upload.
+- Categories and wilayas.
+- Favorites.
+- Reports.
+- Notifications.
+- Moderation.
+- Administration.
+- Real-time connection establishment.
+
+Use consistent HTTP status codes and error response formats.
+
+Validate pagination, filters, sorting, IDs, and request payloads.
+
+Do not expose unpublished listing data through public endpoints.
+
+# 16. TESTING AND QUALITY GATES
+
+Create tests for:
+- Authentication and session expiration.
+- Role-based permissions.
+- Listing creation and moderation.
+- Public visibility rules.
+- Favorites.
+- Image validation.
+- SQL constraints.
+- API validation.
+- Notification persistence.
+- WebSocket authorization.
+- Real-time delivery.
+- Error handling.
+
+After each phase:
+1. Run formatting checks if configured.
+2. Run lint.
+3. Run TypeScript checks.
+4. Run unit tests.
+5. Run database migration tests.
+6. Run a production build.
+7. Fix failures before continuing.
+
+Use Cloudflare-compatible local development and test tooling.
+
+Never report a test as passed unless it was executed and passed.
+
+# 17. DEPLOYMENT
+
+Prepare a documented Cloudflare-only deployment workflow.
+
+Include:
+- Required account setup.
+- Workers configuration.
+- D1 database creation.
+- R2 bucket creation.
+- Durable Objects bindings and migrations.
+- Environment variables and secrets.
+- Local development.
+- Local D1 migrations and seed data.
+- Remote D1 migrations.
+- Preview deployment.
+- Production deployment.
+- Rollback strategy.
+- Backup and recovery strategy.
+- Usage monitoring.
+
+Use the free workers.dev hostname initially where available. Explain that purchasing a custom domain may cost money.
+
+Do not deploy to production or perform destructive remote operations without explicit approval.
+
+Do not commit `.env` files, tokens, passwords, or Cloudflare credentials.
+
+# 18. DOCUMENTATION
+
+Create:
+- README.md
+- docs/ARCHITECTURE.md
+- docs/DATABASE.md
+- docs/API.md
+- docs/SECURITY.md
+- docs/DEPLOYMENT.md
+- docs/TESTING.md
+- docs/FREE_TIER_LIMITS.md
+
+Document all required commands and the difference between local and production environments.
+
+# 19. EXECUTION ORDER
+
+Execute the project in these phases:
+
+Phase 1: Compatibility audit and architecture decision.
+Phase 2: Scaffold and design system.
+Phase 3: D1 schema and migrations.
+Phase 4: Authentication and profiles.
+Phase 5: Marketplace search and listing pages.
+Phase 6: Listing creation and R2 uploads.
+Phase 7: Moderation and admin dashboard.
+Phase 8: Favorites, reports, and notifications.
+Phase 9: Durable Objects and real-time verification.
+Phase 10: Security, testing, accessibility, and performance.
+Phase 11: Cloudflare deployment and documentation.
+
+Work continuously through the phases when safe. If a missing credential, account permission, compatibility blocker, or destructive operation requires my input, stop only for that specific blocker and explain exactly what I must do.
+
+Do not stop after creating a visual prototype. Implement working features and verify them.
+
+At the end of every phase, report:
+- Files created or modified.
+- Commands executed.
+- Actual test results.
+- Known limitations.
+- Remaining tasks.
+
+# FINAL ACCEPTANCE CRITERIA
+
+The project is complete only when:
+- The application runs locally.
+- The database migrations work.
+- Users can register and log in securely.
+- Sellers can submit listings.
+- Unapproved listings remain private.
+- Moderators can approve or reject listings.
+- Approved listings appear in search.
+- R2 uploads work.
+- Favorites and reports work.
+- Notifications persist.
+- Real-time communication has been tested with separate sessions.
+- The production build passes.
+- Deployment instructions are accurate.
+- No required external paid service is silently introduced.
+
+Begin with Phase 1. Verify compatibility before installing dependencies.
