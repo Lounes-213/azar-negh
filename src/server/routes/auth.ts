@@ -510,184 +510,190 @@ authRoutes.post("/google", async (c) => {
     });
   }
 
-  const body = await parseJson(c, googleAuthSchema);
-  let email = body.email;
-  let name = body.name;
-  let picture: string | null = null;
+  try {
+    const body = await parseJson(c, googleAuthSchema);
+    let email = body.email;
+    let name = body.name;
+    let picture: string | null = null;
 
-  // If Google credential JWT is passed from Google Identity Services, decode payload safely
-  if (body.credential) {
-    try {
-      const parts = body.credential.split(".");
-      const tokenPayload = parts[1];
-      if (tokenPayload) {
-        const payloadJson = atob(tokenPayload.replace(/-/g, "+").replace(/_/g, "/"));
-        const payload = JSON.parse(payloadJson) as {
-          email?: string;
-          name?: string;
-          picture?: string;
-          aud?: string;
-          email_verified?: boolean;
-        };
-        if (payload.email) email = payload.email;
-        if (payload.name) name = payload.name;
-        if (payload.picture) picture = payload.picture;
+    // If Google credential JWT is passed from Google Identity Services, decode payload safely
+    if (body.credential) {
+      try {
+        const parts = body.credential.split(".");
+        const tokenPayload = parts[1];
+        if (tokenPayload) {
+          const payloadJson = atob(tokenPayload.replace(/-/g, "+").replace(/_/g, "/"));
+          const payload = JSON.parse(payloadJson) as {
+            email?: string;
+            name?: string;
+            picture?: string;
+            aud?: string;
+            email_verified?: boolean;
+          };
+          if (payload.email) email = payload.email;
+          if (payload.name) name = payload.name;
+          if (payload.picture) picture = payload.picture;
+        }
+      } catch {
+        // Fallback to explicit fields
       }
-    } catch {
-      // Fallback to explicit fields
     }
-  }
 
-  if (!email) {
-    throw new HttpError(400, "INVALID_GOOGLE_TOKEN", "Adresse e-mail Google introuvable.");
-  }
-  email = email.trim().toLowerCase();
-  const fallbackName = email.split("@")[0] ?? "Utilisateur";
-  name = (name || fallbackName).trim().slice(0, 60);
+    if (!email) {
+      throw new HttpError(400, "INVALID_GOOGLE_TOKEN", "Adresse e-mail Google introuvable.");
+    }
+    email = email.trim().toLowerCase();
+    const fallbackName = email.split("@")[0] ?? "Utilisateur";
+    name = (name || fallbackName).trim().slice(0, 60);
 
-  const ADMIN_EMAILS = [
-    "jokakram1@gmail.com",
-    "admin@azar.dz",
-    "admin@example.dz",
-    "benseba.lounes@gmail.com",
-    "lounes.benseba@gmail.com",
-  ];
-  const isAdminEmail = ADMIN_EMAILS.includes(email);
+    const ADMIN_EMAILS = [
+      "jokakram1@gmail.com",
+      "admin@azar.dz",
+      "admin@example.dz",
+      "benseba.lounes@gmail.com",
+      "lounes.benseba@gmail.com",
+    ];
+    const isAdminEmail = ADMIN_EMAILS.includes(email);
 
-  const now = nowIso();
-  let userRow = await c.env.DB.prepare(
-    `SELECT u.id, u.email, u.role, u.status,
-            p.display_name, p.phone, p.phone_public, p.whatsapp_public, p.wilaya_id, p.bio, p.onboarded_at,
-            p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude, p.opening_hours, p.banner_url
-     FROM users u
-     LEFT JOIN seller_profiles p ON p.user_id = u.id
-     WHERE u.email = ?`,
-  )
-    .bind(email)
-    .first<{
-      id: string;
-      email: string;
-      role: import("../../shared/types").Role;
-      status: "ACTIVE" | "SUSPENDED";
-      display_name: string | null;
-      phone: string | null;
-      phone_public: number | null;
-      whatsapp_public: number | null;
-      wilaya_id: number | null;
-      bio: string | null;
-      onboarded_at: string | null;
-      store_name: string | null;
-      store_slug: string | null;
-      commune: string | null;
-      address: string | null;
-      latitude: number | null;
-      longitude: number | null;
-      opening_hours: string | null;
-      banner_url: string | null;
-    }>();
+    const now = nowIso();
+    let userRow = await c.env.DB.prepare(
+      `SELECT u.id, u.email, u.role, u.status,
+              p.display_name, p.phone, p.phone_public, p.whatsapp_public, p.wilaya_id, p.bio, p.onboarded_at,
+              p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude, p.opening_hours, p.banner_url
+       FROM users u
+       LEFT JOIN seller_profiles p ON p.user_id = u.id
+       WHERE u.email = ?`,
+    )
+      .bind(email)
+      .first<{
+        id: string;
+        email: string;
+        role: import("../../shared/types").Role;
+        status: "ACTIVE" | "SUSPENDED";
+        display_name: string | null;
+        phone: string | null;
+        phone_public: number | null;
+        whatsapp_public: number | null;
+        wilaya_id: number | null;
+        bio: string | null;
+        onboarded_at: string | null;
+        store_name: string | null;
+        store_slug: string | null;
+        commune: string | null;
+        address: string | null;
+        latitude: number | null;
+        longitude: number | null;
+        opening_hours: string | null;
+        banner_url: string | null;
+      }>();
 
-  if (!userRow) {
-    const existingAdmins = await c.env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'",
-    ).first<{ count: number }>();
-    const isFirstUserAdmin = (existingAdmins?.count ?? 0) === 0;
-    const initialRole: import("../../shared/types").Role = isAdminEmail || isFirstUserAdmin ? "ADMIN" : "USER";
+    if (!userRow) {
+      const existingAdmins = await c.env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'",
+      ).first<{ count: number }>();
+      const isFirstUserAdmin = (existingAdmins?.count ?? 0) === 0;
+      const initialRole: import("../../shared/types").Role = isAdminEmail || isFirstUserAdmin ? "ADMIN" : "USER";
 
-    const userId = randomId();
-    const dummyPasswordHash = await hashPassword(randomToken(32));
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        "INSERT INTO users (id, email, password_hash, role, status, auth_provider, avatar_url, created_at, updated_at, last_login_at) VALUES (?, ?, ?, ?, 'ACTIVE', 'GOOGLE', ?, ?, ?, ?)",
-      ).bind(userId, email, dummyPasswordHash, initialRole, picture || null, now, now, now),
-      c.env.DB.prepare(
-        "INSERT INTO seller_profiles (user_id, display_name, phone, phone_public, whatsapp_public, wilaya_id, bio, onboarded_at, created_at, updated_at) VALUES (?, ?, '+213550000000', 0, 0, 16, '', ?, ?, ?)",
-      ).bind(userId, name, now, now, now),
-    ]);
+      const userId = randomId();
+      const dummyPasswordHash = "oauth-google$" + randomId();
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          "INSERT INTO users (id, email, password_hash, role, status, auth_provider, avatar_url, created_at, updated_at, last_login_at) VALUES (?, ?, ?, ?, 'ACTIVE', 'GOOGLE', ?, ?, ?, ?)",
+        ).bind(userId, email, dummyPasswordHash, initialRole, picture || null, now, now, now),
+        c.env.DB.prepare(
+          "INSERT INTO seller_profiles (user_id, display_name, phone, phone_public, whatsapp_public, wilaya_id, bio, onboarded_at, created_at, updated_at) VALUES (?, ?, '+213550000000', 0, 0, 16, '', ?, ?, ?)",
+        ).bind(userId, name, now, now, now),
+      ]);
 
-    userRow = {
-      id: userId,
-      email,
-      role: initialRole,
-      status: "ACTIVE",
-      display_name: name,
-      phone: "+213550000000",
-      phone_public: 0,
-      whatsapp_public: 0,
-      wilaya_id: 16,
-      bio: null,
-      onboarded_at: now,
-      store_name: null,
-      store_slug: null,
-      commune: null,
-      address: null,
-      latitude: null,
-      longitude: null,
-      opening_hours: null,
-      banner_url: null,
+      userRow = {
+        id: userId,
+        email,
+        role: initialRole,
+        status: "ACTIVE",
+        display_name: name,
+        phone: "+213550000000",
+        phone_public: 0,
+        whatsapp_public: 0,
+        wilaya_id: 16,
+        bio: null,
+        onboarded_at: now,
+        store_name: null,
+        store_slug: null,
+        commune: null,
+        address: null,
+        latitude: null,
+        longitude: null,
+        opening_hours: null,
+        banner_url: null,
+      };
+
+      await recordAudit(c.env.DB, {
+        actorId: userId,
+        action: "USER_REGISTERED_GOOGLE",
+        entityType: "user",
+        entityId: userId,
+        ipHash,
+      });
+    } else if (userRow.status !== "ACTIVE") {
+      throw new HttpError(403, "ACCOUNT_SUSPENDED", "Ce compte est suspendu.");
+    } else {
+      // If user is in admin list, ensure role is ADMIN
+      if (isAdminEmail && userRow.role !== "ADMIN") {
+        await c.env.DB.prepare("UPDATE users SET role = 'ADMIN' WHERE id = ?").bind(userRow.id).run();
+        userRow.role = "ADMIN";
+      }
+      if (picture) {
+        await c.env.DB.prepare("UPDATE users SET avatar_url = COALESCE(avatar_url, ?) WHERE id = ?").bind(picture, userRow.id).run();
+      }
+      await c.env.DB.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(now, userRow.id).run();
+    }
+
+    const token = randomToken();
+    const sessionId = await sha256Hex(token);
+    const ttlDays = Number(c.env.SESSION_TTL_DAYS || "14");
+    await c.env.DB.prepare(
+      "INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).bind(
+      sessionId,
+      userRow.id,
+      now,
+      isoAfterDays(ttlDays),
+      now,
+      (c.req.header("user-agent") ?? "").slice(0, 300),
+      ipHash,
+    ).run();
+
+    setSessionCookie(c, token, ttlDays);
+    const csrfToken = await deriveCsrfToken(c.env.SESSION_SECRET, sessionId);
+
+    const authUser: AuthUser = {
+      id: userRow.id,
+      email: userRow.email,
+      role: userRow.role,
+      status: userRow.status,
+      displayName: userRow.display_name,
+      phone: userRow.phone,
+      phonePublic: userRow.phone_public === 1,
+      whatsappPublic: userRow.whatsapp_public === 1,
+      wilayaId: userRow.wilaya_id,
+      bio: userRow.bio,
+      profileComplete: Boolean(userRow.onboarded_at && userRow.display_name && userRow.phone && userRow.wilaya_id),
+      storeName: userRow.store_name,
+      storeSlug: userRow.store_slug,
+      commune: userRow.commune,
+      address: userRow.address,
+      latitude: userRow.latitude,
+      longitude: userRow.longitude,
+      openingHours: userRow.opening_hours,
+      bannerUrl: userRow.banner_url,
     };
 
-    await recordAudit(c.env.DB, {
-      actorId: userId,
-      action: "USER_REGISTERED_GOOGLE",
-      entityType: "user",
-      entityId: userId,
-      ipHash,
-    });
-  } else if (userRow.status !== "ACTIVE") {
-    throw new HttpError(403, "ACCOUNT_SUSPENDED", "Ce compte est suspendu.");
-  } else {
-    // If user is in admin list, ensure role is ADMIN
-    if (isAdminEmail && userRow.role !== "ADMIN") {
-      await c.env.DB.prepare("UPDATE users SET role = 'ADMIN' WHERE id = ?").bind(userRow.id).run();
-      userRow.role = "ADMIN";
-    }
-    if (picture) {
-      await c.env.DB.prepare("UPDATE users SET avatar_url = COALESCE(avatar_url, ?) WHERE id = ?").bind(picture, userRow.id).run();
-    }
-    await c.env.DB.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(now, userRow.id).run();
+    return c.json({ user: serializeUser(authUser, csrfToken) });
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    console.error("GOOGLE_AUTH_ERROR", err);
+    throw new HttpError(400, "GOOGLE_AUTH_FAILED", err instanceof Error ? err.message : "Erreur de connexion Google.");
   }
-
-  const token = randomToken();
-  const sessionId = await sha256Hex(token);
-  const ttlDays = Number(c.env.SESSION_TTL_DAYS || "14");
-  await c.env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).bind(
-    sessionId,
-    userRow.id,
-    now,
-    isoAfterDays(ttlDays),
-    now,
-    (c.req.header("user-agent") ?? "").slice(0, 300),
-    ipHash,
-  ).run();
-
-  setSessionCookie(c, token, ttlDays);
-  const csrfToken = await deriveCsrfToken(c.env.SESSION_SECRET, sessionId);
-
-  const authUser: AuthUser = {
-    id: userRow.id,
-    email: userRow.email,
-    role: userRow.role,
-    status: userRow.status,
-    displayName: userRow.display_name,
-    phone: userRow.phone,
-    phonePublic: userRow.phone_public === 1,
-    whatsappPublic: userRow.whatsapp_public === 1,
-    wilayaId: userRow.wilaya_id,
-    bio: userRow.bio,
-    profileComplete: Boolean(userRow.onboarded_at && userRow.display_name && userRow.phone && userRow.wilaya_id),
-    storeName: userRow.store_name,
-    storeSlug: userRow.store_slug,
-    commune: userRow.commune,
-    address: userRow.address,
-    latitude: userRow.latitude,
-    longitude: userRow.longitude,
-    openingHours: userRow.opening_hours,
-    bannerUrl: userRow.banner_url,
-  };
-
-  return c.json({ user: serializeUser(authUser, csrfToken) });
 });
 
 export { CSRF_HEADER };
