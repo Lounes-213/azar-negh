@@ -4,6 +4,7 @@ import { Icon } from "./Icons";
 import { Avatar } from "./ui";
 import { Logo } from "./Logo";
 import { SearchSuggestions } from "./SearchSuggestions";
+import { AzarBotWidget } from "./AzarBotWidget";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { useRealtime } from "../lib/realtime";
@@ -259,6 +260,7 @@ export function Layout() {
 
         <main id="main" className="shell-content">
           <Outlet />
+          <AzarBotWidget />
         </main>
 
         <footer className="footer">

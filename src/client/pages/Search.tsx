@@ -15,6 +15,7 @@ import { ListingCard } from "../components/ListingCard";
 import { api, errorMessage } from "../lib/api";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
+import { trackCategoryInPersona, trackSearchInPersona, trackWilayaInPersona } from "../lib/persona";
 
 type Mode = "all" | "category" | "wilaya";
 
@@ -133,9 +134,20 @@ export function Search({ mode }: { mode: Mode }) {
   const applyFilters = (event: React.FormEvent) => {
     event.preventDefault();
     const next = new URLSearchParams();
-    if (draft.q.trim()) next.set("q", draft.q.trim());
-    if (draft.category) next.set("category", draft.category);
-    if (draft.wilaya) next.set("wilaya", draft.wilaya);
+    if (draft.q.trim()) {
+      next.set("q", draft.q.trim());
+      trackSearchInPersona(draft.q.trim());
+    }
+    if (draft.category) {
+      next.set("category", draft.category);
+      const cat = categoryOptions.find((o) => String(o.id) === draft.category);
+      if (cat) trackCategoryInPersona(cat.label);
+    }
+    if (draft.wilaya) {
+      next.set("wilaya", draft.wilaya);
+      const wil = meta.data?.wilayas.find((w) => String(w.id) === draft.wilaya);
+      if (wil) trackWilayaInPersona(lang === "ar" ? wil.nameAr : wil.nameFr);
+    }
     if (draft.minPrice) next.set("minPrice", draft.minPrice);
     if (draft.maxPrice) next.set("maxPrice", draft.maxPrice);
     if (draft.condition) next.set("condition", draft.condition);

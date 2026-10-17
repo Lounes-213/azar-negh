@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { trackCategoryInPersona, trackWilayaInPersona } from "../lib/persona";
 import type { ListingDetail as ListingDetailType, ListingSummary } from "../../shared/types";
 import { Icon } from "../components/Icons";
 import {
@@ -51,6 +52,13 @@ export function ListingDetail() {
   );
 
   useDocumentTitle(state.data?.listing.title ?? "Annonce");
+
+  useEffect(() => {
+    if (state.data?.listing) {
+      trackCategoryInPersona(state.data.listing.category.nameFr);
+      trackWilayaInPersona(state.data.listing.wilaya.nameFr);
+    }
+  }, [state.data?.listing]);
 
   if (state.loading) return <Spinner />;
 
