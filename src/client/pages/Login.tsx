@@ -147,11 +147,8 @@ export function Login() {
         {/* Brand & Welcoming Header */}
         <div className="auth-brand-head">
           <Link to="/" className="auth-logo-link" aria-label="Azar Neɣ">
-            <Logo height={42} />
+            <Logo height={44} />
           </Link>
-          <span className="auth-pill-badge">
-            {lang === "ar" ? "🇩🇿 السوق الجزائري 58 ولاية" : "🇩🇿 Marketplace 58 wilayas"}
-          </span>
           <h1 className="auth-title">
             {lang === "ar" ? "تسجيل الدخول السريع" : "Connexion à votre compte"}
           </h1>
@@ -211,11 +208,11 @@ export function Login() {
             {lang === "ar" ? (
               <>
                 بالمتابعة، فإنك توافق على{" "}
-                <Link to="/annonces" className="legal-link">
+                <Link to="/conditions" className="legal-link">
                   شروط الاستخدام
                 </Link>{" "}
                 و{" "}
-                <Link to="/annonces" className="legal-link">
+                <Link to="/confidentialite" className="legal-link">
                   سياسة الخصوصية
                 </Link>{" "}
                 الخاصة بمنصة Azar Neɣ.
@@ -223,11 +220,11 @@ export function Login() {
             ) : (
               <>
                 En continuant, vous acceptez les{" "}
-                <Link to="/annonces" className="legal-link">
+                <Link to="/conditions" className="legal-link">
                   Conditions d'utilisation
                 </Link>{" "}
                 et la{" "}
-                <Link to="/annonces" className="legal-link">
+                <Link to="/confidentialite" className="legal-link">
                   Politique de confidentialité
                 </Link>{" "}
                 d'Azar Neɣ.

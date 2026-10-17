@@ -39,6 +39,7 @@ function serializeUser(user: AuthUser, csrfToken: string | null) {
     role: user.role,
     status: user.status,
     displayName: user.displayName,
+    avatarUrl: user.avatarUrl ?? null,
     phone: user.phone,
     phonePublic: user.phonePublic,
     whatsappPublic: user.whatsappPublic,

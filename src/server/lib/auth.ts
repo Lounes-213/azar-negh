@@ -17,6 +17,7 @@ interface SessionRow {
   email: string;
   role: Role;
   status: "ACTIVE" | "SUSPENDED";
+  avatar_url: string | null;
   display_name: string | null;
   phone: string | null;
   phone_public: number | null;
@@ -40,6 +41,7 @@ function rowToUser(row: SessionRow): AuthUser {
     email: row.email,
     role: row.role,
     status: row.status,
+    avatarUrl: row.avatar_url,
     displayName: row.display_name,
     phone: row.phone,
     phonePublic: row.phone_public === 1,
@@ -75,7 +77,7 @@ export async function authenticateRequest(
   const row = await env.DB.prepare(
     `SELECT
         s.id AS session_id, s.expires_at, s.last_seen_at,
-        u.id AS user_id, u.email, u.role, u.status,
+        u.id AS user_id, u.email, u.role, u.status, u.avatar_url,
         p.display_name, p.phone, p.phone_public, p.whatsapp_public, p.wilaya_id, p.bio, p.onboarded_at,
         p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude, p.opening_hours, p.banner_url
      FROM sessions s

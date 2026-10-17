@@ -22,6 +22,7 @@ export interface AuthUser {
   role: Role;
   status: UserStatus;
   displayName: string | null;
+  avatarUrl?: string | null;
   phone: string | null;
   phonePublic: boolean;
   whatsappPublic: boolean;

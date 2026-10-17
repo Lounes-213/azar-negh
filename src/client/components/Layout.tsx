@@ -111,7 +111,7 @@ export function Layout() {
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
               >
-                <Avatar name={user.displayName ?? user.email} />
+                <Avatar name={user.displayName ?? user.email} imageUrl={user.avatarUrl} />
                 <span className="truncate">
                   <strong>{user.displayName ?? "Mon compte"}</strong>
                   <small className="muted">{connected ? "En direct" : "Hors ligne"}</small>
@@ -200,7 +200,7 @@ export function Layout() {
               <strong>
                 {user ? `Salam, ${(user.displayName ?? "").split(" ")[0] || "vous"}` : "Salam 👋"}
               </strong>
-              <small>Algérie · 58 wilayas</small>
+              <small>Azar Neɣ</small>
             </span>
           </div>
 
@@ -232,7 +232,7 @@ export function Layout() {
             </Link>
             {user ? (
               <Link to="/compte" className="topbar-avatar" aria-label={t("nav.account")}>
-                <Avatar name={user.displayName ?? user.email} />
+                <Avatar name={user.displayName ?? user.email} imageUrl={user.avatarUrl} />
               </Link>
             ) : (
               <Link to="/connexion" className="btn btn-sm topbar-login">
@@ -286,7 +286,15 @@ export function Layout() {
               <span>
                 © {new Date().getFullYear()} Azar Neɣ. {t("footer.rights")}
               </span>
-              <span>DZD · Algérie · 58 wilayas</span>
+              <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+                <Link to="/conditions" className="muted" style={{ fontSize: "12px" }}>
+                  {lang === "ar" ? "شروط الاستخدام" : "Conditions"}
+                </Link>
+                <Link to="/confidentialite" className="muted" style={{ fontSize: "12px" }}>
+                  {lang === "ar" ? "سياسة الخصوصية" : "Confidentialité"}
+                </Link>
+                <span>DZD · Azar Neɣ</span>
+              </div>
             </div>
           </div>
         </footer>

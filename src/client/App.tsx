@@ -18,6 +18,8 @@ import { Moderation } from "./pages/Moderation";
 import { ModerationDetail } from "./pages/ModerationDetail";
 import { Reports } from "./pages/Reports";
 import { Admin } from "./pages/Admin";
+import { Terms } from "./pages/Terms";
+import { Privacy } from "./pages/Privacy";
 import { NotFound } from "./pages/NotFound";
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
@@ -74,6 +76,8 @@ export function App() {
           <Route path="vendeurs/:id" element={<Seller />} />
           <Route path="boutique/:id" element={<Seller />} />
           <Route path="connexion" element={<Login />} />
+          <Route path="conditions" element={<Terms />} />
+          <Route path="confidentialite" element={<Privacy />} />
           <Route
             path="compte"
             element={

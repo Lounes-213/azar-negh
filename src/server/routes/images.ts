@@ -242,3 +242,90 @@ imageRoutes.get("/images/:id", async (c) => {
   if (!isPublic) headers.set("Vary", "Cookie");
   return new Response(object.body, { headers });
 });
+
+// Profile avatar endpoints
+imageRoutes.get("/images/avatar/:userId/:filename", async (c) => {
+  const userId = c.req.param("userId");
+  const filename = c.req.param("filename");
+  const key = `avatars/${userId}/${filename}`;
+  const object = await c.env.IMAGES.get(key);
+  if (!object) throw new HttpError(404, "NOT_FOUND", "Avatar introuvable.");
+
+  const headers = new Headers();
+  headers.set("Content-Type", object.httpMetadata?.contentType || "image/jpeg");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Content-Disposition", "inline");
+  headers.set("Cache-Control", "public, max-age=86400");
+  return new Response(object.body, { headers });
+});
+
+imageRoutes.post("/account/avatar", async (c) => {
+  const user = requireUser(c);
+  assertCsrf(c);
+
+  let form: FormData;
+  try {
+    form = await c.req.formData();
+  } catch {
+    throw new HttpError(400, "INVALID_FORM", "Envoi multipart invalide.");
+  }
+  const file = form.get("file");
+  if (!(file instanceof File)) {
+    throw new HttpError(422, "MISSING_FILE", "Aucun fichier reçu.");
+  }
+  const maxBytes = 5 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new HttpError(413, "FILE_TOO_LARGE", "Image trop lourde (5 Mo maximum).");
+  }
+
+  const buffer = await file.arrayBuffer();
+  const mime = assertImagePayload(new Uint8Array(buffer), file.type, maxBytes);
+  const ext = extensionFor(mime);
+  const fileId = randomId();
+  const newKey = `avatars/${user.id}/${fileId}.${ext}`;
+
+  // If old avatar was stored in R2, delete it immediately to free space
+  const currentUser = await c.env.DB.prepare("SELECT avatar_url FROM users WHERE id = ?")
+    .bind(user.id)
+    .first<{ avatar_url: string | null }>();
+  if (currentUser?.avatar_url && currentUser.avatar_url.includes("/api/images/avatar/")) {
+    const parts = currentUser.avatar_url.split("/api/images/avatar/")[1];
+    if (parts) {
+      await deleteR2Object(c.env, `avatars/${parts}`);
+    }
+  }
+
+  // Upload new avatar to R2
+  await c.env.IMAGES.put(newKey, buffer, {
+    httpMetadata: { contentType: mime, cacheControl: "public, max-age=86400" },
+    customMetadata: { uploader: user.id },
+  });
+
+  const newAvatarUrl = `/api/images/avatar/${user.id}/${fileId}.${ext}`;
+  await c.env.DB.prepare("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?")
+    .bind(newAvatarUrl, nowIso(), user.id)
+    .run();
+
+  return c.json({ avatarUrl: newAvatarUrl });
+});
+
+imageRoutes.delete("/account/avatar", async (c) => {
+  const user = requireUser(c);
+  assertCsrf(c);
+
+  const currentUser = await c.env.DB.prepare("SELECT avatar_url FROM users WHERE id = ?")
+    .bind(user.id)
+    .first<{ avatar_url: string | null }>();
+  if (currentUser?.avatar_url && currentUser.avatar_url.includes("/api/images/avatar/")) {
+    const parts = currentUser.avatar_url.split("/api/images/avatar/")[1];
+    if (parts) {
+      await deleteR2Object(c.env, `avatars/${parts}`);
+    }
+  }
+
+  await c.env.DB.prepare("UPDATE users SET avatar_url = NULL, updated_at = ? WHERE id = ?")
+    .bind(nowIso(), user.id)
+    .run();
+
+  return c.json({ avatarUrl: null });
+});

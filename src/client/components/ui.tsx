@@ -426,13 +426,39 @@ export function PageHead({
   );
 }
 
-export function Avatar({ name, size }: { name: string | null | undefined; size?: "lg" | "xl" }) {
+export function Avatar({
+  name,
+  imageUrl,
+  size,
+}: {
+  name: string | null | undefined;
+  imageUrl?: string | null;
+  size?: "lg" | "xl";
+}) {
+  const [imgError, setImgError] = useState(false);
   const initials = (name ?? "?")
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+
+  if (imageUrl && !imgError) {
+    return (
+      <span
+        className={`avatar ${size === "xl" ? "avatar-xl" : size === "lg" ? "avatar-lg" : ""}`}
+        style={{ padding: 0, overflow: "hidden", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+      >
+        <img
+          src={imageUrl}
+          alt={name ?? "Avatar"}
+          onError={() => setImgError(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }}
+        />
+      </span>
+    );
+  }
+
   return (
     <span
       className={`avatar ${size === "xl" ? "avatar-xl" : size === "lg" ? "avatar-lg" : ""}`}
