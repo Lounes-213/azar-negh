@@ -17,47 +17,53 @@ export const aiRoutes = new Hono<AppEnv>();
  * Loads a compact, token-efficient serialization of approved listings for AI reasoning.
  */
 async function loadCatalogContext(db: D1Database, query?: string): Promise<string> {
-  const where =
-    query && query.trim()
-      ? "l.status = 'APPROVED' AND (l.title LIKE ? OR l.description LIKE ?)"
-      : "l.status = 'APPROVED'";
-  const params = query && query.trim() ? [`%${query.trim()}%`, `%${query.trim()}%`] : [];
+  try {
+    const cleanQuery = (query || "").replace(/[%_]/g, " ").trim();
+    const where =
+      cleanQuery.length >= 2
+        ? "l.status = 'APPROVED' AND (l.title LIKE ? OR l.description LIKE ?)"
+        : "l.status = 'APPROVED'";
+    const params = cleanQuery.length >= 2 ? [`%${cleanQuery}%`, `%${cleanQuery}%`] : [];
 
-  const rows = await db
-    .prepare(
-      `SELECT l.id, l.title, l.price_da, l.condition, l.item_type,
-              w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
-              cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar
-       FROM listings l
-       JOIN wilayas w ON w.id = l.wilaya_id
-       JOIN categories cat ON cat.id = l.category_id
-       WHERE ${where}
-       ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-       LIMIT 25`,
-    )
-    .bind(...params)
-    .all<{
-      id: string;
-      title: string;
-      price_da: number;
-      condition: string;
-      item_type: string;
-      wilaya_name_fr: string;
-      wilaya_name_ar: string;
-      category_name_fr: string;
-      category_name_ar: string;
-    }>();
+    const rows = await db
+      .prepare(
+        `SELECT l.id, l.title, l.price_da, l.condition, l.item_type,
+                w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+                cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar
+         FROM listings l
+         LEFT JOIN wilayas w ON w.id = l.wilaya_id
+         LEFT JOIN categories cat ON cat.id = l.category_id
+         WHERE ${where}
+         ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
+         LIMIT 25`,
+      )
+      .bind(...params)
+      .all<{
+        id: string;
+        title: string;
+        price_da: number;
+        condition: string;
+        item_type: string;
+        wilaya_name_fr: string;
+        wilaya_name_ar: string;
+        category_name_fr: string;
+        category_name_ar: string;
+      }>();
 
-  if (!rows.results || rows.results.length === 0) {
-    return "لا توجد منتجات مسجلة حالياً تطابق هذا الطلب.";
+    if (!rows.results || rows.results.length === 0) {
+      return "لا توجد منتجات مسجلة حالياً تطابق هذا الطلب.";
+    }
+
+    return rows.results
+      .map(
+        (r) =>
+          `- [${r.title}](/annonces/${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} | الحالة: ${r.condition || ""}`,
+      )
+      .join("\n");
+  } catch (err) {
+    console.error("loadCatalogContext error:", err);
+    return "لا توجد منتجات مسجلة حالياً.";
   }
-
-  return rows.results
-    .map(
-      (r) =>
-        `- [${r.title}](/annonces/${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar} (${r.wilaya_name_fr}) | الفئة: ${r.category_name_ar} | الحالة: ${r.condition}`,
-    )
-    .join("\n");
 }
 
 const chatSchema = z.object({
@@ -88,12 +94,17 @@ const chatSchema = z.object({
 aiRoutes.post("/ai/chat", async (c) => {
   const user = c.get("user");
   const ip = requestIp(c);
-  const actorKey = user ? `user:${user.id}` : `ip:${await hashIp(c.env, ip)}`;
+  const actorKey = user ? `user:${user.id}` : `ip:${c.get("ipHash") || (await hashIp(c.env, ip))}`;
 
   // Rate limit: 30 chat messages per 10 minutes (prevents bot abuse while allowing fluid discussion)
-  const limit = await consumeRateLimit(c.env.DB, `ai:chat:${actorKey}`, 30, 600);
-  if (!limit.ok) {
-    throw new HttpError(429, "RATE_LIMITED", "Veuillez patienter un moment avant de renvoyer un message.");
+  try {
+    const limit = await consumeRateLimit(c.env.DB, `ai:chat:${actorKey}`, 30, 600);
+    if (!limit.ok) {
+      throw new HttpError(429, "RATE_LIMITED", "Veuillez patienter un moment avant de renvoyer un message.");
+    }
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    // Database rate limit table degradation fallback: continue gracefully
   }
 
   let raw: any;
@@ -123,15 +134,25 @@ aiRoutes.post("/ai/chat", async (c) => {
   // Extract keywords to retrieve matching catalog slice
   const catalogContext = await loadCatalogContext(c.env.DB, lastUserMsg.slice(0, 40));
 
-  const reply = await chatWithAzarBot(
-    c.env,
-    input.messages,
-    catalogContext,
-    input.userPersona,
-    input.lang || "ar",
-  );
+  try {
+    const reply = await chatWithAzarBot(
+      c.env,
+      input.messages,
+      catalogContext,
+      input.userPersona,
+      input.lang || "ar",
+    );
 
-  return c.json({ reply });
+    return c.json({ reply });
+  } catch (err) {
+    console.error("chatWithAzarBot error:", err);
+    return c.json({
+      reply:
+        input.lang === "ar"
+          ? "مرحباً بك! أنا مساعد آزار الذكي. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟"
+          : "Bonjour ! Je suis l'assistant Azar Bot. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?",
+    });
+  }
 });
 
 const aiAssistSchema = z.object({
