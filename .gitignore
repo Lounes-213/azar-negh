@@ -12,3 +12,5 @@ coverage/
 .scratch/
 .vercel/
 .freebuff/
+
+.vercel
