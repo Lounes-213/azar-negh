@@ -42,7 +42,7 @@ function getGeminiKeys(env: Env): string[] {
 }
 
 /**
- * Executes a Gemini request with model gemini-3.8-flash and round-robin key rotation across the 5 keys pool.
+ * Executes a Gemini request with model gemini-3.8-flash (and auto-failover to gemini-3.5-flash if 3.8 hits Google Free Tier 429 quota limits).
  */
 async function callGemini(
   env: Env,
@@ -52,51 +52,53 @@ async function callGemini(
   const keys = getGeminiKeys(env);
   if (keys.length === 0) return null;
 
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+  const modelsToTry = [env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.5-flash"];
 
-  // Try each key in the pool (5 keys)
-  for (let attempt = 0; attempt < keys.length; attempt++) {
-    const key = keys[(currentKeyIndex + attempt) % keys.length];
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-      const payload: any = {
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 900,
-        },
-      };
-
-      if (systemInstruction) {
-        payload.systemInstruction = {
-          parts: [{ text: systemInstruction }],
+  for (const model of modelsToTry) {
+    // Try each key in the pool (5 keys)
+    for (let attempt = 0; attempt < keys.length; attempt++) {
+      const key = keys[(currentKeyIndex + attempt) % keys.length];
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const payload: any = {
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 900,
+          },
         };
-      }
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+        if (systemInstruction) {
+          payload.systemInstruction = {
+            parts: [{ text: systemInstruction }],
+          };
+        }
 
-      if (res.status === 429 || res.status === 403 || res.status === 503) {
-        // Quota or temporary busy for this key, advance index and try next key
-        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.status === 429 || res.status === 403 || res.status === 503) {
+          // Quota or temporary busy for this key, advance index and try next key
+          currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+          continue;
+        }
+
+        if (!res.ok) {
+          continue;
+        }
+
+        const data = (await res.json()) as any;
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text && typeof text === "string") {
+          currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
+          return text.trim();
+        }
+      } catch {
         continue;
       }
-
-      if (!res.ok) {
-        continue;
-      }
-
-      const data = (await res.json()) as any;
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && typeof text === "string") {
-        currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
-        return text.trim();
-      }
-    } catch {
-      continue;
     }
   }
 
