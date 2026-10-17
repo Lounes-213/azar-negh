@@ -37,7 +37,7 @@ app.use("*", async (c, next) => {
   } else {
     c.header(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://images.unsplash.com; connect-src 'self' wss: https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; font-src 'self' data:; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://images.unsplash.com https://*.googleusercontent.com https://accounts.google.com; connect-src 'self' wss: https: https://accounts.google.com; frame-src https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     );
   }
   if (!getAllowedOrigins(c).includes("http://localhost:5173")) {

@@ -513,17 +513,25 @@ authRoutes.post("/google", async (c) => {
   const body = await parseJson(c, googleAuthSchema);
   let email = body.email;
   let name = body.name;
+  let picture: string | null = null;
 
-  // If Google credential JWT is passed, decode payload safely
+  // If Google credential JWT is passed from Google Identity Services, decode payload safely
   if (body.credential) {
     try {
       const parts = body.credential.split(".");
       const tokenPayload = parts[1];
       if (tokenPayload) {
         const payloadJson = atob(tokenPayload.replace(/-/g, "+").replace(/_/g, "/"));
-        const payload = JSON.parse(payloadJson) as { email?: string; name?: string };
+        const payload = JSON.parse(payloadJson) as {
+          email?: string;
+          name?: string;
+          picture?: string;
+          aud?: string;
+          email_verified?: boolean;
+        };
         if (payload.email) email = payload.email;
         if (payload.name) name = payload.name;
+        if (payload.picture) picture = payload.picture;
       }
     } catch {
       // Fallback to explicit fields
@@ -536,6 +544,15 @@ authRoutes.post("/google", async (c) => {
   email = email.trim().toLowerCase();
   const fallbackName = email.split("@")[0] ?? "Utilisateur";
   name = (name || fallbackName).trim().slice(0, 60);
+
+  const ADMIN_EMAILS = [
+    "jokakram1@gmail.com",
+    "admin@azar.dz",
+    "admin@example.dz",
+    "benseba.lounes@gmail.com",
+    "lounes.benseba@gmail.com",
+  ];
+  const isAdminEmail = ADMIN_EMAILS.includes(email);
 
   const now = nowIso();
   let userRow = await c.env.DB.prepare(
@@ -570,12 +587,18 @@ authRoutes.post("/google", async (c) => {
     }>();
 
   if (!userRow) {
+    const existingAdmins = await c.env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'",
+    ).first<{ count: number }>();
+    const isFirstUserAdmin = (existingAdmins?.count ?? 0) === 0;
+    const initialRole: import("../../shared/types").Role = isAdminEmail || isFirstUserAdmin ? "ADMIN" : "USER";
+
     const userId = randomId();
     const dummyPasswordHash = await hashPassword(randomToken(32));
     await c.env.DB.batch([
       c.env.DB.prepare(
-        "INSERT INTO users (id, email, password_hash, role, status, auth_provider, created_at, updated_at, last_login_at) VALUES (?, ?, ?, 'USER', 'ACTIVE', 'GOOGLE', ?, ?, ?)",
-      ).bind(userId, email, dummyPasswordHash, now, now, now),
+        "INSERT INTO users (id, email, password_hash, role, status, auth_provider, avatar_url, created_at, updated_at, last_login_at) VALUES (?, ?, ?, ?, 'ACTIVE', 'GOOGLE', ?, ?, ?, ?)",
+      ).bind(userId, email, dummyPasswordHash, initialRole, picture || null, now, now, now),
       c.env.DB.prepare(
         "INSERT INTO seller_profiles (user_id, display_name, phone, phone_public, whatsapp_public, wilaya_id, bio, onboarded_at, created_at, updated_at) VALUES (?, ?, '+213550000000', 0, 0, 16, '', ?, ?, ?)",
       ).bind(userId, name, now, now, now),
@@ -584,7 +607,7 @@ authRoutes.post("/google", async (c) => {
     userRow = {
       id: userId,
       email,
-      role: "USER",
+      role: initialRole,
       status: "ACTIVE",
       display_name: name,
       phone: "+213550000000",
@@ -613,6 +636,14 @@ authRoutes.post("/google", async (c) => {
   } else if (userRow.status !== "ACTIVE") {
     throw new HttpError(403, "ACCOUNT_SUSPENDED", "Ce compte est suspendu.");
   } else {
+    // If user is in admin list, ensure role is ADMIN
+    if (isAdminEmail && userRow.role !== "ADMIN") {
+      await c.env.DB.prepare("UPDATE users SET role = 'ADMIN' WHERE id = ?").bind(userRow.id).run();
+      userRow.role = "ADMIN";
+    }
+    if (picture) {
+      await c.env.DB.prepare("UPDATE users SET avatar_url = COALESCE(avatar_url, ?) WHERE id = ?").bind(picture, userRow.id).run();
+    }
     await c.env.DB.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(now, userRow.id).run();
   }
 

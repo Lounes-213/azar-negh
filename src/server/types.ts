@@ -12,6 +12,8 @@ export interface Env {
   MAX_IMAGE_BYTES: string;
   /** HMAC + CSRF signing secret. Set with `wrangler secret put SESSION_SECRET`. */
   SESSION_SECRET: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export interface AuthUser {
