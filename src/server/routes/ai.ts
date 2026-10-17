@@ -65,17 +65,18 @@ const chatSchema = z.object({
     .array(
       z.object({
         role: z.enum(["user", "model"]),
-        content: z.string().max(1200),
+        content: z.string().max(4000),
       }),
     )
     .min(1)
-    .max(25),
+    .max(50),
   userPersona: z
     .object({
-      preferredWilaya: z.string().max(60).optional(),
-      recentSearches: z.array(z.string().max(60)).max(10).optional(),
-      favoriteCategories: z.array(z.string().max(60)).max(10).optional(),
+      preferredWilaya: z.string().max(100).optional(),
+      recentSearches: z.array(z.string().max(100)).optional(),
+      favoriteCategories: z.array(z.string().max(100)).optional(),
     })
+    .passthrough()
     .optional(),
   lang: z.enum(["fr", "ar"]).optional(),
 });
@@ -95,7 +96,28 @@ aiRoutes.post("/ai/chat", async (c) => {
     throw new HttpError(429, "RATE_LIMITED", "Veuillez patienter un moment avant de renvoyer un message.");
   }
 
-  const input = await parseJson(c, chatSchema);
+  let raw: any;
+  try {
+    raw = await c.req.json();
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        // keep raw
+      }
+    }
+  } catch {
+    throw new HttpError(400, "INVALID_JSON", "Le corps de la requête doit être un JSON valide.");
+  }
+
+  const parsed = chatSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new HttpError(422, "VALIDATION_ERROR", "Données invalides.", {
+      fields: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+    });
+  }
+  const input = parsed.data;
+
   const lastUserMsg = [...input.messages].reverse().find((m) => m.role === "user")?.content || "";
 
   // Extract keywords to retrieve matching catalog slice

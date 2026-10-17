@@ -17,7 +17,7 @@ function getDecodedDefaultKeys(): string[] {
   }
 }
 
-const MODELS_PRIORITY = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite"];
+const MODELS_PRIORITY = ["gemini-3.8-flash"];
 
 let currentKeyIndex = 0;
 
@@ -42,7 +42,7 @@ function getGeminiKeys(env: Env): string[] {
 }
 
 /**
- * Executes a Gemini request with model failover and round-robin key rotation across the 5 keys.
+ * Executes a Gemini request with model gemini-3.8-flash and round-robin key rotation across the 5 keys pool.
  */
 async function callGemini(
   env: Env,
@@ -52,57 +52,51 @@ async function callGemini(
   const keys = getGeminiKeys(env);
   if (keys.length === 0) return null;
 
-  // Try each model in priority order (3.8-flash -> 3.5-flash)
-  for (const model of MODELS_PRIORITY) {
-    // Try each key in the pool if rate-limited or error
-    for (let attempt = 0; attempt < keys.length; attempt++) {
-      const key = keys[(currentKeyIndex + attempt) % keys.length];
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-        const payload: any = {
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 800,
-          },
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+
+  // Try each key in the pool (5 keys)
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const key = keys[(currentKeyIndex + attempt) % keys.length];
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const payload: any = {
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 900,
+        },
+      };
+
+      if (systemInstruction) {
+        payload.systemInstruction = {
+          parts: [{ text: systemInstruction }],
         };
+      }
 
-        if (systemInstruction) {
-          payload.systemInstruction = {
-            parts: [{ text: systemInstruction }],
-          };
-        }
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.status === 429 || res.status === 403) {
-          // Advance key on rate limit
-          currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-          continue;
-        }
-
-        if (res.status === 503 || res.status === 404) {
-          // Model temporary high demand or not found, try next model
-          break;
-        }
-
-        if (!res.ok) {
-          continue;
-        }
-
-        const data = (await res.json()) as any;
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && typeof text === "string") {
-          currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
-          return text.trim();
-        }
-      } catch {
+      if (res.status === 429 || res.status === 403 || res.status === 503) {
+        // Quota or temporary busy for this key, advance index and try next key
+        currentKeyIndex = (currentKeyIndex + 1) % keys.length;
         continue;
       }
+
+      if (!res.ok) {
+        continue;
+      }
+
+      const data = (await res.json()) as any;
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text && typeof text === "string") {
+        currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
+        return text.trim();
+      }
+    } catch {
+      continue;
     }
   }
 
@@ -170,9 +164,9 @@ ${catalogContext || "لا توجد منتجات مسجلة حالياً."}
 
   // Smart fallback if API is temporarily unavailable
   if (isAr) {
-    return "مرحباً بك! أنا مساعد آزار الذكي 🤖. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟";
+    return "مرحباً بك! أنا مساعد آزار الذكي. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟";
   }
-  return "Bonjour ! Je suis l'assistant Azar Bot 🤖. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?";
+  return "Bonjour ! Je suis l'assistant Azar Bot. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?";
 }
 
 export interface GenerateDescriptionInput {

@@ -54,9 +54,27 @@ export function AzarBotWidget() {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasPromptedGreeting, setHasPromptedGreeting] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Smooth automatic collapse after 3.8s and on scroll
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsCollapsed(true);
+    }, 3800);
+
+    const onScroll = () => {
+      setIsCollapsed(true);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
 
   // Load chat history from client localStorage (zero DB writes)
   useEffect(() => {
@@ -65,15 +83,13 @@ export function AzarBotWidget() {
       if (raw) {
         setMessages(JSON.parse(raw));
       } else {
-        // Default welcoming message
+        // Clean default welcoming message without emojis
         const initial: Message = {
           id: "welcome",
           role: "model",
           content: isAr
-            ? `مرحباً بك${user ? ` ${user.displayName || ""}` : ""}! أنا آزار بوت 🤖، مساعدك الذكي للتسوق في الجزائر.
-اسألني عن أي منتج، قارن الأسعار، أو اطلب توصية ذكية تناسب ميزانيتك وولايتك!`
-            : `Bonjour${user ? ` ${user.displayName || ""}` : ""} ! Je suis Azar Bot 🤖, votre assistant shopping intelligent.
-Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandation personnalisée !`,
+            ? `مرحباً بك${user ? ` ${user.displayName || ""}` : ""}! أنا آزار بوت، مساعدك الذكي للتسوق في الجزائر.\nاسألني عن أي منتج، قارن الأسعار، أو اطلب توصية ذكية تناسب ميزانيتك وولايتك.`
+            : `Bonjour${user ? ` ${user.displayName || ""}` : ""} ! Je suis Azar Bot, votre assistant shopping intelligent.\nPosez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandation personnalisée !`,
           createdAt: Date.now(),
         };
         setMessages([initial]);
@@ -105,7 +121,7 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
     const resetMsg: Message = {
       id: "reset",
       role: "model",
-      content: isAr ? "تم مسح المحادثة. كيف يمكنني مساعدتك الآن؟ 🤖" : "Discussion effacée. Que puis-je chercher pour vous ? 🤖",
+      content: isAr ? "تم مسح المحادثة. كيف يمكنني مساعدتك الآن؟" : "Discussion effacée. Que puis-je chercher pour vous ?",
       createdAt: Date.now(),
     };
     setMessages([resetMsg]);
@@ -143,9 +159,10 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
         lang: isAr ? "ar" : "fr",
       };
 
+      // Direct object payload (api helper handles JSON.stringify without double-encoding)
       const res = await api<{ reply: string }>("/ai/chat", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: payload,
       });
 
       const botMsg: Message = {
@@ -160,33 +177,34 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
       const errorMsg: Message = {
         id: `err_${Date.now()}`,
         role: "model",
-        content: `⚠️ ${errorMessage(err)}`,
+        content: errorMessage(err),
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
 
   const quickPrompts = isAr
-    ? ["📱 أفضل الهواتف اليوم", "🚗 سيارات بأفضل سعر", "🛡️ نصائح الشراء الآمن"]
-    : ["📱 Meilleurs smartphones", "🚗 Voitures bon prix", "🛡️ Conseils d'achat"];
+    ? ["أفضل الهواتف", "سيارات بأفضل سعر", "نصائح الشراء الآمن"]
+    : ["Meilleurs smartphones", "Voitures bon prix", "Conseils d'achat"];
 
   return (
     <div className={`azarbot-widget-container ${isAr ? "is-rtl" : ""}`}>
-      {/* Floating Animated Robot Mascot Button */}
+      {/* Floating Animated Mascot Button */}
       {!isOpen ? (
         <button
           type="button"
-          className="azarbot-launcher-btn"
+          className={`azarbot-launcher-btn ${isCollapsed ? "is-collapsed" : ""}`}
           onClick={() => {
             setIsOpen(true);
             setHasPromptedGreeting(true);
           }}
+          onMouseEnter={() => setIsCollapsed(false)}
+          onMouseLeave={() => setIsCollapsed(true)}
           aria-label="Ouvrir l'assistant Azar Bot"
-          title="Azar Bot — Assistant Shopping IA"
+          title="Azar Bot — Assistant Shopping"
         >
           <div className="azarbot-robot-avatar">
             <svg viewBox="0 0 48 48" width="34" height="34" fill="none">
@@ -200,7 +218,7 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
               {/* Glowing Eyes */}
               <circle cx="18" cy="26" r="3" fill="#6ee7b7" className="robot-eye" />
               <circle cx="30" cy="26" r="3" fill="#6ee7b7" className="robot-eye" />
-              {/* Smile / Mouth */}
+              {/* Smile */}
               <path d="M21 31c1 1 5 1 6 0" stroke="#a7f3d0" strokeWidth="1.8" strokeLinecap="round" />
               {/* Ears */}
               <rect x="4" y="23" width="4" height="7" rx="2" fill="#059669" />
@@ -213,18 +231,18 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
             <span>Azar Bot</span>
           </span>
 
-          {!hasPromptedGreeting ? (
+          {!hasPromptedGreeting && !isCollapsed ? (
             <div className="azarbot-greeting-pill">
-              {isAr ? "خصك سلعة؟ راني هنا 🤖" : "Besoin d'aide ? 🤖"}
+              {isAr ? "خصك سلعة؟ راني هنا" : "Besoin d'aide ?"}
             </div>
           ) : null}
         </button>
       ) : null}
 
-      {/* Floating Chat Modal Panel */}
+      {/* Spacious Floating Chat Modal Panel */}
       {isOpen ? (
         <div className="azarbot-panel" role="dialog" aria-labelledby="azarbot-title">
-          {/* Header */}
+          {/* Header with clean logo and X close button */}
           <div className="azarbot-header">
             <div className="azarbot-header-info">
               <div className="azarbot-header-avatar">
@@ -240,10 +258,10 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
               </div>
               <div>
                 <h3 id="azarbot-title" className="azarbot-header-name">
-                  Azar Bot 🤖
+                  Azar Bot
                 </h3>
                 <small className="azarbot-header-desc">
-                  {isAr ? "مساعد التسوق والمنتجات الذكي" : "Assistant shopping intelligent"}
+                  {isAr ? "مساعد التسوق الذكي" : "Assistant shopping intelligent"}
                 </small>
               </div>
             </div>
@@ -254,27 +272,26 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
                 className="azarbot-icon-btn"
                 onClick={clearChat}
                 title={isAr ? "مسح المحادثة" : "Effacer la conversation"}
+                aria-label="Effacer"
               >
-                <Icon name="trash" size={15} />
+                <Icon name="trash" size={16} />
               </button>
               <button
                 type="button"
                 className="azarbot-icon-btn close-btn"
                 onClick={() => setIsOpen(false)}
                 title={isAr ? "إغلاق" : "Fermer"}
+                aria-label="Fermer"
               >
-                <Icon name="close" size={16} />
+                <Icon name="x" size={18} />
               </button>
             </div>
           </div>
 
-          {/* Messages Feed */}
+          {/* Messages Feed (No repeating robot icons on bubbles) */}
           <div className="azarbot-body">
             {messages.map((msg) => (
               <div key={msg.id} className={`azarbot-message-row ${msg.role === "user" ? "user-row" : "bot-row"}`}>
-                {msg.role === "model" ? (
-                  <div className="azarbot-msg-bot-avatar">🤖</div>
-                ) : null}
                 <div className={`azarbot-bubble ${msg.role === "user" ? "user-bubble" : "bot-bubble"}`}>
                   <div className="azarbot-bubble-content">
                     {renderMarkdownWithLinks(msg.content)}
@@ -285,7 +302,6 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
 
             {loading ? (
               <div className="azarbot-message-row bot-row">
-                <div className="azarbot-msg-bot-avatar">🤖</div>
                 <div className="azarbot-bubble bot-bubble loading-bubble">
                   <span className="dot" />
                   <span className="dot" />
@@ -311,7 +327,7 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
             ))}
           </div>
 
-          {/* Input Box */}
+          {/* Input Box (NO autoFocus so mobile keyboard doesn't pop up immediately) */}
           <form
             className="azarbot-footer"
             onSubmit={(e) => {
@@ -327,7 +343,7 @@ Posez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandati
               onChange={(e) => setInput(e.target.value)}
               placeholder={isAr ? "اسأل آزار عن سلعة، سعر، أو ولاية..." : "Posez une question sur un produit..."}
               maxLength={400}
-              autoFocus
+              autoFocus={false}
             />
             <button
               type="submit"

@@ -3132,21 +3132,59 @@ ol {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px 6px 6px;
+  padding: 6px 16px 6px 6px;
   background: var(--surface);
   border: 1.5px solid var(--brand-400);
   border-radius: var(--radius-pill);
-  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.28), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px -4px rgba(16, 185, 129, 0.32), 0 4px 10px -2px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   position: relative;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
-  animation: robotFloat 3s ease-in-out infinite;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: robotFloat 3.5s ease-in-out infinite;
 }
 
 .azarbot-launcher-btn:hover {
   transform: translateY(-4px) scale(1.03);
-  box-shadow: 0 12px 28px -4px rgba(16, 185, 129, 0.38), 0 6px 14px -2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 28px -4px rgba(16, 185, 129, 0.42), 0 6px 14px -2px rgba(0, 0, 0, 0.1);
   border-color: var(--brand-500);
+}
+
+/* Morph into circle when collapsed */
+.azarbot-launcher-btn.is-collapsed {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+  gap: 0;
+}
+
+.azarbot-launcher-btn.is-collapsed .azarbot-launcher-label {
+  max-width: 0;
+  opacity: 0;
+  transform: scale(0.85);
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.azarbot-launcher-btn.is-collapsed .azarbot-greeting-pill {
+  opacity: 0;
+  transform: translateY(6px) scale(0.9);
+  pointer-events: none;
+}
+
+.azarbot-launcher-btn.is-collapsed:hover {
+  width: auto;
+  padding: 6px 16px 6px 6px;
+  border-radius: var(--radius-pill);
+  gap: 10px;
+}
+
+.azarbot-launcher-btn.is-collapsed:hover .azarbot-launcher-label {
+  max-width: 140px;
+  opacity: 1;
+  transform: scale(1);
 }
 
 @keyframes robotFloat {
@@ -3160,12 +3198,13 @@ ol {
 
 .azarbot-robot-avatar {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: rgba(16, 185, 129, 0.12);
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .robot-eye {
@@ -3197,6 +3236,12 @@ ol {
   font-size: var(--text-sm);
   color: var(--brand-700);
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  max-width: 140px;
+  opacity: 1;
+  overflow: hidden;
+  display: inline-block;
+  transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, transform 0.3s ease;
 }
 
 .azarbot-greeting-pill {
@@ -3213,13 +3258,14 @@ ol {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
   animation: fadeInPill 0.3s ease-out;
   pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .azarbot-greeting-pill::after {
   content: "";
   position: absolute;
   top: 100%;
-  inset-inline-end: 20px;
+  inset-inline-end: 18px;
   border-width: 5px;
   border-style: solid;
   border-color: var(--ink) transparent transparent transparent;
@@ -3236,20 +3282,35 @@ ol {
   }
 }
 
-/* Chat Panel */
+/* Chat Panel - Large & Spacious */
 .azarbot-panel {
-  width: 380px;
+  width: 440px;
   max-width: calc(100vw - 32px);
-  height: 540px;
-  max-height: calc(100vh - 120px);
+  height: 640px;
+  max-height: calc(100vh - 100px);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 20px;
-  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.2), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: panelSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: panelSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1000;
+}
+
+@media (max-width: 640px) {
+  .azarbot-panel {
+    position: fixed;
+    inset-inline-start: 10px;
+    inset-inline-end: 10px;
+    bottom: calc(var(--tabbar-height) + 10px);
+    width: auto;
+    max-width: none;
+    height: calc(100dvh - var(--header-height) - var(--tabbar-height) - 24px);
+    max-height: 84vh;
+    border-radius: 20px;
+  }
 }
 
 @keyframes panelSlideIn {
@@ -3264,7 +3325,7 @@ ol {
 }
 
 .azarbot-header {
-  padding: 12px 16px;
+  padding: 14px 18px;
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.03));
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -3275,13 +3336,13 @@ ol {
 .azarbot-header-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .azarbot-header-avatar {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: var(--surface);
   border: 1.5px solid var(--brand-300);
@@ -3301,14 +3362,14 @@ ol {
 }
 
 .azarbot-header-name {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: 700;
   margin: 0;
   color: var(--ink);
 }
 
 .azarbot-header-desc {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--muted);
   display: block;
 }
@@ -3316,15 +3377,15 @@ ol {
 .azarbot-header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .azarbot-icon-btn {
   background: none;
   border: none;
   color: var(--muted);
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -3338,13 +3399,13 @@ ol {
 }
 
 .azarbot-icon-btn.close-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
 }
 
 .azarbot-body {
   flex: 1;
-  padding: 14px;
+  padding: 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -3362,23 +3423,12 @@ ol {
   justify-content: flex-end;
 }
 
-.azarbot-msg-bot-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(16, 185, 129, 0.1);
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
 .azarbot-bubble {
-  max-width: 82%;
-  padding: 10px 14px;
-  border-radius: 16px;
-  font-size: 0.88rem;
-  line-height: 1.45;
+  max-width: 86%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 0.93rem;
+  line-height: 1.55;
   white-space: pre-line;
   word-break: break-word;
 }
@@ -3404,11 +3454,11 @@ ol {
   border: 1.5px solid var(--brand-300);
   color: var(--brand-800);
   font-weight: 600;
-  padding: 3px 8px;
-  margin: 3px 2px;
+  padding: 4px 10px;
+  margin: 4px 2px;
   border-radius: var(--radius-sm);
   text-decoration: none;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
@@ -3421,8 +3471,8 @@ ol {
 .loading-bubble {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 12px 16px;
+  gap: 5px;
+  padding: 14px 18px;
 }
 
 .loading-bubble .dot {
@@ -3455,7 +3505,7 @@ ol {
 .azarbot-quick-pills {
   display: flex;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 8px 16px;
   overflow-x: auto;
   border-top: 1px solid var(--line);
   background: var(--surface);
@@ -3466,9 +3516,9 @@ ol {
   border: 1px solid var(--line);
   background: var(--surface-muted);
   color: var(--ink-soft);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
   cursor: pointer;
@@ -3482,7 +3532,7 @@ ol {
 }
 
 .azarbot-footer {
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-top: 1px solid var(--line);
   background: var(--surface);
   display: flex;
@@ -3494,7 +3544,7 @@ ol {
   flex: 1;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
-  padding: 8px 14px;
+  padding: 10px 16px;
   font-size: var(--text-sm);
   background: var(--surface-muted);
   outline: none;
@@ -3509,8 +3559,8 @@ ol {
 }
 
 .azarbot-send-btn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: none;
   background: var(--brand-600);
@@ -3531,5 +3581,6 @@ ol {
   background: var(--brand-700);
   transform: scale(1.05);
 }
+
 
 
