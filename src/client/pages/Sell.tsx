@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ItemType, ListingDetail, MetaResponse } from "../../shared/types";
-import { Alert, Button, Field, Input, Select, Spinner, Textarea, useToast } from "../components/ui";
+import { Alert, Button, Field, Input, Spinner, Textarea, useToast } from "../components/ui";
+import { CustomSelect } from "../components/CustomSelect";
 import { Icon } from "../components/Icons";
 import { api, errorMessage, fieldErrors } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -70,16 +71,157 @@ export function Sell() {
     setLoaded(true);
   }, [existing.data, loaded]);
 
+  const [aiBusy, setAiBusy] = useState(false);
+
   const categoryOptions = useMemo(() => {
     const options: { id: number; label: string; depth: number }[] = [];
     for (const category of meta.data?.categories ?? []) {
-      options.push({ id: category.id, label: category.nameFr, depth: 0 });
+      options.push({
+        id: category.id,
+        label: lang === "ar" ? category.nameAr : category.nameFr,
+        depth: 0,
+      });
       for (const child of category.children ?? []) {
-        options.push({ id: child.id, label: child.nameFr, depth: 1 });
+        options.push({
+          id: child.id,
+          label: lang === "ar" ? child.nameAr : child.nameFr,
+          depth: 1,
+        });
       }
     }
     return options;
-  }, [meta.data]);
+  }, [meta.data, lang]);
+
+  const categorySelectOptions = useMemo(
+    () =>
+      categoryOptions.map((option) => ({
+        value: option.id,
+        label: option.depth > 0 ? `— ${option.label}` : option.label,
+      })),
+    [categoryOptions],
+  );
+
+  const wilayaSelectOptions = useMemo(
+    () =>
+      (meta.data?.wilayas ?? []).map((item) => ({
+        value: item.id,
+        label: `${item.id.toString().padStart(2, "0")} — ${lang === "ar" ? item.nameAr : item.nameFr}`,
+        sublabel: lang === "ar" ? item.nameFr : item.nameAr,
+      })),
+    [meta.data, lang],
+  );
+
+  const conditionSelectOptions = useMemo(
+    () =>
+      CONDITION_OPTIONS.map((item) => ({
+        value: item,
+        label: t(`cond.${item}`),
+      })),
+    [t],
+  );
+
+  const handleAiGenerate = async () => {
+    if (!title.trim()) {
+      push(
+        lang === "ar"
+          ? "يرجى كتابة عنوان الإعلان أولاً لتوليد الوصف."
+          : "Veuillez d'abord saisir un titre pour générer la description.",
+        "error",
+      );
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const activeCat = meta.data?.categories.find((c) => String(c.id) === categoryId);
+      const activeWil = meta.data?.wilayas.find((w) => String(w.id) === wilayaId);
+      const res = await api<{ text: string }>("/ai/assist", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "generate",
+          title: title.trim(),
+          categoryName: activeCat ? (lang === "ar" ? activeCat.nameAr : activeCat.nameFr) : undefined,
+          wilayaName: activeWil ? (lang === "ar" ? activeWil.nameAr : activeWil.nameFr) : undefined,
+          priceDa: Number(priceDa) || undefined,
+          condition: t(`cond.${condition}`),
+          itemType,
+          lang: lang === "ar" ? "ar" : "fr",
+        }),
+      });
+      if (res.text) {
+        setDescription(res.text);
+        push(
+          lang === "ar"
+            ? "تم توليد الوصف بنجاح بواسطة الذكاء الاصطناعي !"
+            : "Description rédigée avec succès par l'IA !",
+          "success",
+        );
+      }
+    } catch (err) {
+      push(errorMessage(err), "error");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const handleAiImprove = async () => {
+    if (!description.trim() || description.trim().length < 8) {
+      push(
+        lang === "ar" ? "اكتب مسودة نص لتحسينها." : "Saisissez un texte à améliorer.",
+        "error",
+      );
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const res = await api<{ text: string }>("/ai/assist", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "improve",
+          text: description.trim(),
+          lang: lang === "ar" ? "ar" : "fr",
+        }),
+      });
+      if (res.text) {
+        setDescription(res.text);
+        push(
+          lang === "ar" ? "تم تحسين وتنسيق الوصف !" : "Description améliorée et corrigée !",
+          "success",
+        );
+      }
+    } catch (err) {
+      push(errorMessage(err), "error");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const handleAiTranslate = async () => {
+    if (!description.trim() || description.trim().length < 4) return;
+    setAiBusy(true);
+    try {
+      const isArabic = /[\u0600-\u06FF]/.test(description);
+      const targetLang = isArabic ? "fr" : "ar";
+      const res = await api<{ text: string }>("/ai/assist", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "translate",
+          text: description.trim(),
+          targetLang,
+        }),
+      });
+      if (res.text) {
+        setDescription(res.text);
+        push(
+          targetLang === "ar" ? "تمت الترجمة إلى العربية !" : "Traduit en français !",
+          "success",
+        );
+      }
+    } catch (err) {
+      push(errorMessage(err), "error");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   if (editing && existing.loading) return <Spinner />;
   if (editing && existing.data && !existing.data.listing.isOwner) {
@@ -281,16 +423,15 @@ export function Sell() {
                     onClick={() => setItemType("PRODUCT")}
                     style={{
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
-                      gap: 4,
-                      padding: "12px 8px",
-                      height: "auto",
+                      justifyContent: "center",
+                      padding: "10px 8px",
                       borderRadius: "var(--radius-md)",
+                      fontWeight: 600,
+                      fontSize: "0.88rem",
                     }}
                   >
-                    <span style={{ fontSize: "1.3rem" }}>📦</span>
-                    <span style={{ fontWeight: 600 }}>{lang === "ar" ? "منتج مادي" : "Produit"}</span>
+                    <span>{lang === "ar" ? "منتج مادي" : "Produit physique"}</span>
                   </button>
                   <button
                     type="button"
@@ -298,16 +439,15 @@ export function Sell() {
                     onClick={() => setItemType("SERVICE")}
                     style={{
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
-                      gap: 4,
-                      padding: "12px 8px",
-                      height: "auto",
+                      justifyContent: "center",
+                      padding: "10px 8px",
                       borderRadius: "var(--radius-md)",
+                      fontWeight: 600,
+                      fontSize: "0.88rem",
                     }}
                   >
-                    <span style={{ fontSize: "1.3rem" }}>🛠️</span>
-                    <span style={{ fontWeight: 600 }}>{lang === "ar" ? "خدمة" : "Service"}</span>
+                    <span>{lang === "ar" ? "خدمة" : "Service"}</span>
                   </button>
                   <button
                     type="button"
@@ -315,16 +455,15 @@ export function Sell() {
                     onClick={() => setItemType("DIGITAL")}
                     style={{
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
-                      gap: 4,
-                      padding: "12px 8px",
-                      height: "auto",
+                      justifyContent: "center",
+                      padding: "10px 8px",
                       borderRadius: "var(--radius-md)",
+                      fontWeight: 600,
+                      fontSize: "0.88rem",
                     }}
                   >
-                    <span style={{ fontSize: "1.3rem" }}>💾</span>
-                    <span style={{ fontWeight: 600 }}>{lang === "ar" ? "رقمي" : "Numérique"}</span>
+                    <span>{lang === "ar" ? "منتج رقمي" : "Numérique"}</span>
                   </button>
                 </div>
               </div>
@@ -352,18 +491,12 @@ export function Sell() {
                   error={fields.categoryId}
                   required
                 >
-                  <Select
+                  <CustomSelect
                     id="sell-category"
                     value={categoryId}
-                    onChange={(event) => setCategoryId(event.target.value)}
-                  >
-                    {categoryOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.depth > 0 ? "— " : ""}
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={setCategoryId}
+                    options={categorySelectOptions}
+                  />
                 </Field>
                 <Field
                   label={t("common.wilaya")}
@@ -371,18 +504,16 @@ export function Sell() {
                   error={fields.wilayaId}
                   required
                 >
-                  <Select
+                  <CustomSelect
                     id="sell-wilaya"
                     value={wilayaId}
-                    onChange={(event) => setWilayaId(event.target.value)}
-                  >
-                    {meta.data?.wilayas.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.id.toString().padStart(2, "0")} —{" "}
-                        {lang === "ar" ? item.nameAr : item.nameFr}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={setWilayaId}
+                    options={wilayaSelectOptions}
+                    searchable
+                    searchPlaceholder={
+                      lang === "ar" ? "ابحث عن الولاية..." : "Rechercher wilaya..."
+                    }
+                  />
                 </Field>
                 <Field
                   label={`${t("common.price")} (DA)`}
@@ -402,17 +533,12 @@ export function Sell() {
                   />
                 </Field>
                 <Field label={t("common.condition")} htmlFor="sell-condition" required>
-                  <Select
+                  <CustomSelect
                     id="sell-condition"
                     value={condition}
-                    onChange={(event) => setCondition(event.target.value)}
-                  >
-                    {CONDITION_OPTIONS.map((item) => (
-                      <option key={item} value={item}>
-                        {t(`cond.${item}`)}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={setCondition}
+                    options={conditionSelectOptions}
+                  />
                 </Field>
               </div>
 
@@ -425,21 +551,137 @@ export function Sell() {
                 <span>Prix négociable</span>
               </label>
 
-              <Field
-                label={t("listing.description")}
-                htmlFor="sell-description"
-                error={fields.description}
-                required
-                hint={`${description.length}/4000 caractères. Précisez l'état, les défauts et les accessoires inclus.`}
-              >
+              {/* Description Field with AI Assistant Toolbar */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 6,
+                    flexWrap: "wrap",
+                    gap: 6,
+                  }}
+                >
+                  <label
+                    htmlFor="sell-description"
+                    className="field-label"
+                    style={{ margin: 0, fontWeight: 600 }}
+                  >
+                    {t("listing.description")} <span style={{ color: "var(--danger)" }}>*</span>
+                  </label>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      onClick={handleAiGenerate}
+                      disabled={aiBusy}
+                      title={
+                        lang === "ar"
+                          ? "توليد وصف متكامل بالذكاء الاصطناعي"
+                          : "Rédiger automatiquement avec Gemini IA"
+                      }
+                      style={{
+                        background: "rgba(16, 185, 129, 0.12)",
+                        color: "var(--brand-700)",
+                        borderColor: "var(--brand-300)",
+                        borderRadius: "var(--radius-pill)",
+                        padding: "4px 10px",
+                        fontSize: "0.82rem",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        height: 30,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {aiBusy ? (
+                        <Spinner />
+                      ) : (
+                        <Icon name="sparkles" size={14} style={{ color: "var(--brand-600)" }} />
+                      )}
+                      <span>
+                        {aiBusy
+                          ? lang === "ar"
+                            ? "جاري المعالجة..."
+                            : "IA en cours..."
+                          : lang === "ar"
+                            ? "مساعد الذكاء الاصطناعي"
+                            : "Rédiger avec l'IA"}
+                      </span>
+                    </button>
+
+                    {description.trim().length > 8 ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={handleAiImprove}
+                          disabled={aiBusy}
+                          title={
+                            lang === "ar"
+                              ? "تحسين وتنسيق الوصف"
+                              : "Corriger l'orthographe et améliorer la mise en page"
+                          }
+                          style={{
+                            border: "1px solid var(--line)",
+                            borderRadius: "var(--radius-pill)",
+                            padding: "3px 8px",
+                            fontSize: "0.8rem",
+                            height: 30,
+                          }}
+                        >
+                          {lang === "ar" ? "تحسين النص" : "Améliorer"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={handleAiTranslate}
+                          disabled={aiBusy}
+                          title={
+                            lang === "ar"
+                              ? "ترجمة النص (فرنسية ⇄ عربية)"
+                              : "Traduire en Français / Arabe"
+                          }
+                          style={{
+                            border: "1px solid var(--line)",
+                            borderRadius: "var(--radius-pill)",
+                            padding: "3px 8px",
+                            fontSize: "0.8rem",
+                            height: 30,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <Icon name="globe" size={13} />
+                          <span>{lang === "ar" ? "ترجمة" : "Traduire"}</span>
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
                 <Textarea
                   id="sell-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={4000}
                   placeholder="Décrivez votre article avec honnêteté : âge, état, accessoires, raison de la vente…"
+                  aria-invalid={Boolean(fields.description)}
                 />
-              </Field>
+                <div
+                  className="hint mt-1"
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <span>Précisez l'état, les défauts et les accessoires inclus.</span>
+                  <span>{description.length}/4000</span>
+                </div>
+                {fields.description ? (
+                  <div className="error-text mt-1">{fields.description}</div>
+                ) : null}
+              </div>
 
               <div className="divider" />
               <h2 style={{ fontSize: "var(--text-md)" }}>Préférences de contact</h2>

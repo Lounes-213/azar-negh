@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { MetaResponse, SessionUser } from "../../shared/types";
-import { Alert, Avatar, Button, Field, Input, Select, Spinner, Textarea } from "../components/ui";
+import { Alert, Avatar, Button, Field, Input, Spinner, Textarea } from "../components/ui";
+import { CustomSelect } from "../components/CustomSelect";
 import { Icon } from "../components/Icons";
 import { api, errorMessage, fieldErrors } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -386,18 +387,18 @@ export function Account() {
                   error={fields.wilayaId}
                   required
                 >
-                  <Select
+                  <CustomSelect
                     id="profile-wilaya"
                     value={wilayaId}
-                    onChange={(event) => setWilayaId(event.target.value)}
-                  >
-                    {meta.data?.wilayas.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.id.toString().padStart(2, "0")} —{" "}
-                        {isAr ? item.nameAr : item.nameFr}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={setWilayaId}
+                    options={(meta.data?.wilayas ?? []).map((item) => ({
+                      value: item.id,
+                      label: `${item.id.toString().padStart(2, "0")} — ${isAr ? item.nameAr : item.nameFr}`,
+                      sublabel: isAr ? item.nameFr : item.nameAr,
+                    }))}
+                    searchable
+                    searchPlaceholder={isAr ? "ابحث عن الولاية..." : "Rechercher wilaya..."}
+                  />
                 </Field>
 
                 <Field

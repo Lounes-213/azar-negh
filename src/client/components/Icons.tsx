@@ -309,6 +309,12 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   navigation: <polygon points="3 11 22 2 13 21 11 13 3 11" />,
+  sparkles: (
+    <>
+      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof paths;

@@ -14,6 +14,7 @@ import { moderationRoutes } from "./routes/moderation";
 import { adminRoutes } from "./routes/admin";
 import { imageRoutes } from "./routes/images";
 import { realtimeRoutes } from "./routes/realtime";
+import { aiRoutes } from "./routes/ai";
 import { cleanupRateLimits } from "./lib/rate-limit";
 import { cleanupAbandonedUploads } from "./lib/images";
 
@@ -93,6 +94,7 @@ app.route("/api", moderationRoutes);
 app.route("/api", adminRoutes);
 app.route("/api", imageRoutes);
 app.route("/api", realtimeRoutes);
+app.route("/api", aiRoutes);
 
 app.all("/api/*", (c) =>
   c.json({ error: { code: "NOT_FOUND", message: "Ressource introuvable." } }, 404),

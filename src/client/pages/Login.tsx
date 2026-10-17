@@ -65,6 +65,11 @@ export function Login() {
 
   useDocumentTitle(lang === "ar" ? "تسجيل الدخول — Azar Neɣ" : "Connexion — Azar Neɣ");
 
+  if (!loading && user) {
+    const target = !next || next === "/connexion" ? "/compte" : next;
+    return <Navigate to={target} replace />;
+  }
+
   useEffect(() => {
     if (user) return;
 

@@ -14,6 +14,9 @@ export interface Env {
   SESSION_SECRET: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_API_KEYS?: string;
+  AI?: any;
 }
 
 export interface AuthUser {

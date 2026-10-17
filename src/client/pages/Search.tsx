@@ -9,7 +9,8 @@ import type {
   SortOption,
 } from "../../shared/types";
 import { Icon } from "../components/Icons";
-import { EmptyState, Field, Pagination, Select, SkeletonStack } from "../components/ui";
+import { EmptyState, Field, Pagination, SkeletonStack } from "../components/ui";
+import { CustomSelect } from "../components/CustomSelect";
 import { ListingCard } from "../components/ListingCard";
 import { api, errorMessage } from "../lib/api";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
@@ -30,12 +31,23 @@ function findCategoryBySlug(
   return undefined;
 }
 
-function flattenCategories(categories: Category[]): { id: number; label: string; depth: number }[] {
+function flattenCategories(
+  categories: Category[],
+  lang?: "fr" | "ar",
+): { id: number; label: string; depth: number }[] {
   const result: { id: number; label: string; depth: number }[] = [];
   for (const category of categories) {
-    result.push({ id: category.id, label: category.nameFr, depth: 0 });
+    result.push({
+      id: category.id,
+      label: lang === "ar" ? category.nameAr : category.nameFr,
+      depth: 0,
+    });
     for (const child of category.children ?? []) {
-      result.push({ id: child.id, label: child.nameFr, depth: 1 });
+      result.push({
+        id: child.id,
+        label: lang === "ar" ? child.nameAr : child.nameFr,
+        depth: 1,
+      });
     }
   }
   return result;
@@ -161,8 +173,62 @@ export function Search({ mode }: { mode: Mode }) {
   };
 
   const categoryOptions = useMemo(
-    () => flattenCategories(meta.data?.categories ?? []),
-    [meta.data],
+    () => flattenCategories(meta.data?.categories ?? [], lang),
+    [meta.data, lang],
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { value: "newest", label: t("common.newest") },
+      { value: "oldest", label: t("common.oldest") },
+      { value: "price_asc", label: t("common.priceAsc") },
+      { value: "price_desc", label: t("common.priceDesc") },
+    ],
+    [t],
+  );
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { value: "", label: t("common.allF") },
+      ...categoryOptions.map((opt) => ({
+        value: String(opt.id),
+        label: opt.depth > 0 ? `— ${opt.label}` : opt.label,
+      })),
+    ],
+    [categoryOptions, t],
+  );
+
+  const wilayaFilterOptions = useMemo(
+    () => [
+      { value: "", label: t("common.allF") },
+      ...(meta.data?.wilayas ?? []).map((w) => ({
+        value: String(w.id),
+        label: `${w.id.toString().padStart(2, "0")} — ${lang === "ar" ? w.nameAr : w.nameFr}`,
+        sublabel: lang === "ar" ? w.nameFr : w.nameAr,
+      })),
+    ],
+    [meta.data, lang, t],
+  );
+
+  const conditionFilterOptions = useMemo(
+    () => [
+      { value: "", label: t("common.all") },
+      ...(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"] as ListingCondition[]).map((c) => ({
+        value: c,
+        label: t(`cond.${c}`),
+      })),
+    ],
+    [t],
+  );
+
+  const itemTypeFilterOptions = useMemo(
+    () => [
+      { value: "", label: lang === "ar" ? "كل الأنواع" : "Tous les types" },
+      { value: "PRODUCT", label: lang === "ar" ? "منتجات مادية" : "Produits physiques" },
+      { value: "SERVICE", label: lang === "ar" ? "خدمات" : "Services" },
+      { value: "DIGITAL", label: lang === "ar" ? "منتجات رقمية" : "Produits numériques" },
+    ],
+    [lang],
   );
 
   return (
@@ -183,17 +249,14 @@ export function Search({ mode }: { mode: Mode }) {
           <label className="sr-only" htmlFor="sort">
             {t("common.sort")}
           </label>
-          <Select
+          <CustomSelect
             id="sort"
             value={sort}
-            onChange={(event) => updateSort(event.target.value)}
-            style={{ minWidth: 180 }}
-          >
-            <option value="newest">{t("common.newest")}</option>
-            <option value="oldest">{t("common.oldest")}</option>
-            <option value="price_asc">{t("common.priceAsc")}</option>
-            <option value="price_desc">{t("common.priceDesc")}</option>
-          </Select>
+            onChange={updateSort}
+            options={sortOptions}
+            size="sm"
+            style={{ width: "auto", minWidth: 175 }}
+          />
           <button
             type="button"
             className="btn btn-secondary filter-toggle"
@@ -239,7 +302,7 @@ export function Search({ mode }: { mode: Mode }) {
             onClick={() => updateItemType("PRODUCT")}
             style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
           >
-            📦 {lang === "ar" ? "المنتجات" : "Produits"}
+            {lang === "ar" ? "المنتجات" : "Produits"}
           </button>
           <button
             type="button"
@@ -247,7 +310,7 @@ export function Search({ mode }: { mode: Mode }) {
             onClick={() => updateItemType("SERVICE")}
             style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
           >
-            🛠️ {lang === "ar" ? "الخدمات" : "Services"}
+            {lang === "ar" ? "الخدمات" : "Services"}
           </button>
           <button
             type="button"
@@ -255,7 +318,7 @@ export function Search({ mode }: { mode: Mode }) {
             onClick={() => updateItemType("DIGITAL")}
             style={{ borderRadius: "20px", whiteSpace: "nowrap", paddingInline: 14 }}
           >
-            💾 {lang === "ar" ? "منتجات رقمية" : "Produits numériques"}
+            {lang === "ar" ? "منتجات رقمية" : "Produits numériques"}
           </button>
         </div>
       </div>
@@ -281,37 +344,25 @@ export function Search({ mode }: { mode: Mode }) {
           </Field>
 
           <Field label={t("common.category")} htmlFor="filter-category">
-            <select
+            <CustomSelect
               id="filter-category"
-              className="select"
               value={draft.category}
-              onChange={(event) => setDraft({ ...draft, category: event.target.value })}
-            >
-              <option value="">{t("common.allF")}</option>
-              {categoryOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.depth > 0 ? "— " : ""}
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setDraft({ ...draft, category: value })}
+              options={categoryFilterOptions}
+              searchable
+              searchPlaceholder={lang === "ar" ? "ابحث عن فئة..." : "Rechercher catégorie..."}
+            />
           </Field>
 
           <Field label={t("common.wilaya")} htmlFor="filter-wilaya">
-            <select
+            <CustomSelect
               id="filter-wilaya"
-              className="select"
               value={draft.wilaya}
-              onChange={(event) => setDraft({ ...draft, wilaya: event.target.value })}
-            >
-              <option value="">{t("common.allF")}</option>
-              {meta.data?.wilayas.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.id.toString().padStart(2, "0")} —{" "}
-                  {lang === "ar" ? item.nameAr : item.nameFr}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setDraft({ ...draft, wilaya: value })}
+              options={wilayaFilterOptions}
+              searchable
+              searchPlaceholder={lang === "ar" ? "ابحث عن ولاية..." : "Rechercher wilaya..."}
+            />
           </Field>
 
           <div className="filter-group">
@@ -343,35 +394,21 @@ export function Search({ mode }: { mode: Mode }) {
           </div>
 
           <Field label={t("common.condition")} htmlFor="filter-condition">
-            <select
+            <CustomSelect
               id="filter-condition"
-              className="select"
               value={draft.condition}
-              onChange={(event) => setDraft({ ...draft, condition: event.target.value })}
-            >
-              <option value="">{t("common.all")}</option>
-              {(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"] as ListingCondition[]).map(
-                (condition) => (
-                  <option key={condition} value={condition}>
-                    {t(`cond.${condition}`)}
-                  </option>
-                ),
-              )}
-            </select>
+              onChange={(value) => setDraft({ ...draft, condition: value })}
+              options={conditionFilterOptions}
+            />
           </Field>
 
           <Field label={lang === "ar" ? "نوع العرض" : "Type d'offre"} htmlFor="filter-item-type">
-            <select
+            <CustomSelect
               id="filter-item-type"
-              className="select"
               value={draft.itemType}
-              onChange={(event) => setDraft({ ...draft, itemType: event.target.value })}
-            >
-              <option value="">{lang === "ar" ? "كل الأنواع" : "Tous les types"}</option>
-              <option value="PRODUCT">📦 {lang === "ar" ? "منتجات مادية" : "Produits physiques"}</option>
-              <option value="SERVICE">🛠️ {lang === "ar" ? "خدمات" : "Services"}</option>
-              <option value="DIGITAL">💾 {lang === "ar" ? "منتجات رقمية" : "Produits numériques"}</option>
-            </select>
+              onChange={(value) => setDraft({ ...draft, itemType: value })}
+              options={itemTypeFilterOptions}
+            />
           </Field>
 
           <button type="submit" className="btn btn-block">

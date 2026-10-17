@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { Icon } from "./Icons";
 import { Avatar } from "./ui";
 import { Logo } from "./Logo";
+import { SearchSuggestions } from "./SearchSuggestions";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { useRealtime } from "../lib/realtime";
@@ -28,6 +29,7 @@ export function Layout() {
   const { lang, setLang, t } = useI18n();
   const { unread, connected } = useRealtime();
   const [term, setTerm] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -204,22 +206,35 @@ export function Layout() {
             </span>
           </div>
 
-          <form className="topbar-search" onSubmit={submitSearch} role="search">
-            <Icon name="search" size={18} />
-            <label className="sr-only" htmlFor="global-search">
-              {t("common.search")}
-            </label>
-            <input
-              id="global-search"
-              value={term}
-              onChange={(event) => setTerm(event.target.value)}
-              placeholder={t("home.searchPlaceholder")}
-              maxLength={80}
+          <div style={{ position: "relative", flex: 1, maxWidth: 560, gridArea: "search" }}>
+            <form className="topbar-search" onSubmit={submitSearch} role="search">
+              <Icon name="search" size={18} />
+              <label className="sr-only" htmlFor="global-search">
+                {t("common.search")}
+              </label>
+              <input
+                id="global-search"
+                value={term}
+                onChange={(event) => {
+                  setTerm(event.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder={t("home.searchPlaceholder")}
+                maxLength={80}
+                autoComplete="off"
+              />
+              <button type="submit" className="btn btn-sm">
+                {t("common.search")}
+              </button>
+            </form>
+            <SearchSuggestions
+              query={term}
+              isOpen={showSuggestions}
+              onClose={() => setShowSuggestions(false)}
+              onSelectQuery={(q) => setTerm(q)}
             />
-            <button type="submit" className="btn btn-sm">
-              {t("common.search")}
-            </button>
-          </form>
+          </div>
 
           <div className="topbar-actions">
             <Link

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Icon, type IconName } from "../components/Icons";
 import { EmptyState, SkeletonStack, Spinner } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
+import { SearchSuggestions } from "../components/SearchSuggestions";
 import { api } from "../lib/api";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
@@ -20,6 +21,7 @@ export function Home() {
   useDocumentTitle("");
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const meta = useAsync(() => api<MetaResponse>("/meta"), []);
   const recent = useAsync(
@@ -53,23 +55,36 @@ export function Home() {
           </h1>
           <p className="hero-lead">{t("home.lead")}</p>
 
-          <form className="hero-search" onSubmit={submitSearch} role="search">
-            <label className="sr-only" htmlFor="home-search">
-              {t("common.search")}
-            </label>
-            <input
-              id="home-search"
-              className="input"
-              value={term}
-              onChange={(event) => setTerm(event.target.value)}
-              placeholder={t("home.searchPlaceholder")}
-              maxLength={80}
+          <div style={{ position: "relative", width: "100%", maxWidth: "620px" }}>
+            <form className="hero-search" onSubmit={submitSearch} role="search">
+              <label className="sr-only" htmlFor="home-search">
+                {t("common.search")}
+              </label>
+              <input
+                id="home-search"
+                className="input"
+                value={term}
+                onChange={(event) => {
+                  setTerm(event.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder={t("home.searchPlaceholder")}
+                maxLength={80}
+                autoComplete="off"
+              />
+              <button type="submit" className="btn">
+                <Icon name="search" size={18} />
+                {lang === "ar" ? "استكشف" : "Explorer"}
+              </button>
+            </form>
+            <SearchSuggestions
+              query={term}
+              isOpen={showSuggestions}
+              onClose={() => setShowSuggestions(false)}
+              onSelectQuery={(q) => setTerm(q)}
             />
-            <button type="submit" className="btn">
-              <Icon name="search" size={18} />
-              {lang === "ar" ? "استكشف" : "Explorer"}
-            </button>
-          </form>
+          </div>
 
           <div className="hero-meta">
             <span>

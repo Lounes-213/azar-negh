@@ -279,17 +279,36 @@ export async function loadListingImages(
 
 export async function relatedListings(
   db: D1Database,
-  listing: { id: string; categoryId: number; wilayaId: number },
+  listing: { id: string; categoryId: number; wilayaId: number; priceDa?: number },
   viewerId: string,
 ): Promise<ListingSummary[]> {
+  const price = listing.priceDa ?? 0;
+  const minPrice = Math.max(0, Math.floor(price * 0.55));
+  const maxPrice = Math.ceil(price * 1.6);
+
   const rows = await db
     .prepare(
       `${SUMMARY_SELECT}
        WHERE l.status = 'APPROVED' AND l.id != ? AND (l.category_id = ? OR l.wilaya_id = ?)
-       ORDER BY (l.category_id = ?) DESC, l.published_at DESC
-       LIMIT 4`,
+       ORDER BY (
+         (CASE WHEN l.category_id = ? THEN 100 ELSE 0 END) +
+         (CASE WHEN l.wilaya_id = ? THEN 40 ELSE 0 END) +
+         (CASE WHEN ? > 0 AND l.price_da BETWEEN ? AND ? THEN 30 ELSE 0 END) +
+         (COALESCE(l.order_clicks, 0) * 3 + COALESCE(l.call_clicks, 0) * 2)
+       ) DESC, l.published_at DESC
+       LIMIT 6`,
     )
-    .bind(viewerId, listing.id, listing.categoryId, listing.wilayaId, listing.categoryId)
+    .bind(
+      viewerId,
+      listing.id,
+      listing.categoryId,
+      listing.wilayaId,
+      listing.categoryId,
+      listing.wilayaId,
+      price,
+      minPrice,
+      maxPrice,
+    )
     .all<ListingRow>();
   return (rows.results ?? []).map(rowToSummary);
 }

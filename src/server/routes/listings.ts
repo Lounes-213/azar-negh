@@ -77,11 +77,71 @@ async function respondDetail(
   const images = await loadListingImages(c.env.DB, id);
   const related = await relatedListings(
     c.env.DB,
-    { id: row.id, categoryId: row.category_id, wilayaId: row.wilaya_id },
+    { id: row.id, categoryId: row.category_id, wilayaId: row.wilaya_id, priceDa: row.price_da },
     viewer?.id ?? "",
   );
   return c.json({ listing: rowToDetail(row, images, viewer), related }, status);
 }
+
+listingRoutes.get("/listings/suggestions", async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) {
+    return c.json({ suggestions: [], categories: [] });
+  }
+
+  const pattern = `%${q}%`;
+  const [items, categories] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT l.id, l.title, l.price_da, l.wilaya_id,
+              w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+              cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
+              (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
+       FROM listings l
+       JOIN wilayas w ON w.id = l.wilaya_id
+       JOIN categories cat ON cat.id = l.category_id
+       WHERE l.status = 'APPROVED' AND (l.title LIKE ? OR l.description LIKE ?)
+       ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
+       LIMIT 5`,
+    )
+      .bind(pattern, pattern)
+      .all<{
+        id: string;
+        title: string;
+        price_da: number;
+        wilaya_id: number;
+        wilaya_name_fr: string;
+        wilaya_name_ar: string;
+        category_name_fr: string;
+        category_name_ar: string;
+        cover_id: string | null;
+      }>(),
+    c.env.DB.prepare(
+      `SELECT id, slug, name_fr, name_ar FROM categories
+       WHERE is_active = 1 AND (name_fr LIKE ? OR name_ar LIKE ?)
+       LIMIT 3`,
+    )
+      .bind(pattern, pattern)
+      .all<{ id: number; slug: string; name_fr: string; name_ar: string }>(),
+  ]);
+
+  c.header("Cache-Control", "public, max-age=60");
+  return c.json({
+    suggestions: (items.results ?? []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      priceDa: row.price_da,
+      wilaya: { id: row.wilaya_id, nameFr: row.wilaya_name_fr, nameAr: row.wilaya_name_ar },
+      category: { nameFr: row.category_name_fr, nameAr: row.category_name_ar },
+      coverImage: imageUrl(row.cover_id),
+    })),
+    categories: (categories.results ?? []).map((cat) => ({
+      id: cat.id,
+      slug: cat.slug,
+      nameFr: cat.name_fr,
+      nameAr: cat.name_ar,
+    })),
+  });
+});
 
 listingRoutes.get("/listings", async (c) => {
   const query = parseQuery(c.req.query(), searchQuerySchema);
@@ -121,7 +181,7 @@ listingRoutes.get("/listings/:id", async (c) => {
   const images = await loadListingImages(c.env.DB, id);
   const related = await relatedListings(
     c.env.DB,
-    { id: row.id, categoryId: row.category_id, wilayaId: row.wilaya_id },
+    { id: row.id, categoryId: row.category_id, wilayaId: row.wilaya_id, priceDa: row.price_da },
     viewer?.id ?? "",
   );
   c.header("Cache-Control", "private, max-age=0");
