@@ -162,6 +162,12 @@ const chatSchema = z.object({
       data: z.string().max(7 * 1024 * 1024), // Max ~5MB binary base64
     })
     .optional(),
+  audio: z
+    .object({
+      mimeType: z.string().max(50),
+      data: z.string().max(10 * 1024 * 1024), // Max ~7MB binary base64
+    })
+    .optional(),
   userPersona: z
     .object({
       preferredWilaya: z.string().max(100).optional(),
@@ -228,6 +234,7 @@ aiRoutes.post("/ai/chat", async (c) => {
       input.userPersona,
       input.lang || "ar",
       input.image,
+      input.audio,
     );
 
     // Extract product IDs if suggested by AI: [MATCHED_PRODUCTS: id1, id2, id3]
@@ -265,8 +272,8 @@ aiRoutes.post("/ai/chat", async (c) => {
       }
     }
 
-    // If user provided an image and matched products are still empty, attach top relevant candidates (max 3)
-    if (input.image && matchedProducts.length === 0 && catalogResult.candidates.length > 0) {
+    // If user provided an image or audio and matched products are still empty, attach top relevant candidates (max 3)
+    if ((input.image || input.audio) && matchedProducts.length === 0 && catalogResult.candidates.length > 0) {
       matchedProducts.push(...catalogResult.candidates.slice(0, 3));
     }
 

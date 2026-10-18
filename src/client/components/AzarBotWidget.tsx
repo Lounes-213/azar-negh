@@ -23,6 +23,8 @@ interface Message {
   content: string;
   createdAt: number;
   imagePreview?: string;
+  isVoice?: boolean;
+  voiceDuration?: number;
   products?: BotProductCard[];
 }
 
@@ -296,6 +298,15 @@ export function AzarBotWidget() {
     previewUrl: string;
   } | null>(null);
 
+  // Search by Voice state (20s max limit - understands Kabyle / Taqbaylit, Darija, Arabic)
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recordingSecondsRef = useRef(0);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -345,8 +356,8 @@ export function AzarBotWidget() {
           id: "welcome",
           role: "model",
           content: isAr
-            ? `مرحباً بك${user ? ` **${user.displayName || ""}**` : ""}! أنا **آزار شات**، مساعدك الذكي للتسوق في الجزائر.\nاسألني عن أي منتج، قارن بين **الأسعار والمواصفات**، أو ارفع **صورة لأي سلعة** للبحث عنها فوراً!`
-            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Azar Chat**, votre assistant shopping intelligent.\nPosez-moi vos questions, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
+            ? `مرحباً بك${user ? ` **${user.displayName || ""}**` : ""}! أنا **آزار شات**، مساعدك الذكي للتسوق في الجزائر.\nاسألني كتابة أو تحدث بالمايك 🎙️ بالقبائلية (**Taqbaylit**)، الدارجة أو العربية، قارن بين **الأسعار والمواصفات**، أو ارفع **صورة لأي سلعة** للبحث عنها فوراً!`
+            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Azar Chat**, votre assistant shopping intelligent.\nÉcrivez ou parlez au micro 🎙️ en **Kabyle (Taqbaylit)**, Darija ou Français, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
           createdAt: Date.now(),
         };
         setMessages([initial]);
@@ -470,9 +481,146 @@ export function AzarBotWidget() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const sendMessage = async (textToSend?: string) => {
+  const getAudioMimeType = () => {
+    if (typeof MediaRecorder === "undefined") return "audio/webm";
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+      "audio/wav",
+    ];
+    for (const t of candidates) {
+      if (MediaRecorder.isTypeSupported(t)) return t;
+    }
+    return "audio/webm";
+  };
+
+  const cancelRecording = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.onstop = null;
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    recordingSecondsRef.current = 0;
+  };
+
+  const stopRecording = (shouldSend = true) => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === "inactive") {
+      cancelRecording();
+      return;
+    }
+
+    const duration = Math.max(1, recordingSecondsRef.current);
+    const mimeType = recorder.mimeType || "audio/webm";
+
+    recorder.onstop = () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      setIsRecording(false);
+      setRecordingSeconds(0);
+      recordingSecondsRef.current = 0;
+
+      if (shouldSend && audioChunksRef.current.length > 0) {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        audioChunksRef.current = [];
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const raw = reader.result as string;
+          const base64 = raw.split(",")[1];
+          if (base64) {
+            sendMessage(undefined, {
+              base64,
+              mimeType,
+              duration,
+            });
+          }
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        audioChunksRef.current = [];
+      }
+    };
+
+    try {
+      recorder.stop();
+    } catch {
+      cancelRecording();
+    }
+  };
+
+  const startRecording = async () => {
+    if (loading || isCompressing || isRecording) return;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        alert(isAr ? "الميكروفون غير مدعوم في هذا المتصفح." : "Microphone non supporté sur ce navigateur.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = getAudioMimeType();
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.start(250);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingSecondsRef.current = 0;
+
+      const startTime = Date.now();
+      recordingTimerRef.current = setInterval(() => {
+        const elapsed = Math.min(20, Math.floor((Date.now() - startTime) / 1000));
+        setRecordingSeconds(elapsed);
+        recordingSecondsRef.current = elapsed;
+        if (elapsed >= 20) {
+          stopRecording(true);
+        }
+      }, 500);
+    } catch (err) {
+      console.error("Mic access error:", err);
+      alert(isAr ? "يرجى السماح بالوصول إلى الميكروفون لاستخدام البحث الصوتي." : "Veuillez autoriser l'accès au micro pour utiliser la recherche vocale.");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      cancelRecording();
+    };
+  }, []);
+
+  const sendMessage = async (
+    textToSend?: string,
+    audioToSend?: { base64: string; mimeType: string; duration: number },
+  ) => {
     const text = (textToSend || input).trim();
-    if ((!text && !selectedImage) || loading || isCompressing) return;
+    if ((!text && !selectedImage && !audioToSend) || loading || isCompressing || isRecording) return;
 
     const currentImage = selectedImage;
     setSelectedImage(null);
@@ -481,9 +629,13 @@ export function AzarBotWidget() {
     const userMsg: Message = {
       id: `u_${Date.now()}`,
       role: "user",
-      content: text || (isAr ? "ابحث لي عن هذا المنتج في المنصة" : "Trouvez-moi ce produit sur la plateforme"),
+      content: audioToSend
+        ? (isAr ? `🎙️ استفسار صوتي (${audioToSend.duration} ثانية)` : `🎙️ Message vocal (${audioToSend.duration}s)`)
+        : (text || (isAr ? "ابحث لي عن هذا المنتج في المنصة" : "Trouvez-moi ce produit sur la plateforme")),
       createdAt: Date.now(),
       imagePreview: currentImage ? currentImage.previewUrl : undefined,
+      isVoice: !!audioToSend,
+      voiceDuration: audioToSend?.duration,
     };
 
     const nextMessages = [...messages, userMsg];
@@ -509,6 +661,13 @@ export function AzarBotWidget() {
         payload.image = {
           mimeType: currentImage.mimeType,
           data: currentImage.base64,
+        };
+      }
+
+      if (audioToSend) {
+        payload.audio = {
+          mimeType: audioToSend.mimeType,
+          data: audioToSend.base64,
         };
       }
 
@@ -546,8 +705,8 @@ export function AzarBotWidget() {
   };
 
   const quickPrompts = isAr
-    ? ["أفضل الهواتف اليوم", "قارن بين العروض", "نصائح فحص السلعة", "سيارات بأفضل سعر"]
-    : ["Meilleurs smartphones", "Comparer les offres", "Conseils d'achat", "Voitures bon prix"];
+    ? ["أفضل الهواتف اليوم", "قارن بين العروض", "Ayen yellan di ssuq? (بالقبائلية)", "نصائح فحص السلعة"]
+    : ["Meilleurs smartphones", "Comparer les offres", "Ayen yellan di ssuq? (Kabyle)", "Conseils d'achat"];
 
   return (
     <div className={`azarbot-widget-container ${isAr ? "is-rtl" : ""}`}>
@@ -675,6 +834,19 @@ export function AzarBotWidget() {
             {messages.map((msg) => (
               <div key={msg.id} className={`azarbot-message-row ${msg.role === "user" ? "user-row" : "bot-row"}`}>
                 <div className={`azarbot-bubble ${msg.role === "user" ? "user-bubble" : "bot-bubble"}`}>
+                  {/* User uploaded voice note tag */}
+                  {msg.isVoice ? (
+                    <div className="azarbot-voice-tag">
+                      <div className="azarbot-voice-icon-circle">
+                        <Icon name="mic" size={13} />
+                      </div>
+                      <div className="azarbot-voice-bars">
+                        <span /><span /><span /><span />
+                      </div>
+                      <span className="azarbot-voice-len">{msg.voiceDuration || 1}s</span>
+                    </div>
+                  ) : null}
+
                   {/* User uploaded image preview inside chat */}
                   {msg.imagePreview ? (
                     <div className="azarbot-msg-image-wrap">
@@ -766,8 +938,8 @@ export function AzarBotWidget() {
                         ? "جاري تحليل الصورة والبحث عن المنتجات..."
                         : "Analyse de l'image en cours..."
                       : isAr
-                      ? "جاري التفكير والبحث..."
-                      : "Recherche en cours..."}
+                      ? "جاري الاستماع والتفكير والبحث..."
+                      : "Écoute et recherche en cours..."}
                   </span>
                 </div>
               </div>
@@ -812,83 +984,141 @@ export function AzarBotWidget() {
             </div>
           ) : null}
 
-          {/* Input Box with Camera button, Stop button and Send (>) button */}
-          <form
-            className="azarbot-footer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage();
-            }}
-          >
-            {/* Hidden native file input for camera/image upload (max 5MB) */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/jpeg,image/png,image/webp"
-              style={{ display: "none" }}
-              onChange={handleImageSelect}
-            />
+          {/* Recording Dock OR Standard Footer */}
+          {isRecording ? (
+            <div className="azarbot-recording-bar">
+              <div className="azarbot-rec-status">
+                <span className="azarbot-rec-pulse-dot" />
+                <span className="azarbot-rec-time">
+                  00:{String(recordingSeconds).padStart(2, "0")} / 00:20
+                </span>
+              </div>
 
-            {/* Photo / Camera search button */}
-            <button
-              type="button"
-              className={`azarbot-image-btn ${selectedImage ? "has-image" : ""}`}
-              onClick={() => fileInputRef.current?.click()}
-              title={isAr ? "ابحث بصورة من هاتفك (تحليل سريع)" : "Chercher par image"}
-              aria-label="Téléverser une image"
-              disabled={loading || isCompressing}
+              {/* Dynamic Soundwave frequency visualizer */}
+              <div className="azarbot-waveform" aria-hidden="true">
+                <span className="wave-bar w-1" />
+                <span className="wave-bar w-2" />
+                <span className="wave-bar w-3" />
+                <span className="wave-bar w-4" />
+                <span className="wave-bar w-5" />
+                <span className="wave-bar w-6" />
+                <span className="wave-bar w-7" />
+              </div>
+
+              <div className="azarbot-rec-actions">
+                {/* Cancel / Discard */}
+                <button
+                  type="button"
+                  className="azarbot-rec-cancel-btn"
+                  onClick={cancelRecording}
+                  title={isAr ? "إلغاء التسجيل" : "Annuler"}
+                  aria-label="Annuler l'enregistrement"
+                >
+                  <Icon name="trash" size={16} />
+                </button>
+
+                {/* Finish & Send Voice Note */}
+                <button
+                  type="button"
+                  className="azarbot-rec-send-btn"
+                  onClick={() => stopRecording(true)}
+                  title={isAr ? "إرسال التسجيل الصوتي" : "Envoyer l'enregistrement"}
+                  aria-label="Envoyer"
+                >
+                  <Icon name={isAr ? "chevron-left" : "chevron-right"} size={18} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form
+              className="azarbot-footer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                sendMessage();
+              }}
             >
-              <Icon name="camera" size={18} />
-            </button>
+              {/* Hidden native file input for camera/image upload (max 5MB) */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: "none" }}
+                onChange={handleImageSelect}
+              />
 
-            <input
-              ref={inputRef}
-              type="text"
-              className="azarbot-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                isCompressing
-                  ? isAr
-                    ? "جاري تجهيز الصورة..."
-                    : "Traitement de l'image..."
-                  : selectedImage
-                  ? isAr
-                    ? "أضف ملاحظة أو اضغط إرسال للبحث..."
-                    : "Ajoutez un mot ou envoyez..."
-                  : isAr
-                  ? "اسأل عن منتج أو ارفع صورة..."
-                  : "Posez une question ou envoyez une photo..."
-              }
-              maxLength={400}
-              autoFocus={false}
-              disabled={loading}
-            />
-
-            {/* Stop button while loading, or > send button */}
-            {loading ? (
+              {/* Photo / Camera search button */}
               <button
                 type="button"
-                className="azarbot-stop-btn"
-                onClick={stopGeneration}
-                title={isAr ? "إيقاف الرد" : "Arrêter la génération"}
-                aria-label="Arrêter"
+                className={`azarbot-image-btn ${selectedImage ? "has-image" : ""}`}
+                onClick={() => fileInputRef.current?.click()}
+                title={isAr ? "ابحث بصورة من هاتفك (تحليل سريع)" : "Chercher par image"}
+                aria-label="Téléverser une image"
+                disabled={loading || isCompressing}
               >
-                <Icon name="square" size={12} filled />
-                <span>{isAr ? "إيقاف" : "Stop"}</span>
+                <Icon name="camera" size={18} />
               </button>
-            ) : (
+
+              {/* Voice recording button (Supports Kabyle / Taqbaylit, Darija, Arabic) */}
               <button
-                type="submit"
-                className="azarbot-send-btn"
-                disabled={(!input.trim() && !selectedImage) || isCompressing}
-                aria-label="Envoyer"
-                title={isAr ? "إرسال" : "Envoyer"}
+                type="button"
+                className="azarbot-mic-btn"
+                onClick={startRecording}
+                title={isAr ? "بحث بالصوت (حتى 20ث) — يفهم القبائلية والدارجة" : "Recherche vocale (max 20s) — Kabyle, Darija..."}
+                aria-label="Recherche vocale"
+                disabled={loading || isCompressing}
               >
-                <Icon name={isAr ? "chevron-left" : "chevron-right"} size={18} />
+                <Icon name="mic" size={18} />
               </button>
-            )}
-          </form>
+
+              <input
+                ref={inputRef}
+                type="text"
+                className="azarbot-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={
+                  isCompressing
+                    ? isAr
+                      ? "جاري تجهيز الصورة..."
+                      : "Traitement de l'image..."
+                    : selectedImage
+                    ? isAr
+                      ? "أضف ملاحظة أو اضغط إرسال للبحث..."
+                      : "Ajoutez un mot ou envoyez..."
+                    : isAr
+                    ? "اسأل، تحدث بالمايك 🎙️ أو ارفع صورة..."
+                    : "Écrivez, parlez au micro 🎙️ ou photo..."
+                }
+                maxLength={400}
+                autoFocus={false}
+                disabled={loading}
+              />
+
+              {/* Stop button while loading, or > send button */}
+              {loading ? (
+                <button
+                  type="button"
+                  className="azarbot-stop-btn"
+                  onClick={stopGeneration}
+                  title={isAr ? "إيقاف الرد" : "Arrêter la génération"}
+                  aria-label="Arrêter"
+                >
+                  <Icon name="square" size={12} filled />
+                  <span>{isAr ? "إيقاف" : "Stop"}</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="azarbot-send-btn"
+                  disabled={(!input.trim() && !selectedImage) || isCompressing}
+                  aria-label="Envoyer"
+                  title={isAr ? "إرسال" : "Envoyer"}
+                >
+                  <Icon name={isAr ? "chevron-left" : "chevron-right"} size={18} />
+                </button>
+              )}
+            </form>
+          )}
         </div>
       ) : null}
     </div>

@@ -4104,6 +4104,224 @@ ol {
 }
 
 /* ==========================================================================
+   Voice Search & Recording Dock (Supports Kabyle / Taqbaylit, Darija, Arabic)
+   ========================================================================== */
+
+.azarbot-mic-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.azarbot-mic-btn:hover {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  transform: scale(1.08);
+}
+
+.azarbot-mic-btn:active {
+  transform: scale(0.94);
+}
+
+/* Voice Message Tag inside User Bubble */
+.azarbot-voice-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 5px 12px;
+  border-radius: 20px;
+  margin-bottom: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.azarbot-voice-icon-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.azarbot-voice-bars {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 14px;
+}
+
+.azarbot-voice-bars span {
+  width: 2.5px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+.azarbot-voice-bars span:nth-child(1) { height: 6px; }
+.azarbot-voice-bars span:nth-child(2) { height: 12px; }
+.azarbot-voice-bars span:nth-child(3) { height: 15px; }
+.azarbot-voice-bars span:nth-child(4) { height: 8px; }
+
+.azarbot-voice-len {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Live Recording Dock */
+.azarbot-recording-bar {
+  padding: 8px 12px;
+  border-top: 1px solid rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(16, 185, 129, 0.04));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+  animation: slideInRecording 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInRecording {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.azarbot-rec-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.azarbot-rec-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+  animation: recPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes recPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.45;
+  }
+}
+
+.azarbot-rec-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ef4444;
+  letter-spacing: 0.03em;
+}
+
+.azarbot-waveform {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5px;
+  height: 28px;
+}
+
+.wave-bar {
+  width: 3px;
+  background: linear-gradient(to top, #10b981, #059669);
+  border-radius: 3px;
+  height: 6px;
+  animation: waveMotion 1s infinite ease-in-out;
+}
+
+.wave-bar.w-1 { animation-delay: 0.05s; }
+.wave-bar.w-2 { animation-delay: 0.25s; }
+.wave-bar.w-3 { animation-delay: 0.45s; }
+.wave-bar.w-4 { animation-delay: 0.15s; }
+.wave-bar.w-5 { animation-delay: 0.35s; }
+.wave-bar.w-6 { animation-delay: 0.55s; }
+.wave-bar.w-7 { animation-delay: 0.2s; }
+
+@keyframes waveMotion {
+  0%, 100% {
+    height: 4px;
+    opacity: 0.35;
+  }
+  50% {
+    height: 22px;
+    opacity: 1;
+  }
+}
+
+.azarbot-rec-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.azarbot-rec-cancel-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.azarbot-rec-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  transform: scale(1.08);
+}
+
+.azarbot-rec-send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: #10b981;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.azarbot-rec-send-btn:hover {
+  background: #059669;
+  transform: scale(1.08);
+}
+
+/* ==========================================================================
    Modern App Splash Screen (Fast, sleek entry with animated dots)
    ========================================================================== */
 

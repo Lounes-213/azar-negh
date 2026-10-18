@@ -314,6 +314,11 @@ export interface ChatImageInput {
   data: string; // base64 without prefix
 }
 
+export interface ChatAudioInput {
+  mimeType: string;
+  data: string; // base64 without prefix
+}
+
 export interface ChatMessage {
   role: "user" | "model";
   content: string;
@@ -327,7 +332,7 @@ export interface UserPersona {
 
 /**
  * Intelligent shopping assistant chatbot for Azar Neɣ.
- * Has full visibility of approved database products, multimodal vision, and strict safety boundaries.
+ * Has full visibility of approved database products, multimodal vision & audio, and strict safety boundaries.
  */
 export async function chatWithAzarBot(
   env: Env,
@@ -336,6 +341,7 @@ export async function chatWithAzarBot(
   persona?: UserPersona,
   lang: "fr" | "ar" = "ar",
   image?: ChatImageInput,
+  audio?: ChatAudioInput,
 ): Promise<string> {
   const isAr = lang === "ar";
 
@@ -348,22 +354,32 @@ export async function chatWithAzarBot(
 - تجنب تماماً المقدمات المطولة والمجاملات الإنشائية أو تكرار التحيات في كل رد، وأعط الزبون الزبدة والخلاصة فوراً.
 - عند المقارنة: اعرض جدول المقارنة المقتضب فوراً يليه سطر واحد فقط كخلاصة أو نصيحة حاسمة.
 
+قاعدة الفهم والتحدث بالأمازيغية القبائلية (TAQBAYLIT / AMAZIGH COMPREHENSION & MATCHING):
+- منصتنا تحمل اسماً أمازيغياً أصيلاً "Azar Neɣ" (آزار نغ). لذلك تفهم بدقة وبراعة تامة اللغة الأمازيغية القبائلية (Taqbaylit)، سواء وردت كنص لاتيني/عربي أو عبر تسجيل صوتي (Audio / Micro)!
+- تفهم بطلاقة جميع عبارات ومصطلحات التسوق والتحية القبائلية الجزائرية، مثل:
+  • التحية: "Azul fell-awen", "Amek telliḍ", "Ansuf yis-wen", "Tanmirt"
+  • الأسعار والسلع: "Acḥal ssuma", "Ssuma yelhan", "Aznuz", "Aɣbalu", "Tilifun", "Tawilayt", "Yelha", "Axxam", "Ayen yellan", إلخ.
+- إذا تحدث المستخدم بالقبائلية (صوتياً أو كتابياً)، يجب أن ترد عليه بنص بالقبائلية اللطيفة والمفهومة (بالحروف اللاتينية أو العربية مع الترحيب القبائلي مثل Azul)، مع ترشيح أفضل السلع المناسبة من الكتالوج!
+- الرد يجب أن يكون دائماً رسالة نصية واضحة ومقتضبة (Text message) متبوعة ببطاقات الشراء [MATCHED_PRODUCTS: id1, id2].
+
 قاعدة اللغة الصارمة (STRICT LANGUAGE MATCHING RULE):
 - يجب دائماً الرد بنفس لغة ولهجة رسالة المستخدم الأخيرة تماماً وبطريقة طبيعية وتلقائية:
   1. إذا تحدث بالدارجة الجزائرية بالحروف العربية (مثال: "واش عندك هواتف اليوم؟" أو "كاين كاش سيارة نقية؟")، أجب بالدارجة الجزائرية المحترفة واللطيفة والترحيبية.
   2. إذا تحدث بالدارجة الجزائرية بالحروف اللاتينية (عربيزي مثل: "kayen des telephones mlihin?" أو "choufli golf 7 svp")، أجب بالدارجة الجزائرية بالحروف اللاتينية أو الفرنسية البسيطة والودودة.
-  3. إذا تحدث بالفرنسية، أجب بالفرنسية الاحترافية والواضحة.
-  4. إذا تحدث بالعربية الفصحى، أجب بالعربية الفصحى الراقية.
-  5. إذا تحدث بالإنجليزية، أجب بالإنجليزية.
+  3. إذا تحدث بالقبائلية (Taqbaylit)، أجب بالقبائلية مع الترحيب الأمازيغي الودود.
+  4. إذا تحدث بالفرنسية، أجب بالفرنسية الاحترافية والواضحة.
+  5. إذا تحدث بالعربية الفصحى، أجب بالعربية الفصحى الراقية.
+  6. إذا تحدث بالإنجليزية، أجب بالإنجليزية.
 
 قواعد التنسيق والألوان والعرض (FORMATTING, COLOR HIGHLIGHTS & COMPARISON TABLES):
 1. استخدم خطاً عريضاً بين نجمتين مزدوجتين **للكلمات المهمة والأسماء والأسعار** (مثل: **iPhone 13** أو **85,000 DA** أو **مستعمل بحالة ممتازة** أو **الجزائر العاصمة**)، لأن تطبيقنا سيعرض هذه الكلمات تلقائياً باللون الأخضر المميز للتطبيق!
 2. عند المقارنة بين منتجات أو مواصفات أو أسعار، أنشئ جدول مقارنة منسق بصيغة Markdown الجدولية لسهولة القراءة على الهاتف:
 | المنتج | السعر | الحالة | الولاية | الملاحظات |
-| --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- |
 3. عند اقتراح أي منتج من الكتالوج المتوفر، اذكر رابطه بهذا الشكل الدقيق: [اسم المنتج](/annonces/معرف_المنتج).
 4. إذا أرفق المستخدم صورة، قم بفحصها وتحليلها بدقة: تعرف على نوع المنتج، ماركته، ومواصفاته، وقدم نصائح وإرشادات ومطابقة من الكتالوج.
-5. إذا وجدت منتجات مطابقة تماماً لطلب المستخدم من الكتالوج المتاح، اختر أفضل 1 إلى 3 منتجات مطابقة فقط، واذكر في نهاية إجابتك سطراً بهذا الشكل الدقيق لتوليد بطاقات شراء تفاعلية:
+5. إذا أرسل المستخدم تسجيلاً صوتياً (Audio)، استمع إليه بدقة وافهم لهجته (قبائلية، دارجة، عربية، فرنسية)، واقترح عليه المنتجات المناسبة بنص رسالة سريعة ومباشرة.
+6. إذا وجدت منتجات مطابقة تماماً لطلب المستخدم من الكتالوج المتاح، اختر أفضل 1 إلى 3 منتجات مطابقة فقط، واذكر في نهاية إجابتك سطراً بهذا الشكل الدقيق لتوليد بطاقات شراء تفاعلية:
 [MATCHED_PRODUCTS: id1, id2, id3]
 
 بيانات المنتجات المتاحة حالياً في قاعدة بيانات المنصة:
@@ -387,16 +403,33 @@ ${catalogContext || "لا توجد منتجات مسجلة حالياً."}
     const isLast = idx === messages.length - 1;
     const parts: GeminiPart[] = [];
 
-    // If user provided an image on the last message, attach it
-    if (isLast && m.role === "user" && image?.data) {
+    // If user provided an image or audio on the last message, attach it
+    if (isLast && m.role === "user") {
+      if (image?.data) {
+        parts.push({
+          inlineData: {
+            mimeType: image.mimeType,
+            data: image.data,
+          },
+        });
+      }
+      if (audio?.data) {
+        parts.push({
+          inlineData: {
+            mimeType: audio.mimeType,
+            data: audio.data,
+          },
+        });
+      }
+
+      const defaultText = audio?.data
+        ? (isAr ? "استمع إلى هذا التسجيل الصوتي بدقة (قبائلية / دارجة / فرنسية / عربية) وافهم طلب الزبون جيداً، ثم أجب بنص مباشر وموجز ورشح له أفضل السلع المطابقة من الكتالوج." : "Écoute cet enregistrement vocal (kabyle/darija/français), comprends la demande et réponds directement avec les meilleures annonces.")
+        : image?.data
+        ? (isAr ? "حلل هذه الصورة وتعرف على هذا المنتج وابحث عن أفضل المنتجات المشابهة في المنصة." : "Analyse cette image, identifie ce produit et trouve les meilleures annonces similaires sur la plateforme.")
+        : "";
+
       parts.push({
-        inlineData: {
-          mimeType: image.mimeType,
-          data: image.data,
-        },
-      });
-      parts.push({
-        text: m.content || (isAr ? "حلل هذه الصورة وتعرف على هذا المنتج وابحث عن أفضل المنتجات المشابهة في المنصة." : "Analyse cette image, identifie ce produit et trouve les meilleures annonces similaires sur la plateforme."),
+        text: m.content ? m.content : defaultText,
       });
     } else {
       parts.push({ text: m.content });
