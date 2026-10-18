@@ -207,7 +207,7 @@ export function Layout() {
             </span>
           </div>
 
-          <div style={{ position: "relative", flex: 1, maxWidth: 560, gridArea: "search" }}>
+          <div className="topbar-search-wrap">
             <form className="topbar-search" onSubmit={submitSearch} role="search">
               <Icon name="search" size={18} />
               <label className="sr-only" htmlFor="global-search">
