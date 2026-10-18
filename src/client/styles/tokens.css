@@ -88,18 +88,19 @@
 
   --glass-bg: rgba(255, 255, 255, 0.95);
   --glass-border: rgba(229, 238, 232, 0.9);
-  --brand-negh-color: #10b981;
+  --brand-negh-color: #16a34a;
 }
 
-/* Styled text for the "Negh" part of "Azar Negh" - on one line, green, not bold */
+/* Styled text for the "Negh" part of "Azar Negh" - on one line, app green, not bold */
 .brand-negh {
-  color: #10b981 !important;
+  color: var(--brand-negh-color, #16a34a) !important;
   font-weight: 400 !important;
-  display: inline;
+  display: inline !important;
+  white-space: nowrap !important;
 }
 .brand-title {
   white-space: nowrap !important;
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   gap: 4px;
 }
@@ -142,7 +143,7 @@ html[lang="ar"] {
   --grad-soft: linear-gradient(180deg, #131e17 0%, #0b130e 100%);
   --glass-bg: rgba(14, 23, 17, 0.96);
   --glass-border: rgba(34, 54, 42, 0.9);
-  --brand-negh-color: #34d399;
+  --brand-negh-color: #22c55e;
   color-scheme: dark;
 }
 

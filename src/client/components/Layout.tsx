@@ -220,10 +220,20 @@ export function Layout() {
           </Link>
 
           <div className="mobile-greeting">
-            <span>
-              <strong>{getGreeting(user, lang)}</strong>
-              <small>
-                Aẓar <span className="brand-negh" style={{ color: "#10b981", fontWeight: 400 }}>Negh</span>
+            <span className="mobile-greeting-stack">
+              <strong className="mobile-greeting-salute">{getGreeting(user, lang)}</strong>
+              <small
+                className="mobile-greeting-brand"
+                dir="ltr"
+                style={{
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                <span>Aẓar</span>
+                <span className="brand-negh">Negh</span>
               </small>
             </span>
           </div>
