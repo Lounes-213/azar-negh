@@ -170,8 +170,8 @@ notificationRoutes.post("/push/test", async (c) => {
   let sent = 0;
   for (const sub of targetSubs) {
     const ok = await sendWebPush(c.env.DB, sub, {
-      title: "Azar Neɣ — تجربة إشعار الهاتف 🔔",
-      body: "مرحباً بك! إشعارات الهاتف تعمل بنجاح حتى والشاشة مغلقة 🚀",
+      title: "Azar Neɣ",
+      body: "إشعار تجريبي: النظام يعمل بنجاح في الخلفية.",
       url: "/compte/notifications",
     });
     if (ok) sent++;
@@ -179,4 +179,28 @@ notificationRoutes.post("/push/test", async (c) => {
 
   return c.json({ ok: true, sent });
 });
+
+notificationRoutes.post("/push/unsubscribe", async (c) => {
+  const user = c.get("user");
+  let body: any = await c.req.json().catch(() => ({}));
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {}
+  }
+
+  const endpoint = body?.endpoint;
+  if (endpoint) {
+    await c.env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?")
+      .bind(endpoint)
+      .run();
+  } else if (user) {
+    await c.env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id = ?")
+      .bind(user.id)
+      .run();
+  }
+
+  return c.json({ ok: true });
+});
+
 
