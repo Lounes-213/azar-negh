@@ -18,6 +18,20 @@ function tabClass({ isActive }: { isActive: boolean }) {
   return isActive ? "active" : "";
 }
 
+function getGreeting(user: { displayName?: string | null } | null, lang: string): string {
+  const hour = new Date().getHours();
+  const isEvening = hour >= 18 || hour < 5;
+  const firstName = (user?.displayName ?? "").trim().split(/\s+/)[0] || "";
+
+  if (lang === "ar") {
+    const timeGreeting = isEvening ? "مساء الخير" : "صباح الخير";
+    return firstName ? `${timeGreeting}، ${firstName}` : `${timeGreeting} 👋`;
+  }
+
+  const timeGreeting = isEvening ? "Bonsoir" : "Bonjour";
+  return firstName ? `${timeGreeting}, ${firstName}` : `${timeGreeting} 👋`;
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -205,28 +219,12 @@ export function Layout() {
             <Logo variant="mark" height={34} />
           </Link>
 
-          <div
-            className="mobile-greeting"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              minWidth: 0,
-            }}
-          >
-            <span
-              className="brand-title"
-              style={{
-                fontSize: "1.2rem",
-                fontWeight: 700,
-                color: "var(--ink)",
-                whiteSpace: "nowrap",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Azar <span className="brand-negh" style={{ color: "#10b981", fontWeight: 400 }}>Negh</span>
+          <div className="mobile-greeting">
+            <span>
+              <strong>{getGreeting(user, lang)}</strong>
+              <small>
+                Aẓar <span className="brand-negh" style={{ color: "#10b981", fontWeight: 400 }}>Negh</span>
+              </small>
             </span>
           </div>
 

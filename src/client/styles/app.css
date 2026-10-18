@@ -4459,7 +4459,7 @@ ol {
 }
 
 .app-splash-title {
-  font-size: 1.85rem;
+  font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0;
@@ -4469,7 +4469,7 @@ ol {
 }
 
 .app-splash-subtitle {
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--muted);
   margin: 0;

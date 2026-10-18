@@ -30,6 +30,9 @@ function Protected({ children, roles }: { children: ReactNode; roles?: Role[] })
   const location = useLocation();
   if (loading) return <Spinner />;
   if (!user) {
+    if (roles?.includes("ADMIN") || roles?.includes("MODERATOR")) {
+      return <NotFound />;
+    }
     const next = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/connexion?next=${next}`} replace />;
   }
@@ -73,8 +76,22 @@ export function App() {
     <ErrorBoundary>
       {showSplash ? <SplashScreen onFinish={() => setShowSplash(false)} /> : null}
       <Routes>
-        <Route path="azar-secret-control-77x" element={<SecretAdminPortal />} />
-        <Route path="azar-secret-control-77x/*" element={<SecretAdminPortal />} />
+        <Route
+          path="azar-secret-control-77x"
+          element={
+            <Protected roles={["ADMIN"]}>
+              <SecretAdminPortal />
+            </Protected>
+          }
+        />
+        <Route
+          path="azar-secret-control-77x/*"
+          element={
+            <Protected roles={["ADMIN"]}>
+              <SecretAdminPortal />
+            </Protected>
+          }
+        />
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="annonces" element={<Search mode="all" />} />
