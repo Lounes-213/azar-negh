@@ -178,7 +178,7 @@ export function HeroCarousel() {
                       <span>{lang === "ar" ? slide.btnAr : slide.btnFr}</span>
                       <Icon
                         name={isRtl ? "chevron-left" : "arrow-right"}
-                        size={15}
+                        size={12}
                       />
                     </Link>
                   </div>
@@ -201,25 +201,6 @@ export function HeroCarousel() {
           );
         })}
       </div>
-
-      {/* Manual Arrow Controls */}
-      <button
-        type="button"
-        className="hero-carousel-arrow hero-carousel-arrow-prev"
-        onClick={goToPrev}
-        aria-label={lang === "ar" ? "السابق" : "Précédent"}
-      >
-        <Icon name={isRtl ? "chevron-right" : "chevron-left"} size={16} />
-      </button>
-
-      <button
-        type="button"
-        className="hero-carousel-arrow hero-carousel-arrow-next"
-        onClick={goToNext}
-        aria-label={lang === "ar" ? "التالي" : "Suivant"}
-      >
-        <Icon name={isRtl ? "chevron-left" : "chevron-right"} size={16} />
-      </button>
 
       {/* Dot Indicators with 4-second animated progress */}
       <div className="hero-carousel-dots" role="tablist">

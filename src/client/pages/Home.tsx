@@ -25,10 +25,50 @@ export function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const meta = useAsync(() => api<MetaResponse>("/meta"), []);
-  const recent = useAsync(
-    () => api<{ listings: Paginated<ListingSummary> }>("/listings?sort=newest&perPage=8"),
-    [],
-  );
+  const [homeListings, setHomeListings] = useState<ListingSummary[]>([]);
+  const [homeTotal, setHomeTotal] = useState(0);
+  const [homePage, setHomePage] = useState(1);
+  const [homeLoading, setHomeLoading] = useState(true);
+  const [homeLoadingMore, setHomeLoadingMore] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setHomeLoading(true);
+    api<{ listings: Paginated<ListingSummary> }>("/listings?sort=newest&perPage=8&page=1")
+      .then((res) => {
+        if (!active) return;
+        setHomeListings(res.listings.items);
+        setHomeTotal(res.listings.total);
+        setHomePage(1);
+      })
+      .catch(() => {
+        // silent
+      })
+      .finally(() => {
+        if (active) setHomeLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleHomeLoadMore = async () => {
+    if (homeLoadingMore || homeListings.length >= homeTotal) return;
+    setHomeLoadingMore(true);
+    const nextPage = homePage + 1;
+    try {
+      const res = await api<{ listings: Paginated<ListingSummary> }>(
+        `/listings?sort=newest&perPage=8&page=${nextPage}`,
+      );
+      setHomeListings((prev) => [...prev, ...res.listings.items]);
+      setHomePage(nextPage);
+      setHomeTotal(res.listings.total);
+    } catch {
+      // silent
+    } finally {
+      setHomeLoadingMore(false);
+    }
+  };
 
   const [detectedPlace, setDetectedPlace] = useState<string | null>(() => {
     try {
@@ -139,7 +179,7 @@ export function Home() {
         </div>
       </section>
 
-      <section className="section" aria-labelledby="categories-title">
+      <section className="section section-categories" aria-labelledby="categories-title">
         <div className="section-head">
           <div>
             <h2 id="categories-title">{t("home.categories")}</h2>
@@ -184,8 +224,8 @@ export function Home() {
       </section>
 
       <section
-        className="section"
-        style={{ marginTop: 12, marginBottom: 8 }}
+        className="section section-hero-carousel"
+        style={{ marginTop: 10, marginBottom: 8 }}
         aria-label={lang === "ar" ? "عروض وإعلانات مميزة" : "Offres et bannières"}
       >
         <HeroCarousel />
@@ -211,16 +251,72 @@ export function Home() {
           {t("home.recent")}
         </h2>
 
-        {recent.loading ? (
+        {homeLoading ? (
           <SkeletonStack count={4} />
-        ) : recent.data && recent.data.listings.items.length > 0 ? (
-          <div className="listing-grid">
-            {recent.data.listings.items.map((listing, index) => (
-              <div key={listing.id} className="card-animated-wrap" style={{ animationDelay: `${index * 45}ms` }}>
-                <ListingCard listing={listing} />
+        ) : homeListings.length > 0 ? (
+          <>
+            <div className="listing-grid">
+              {homeListings.map((listing, index) => (
+                <div
+                  key={listing.id}
+                  className="card-animated-wrap"
+                  style={{ animationDelay: `${(index % 8) * 35}ms` }}
+                >
+                  <ListingCard listing={listing} />
+                </div>
+              ))}
+            </div>
+
+            {/* Voir plus (+8) button under the product list */}
+            {homeListings.length < homeTotal ? (
+              <div className="home-load-more-wrap">
+                <button
+                  type="button"
+                  className="btn btn-load-more"
+                  onClick={handleHomeLoadMore}
+                  disabled={homeLoadingMore}
+                >
+                  {homeLoadingMore ? (
+                    <>
+                      <span
+                        className="spinner"
+                        style={{
+                          width: 15,
+                          height: 15,
+                          borderWidth: 2,
+                          borderColor: "rgba(255, 255, 255, 0.3)",
+                          borderTopColor: "#fff",
+                          margin: 0,
+                          display: "inline-block",
+                        }}
+                      />
+                      <span>{lang === "ar" ? "جارِ التحميل..." : "Chargement..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="arrow-down" size={15} />
+                      <span>
+                        {lang === "ar" ? "عرض المزيد (+8)" : "Voir plus de produits (+8)"}
+                      </span>
+                    </>
+                  )}
+                </button>
+                <span className="home-load-more-count">
+                  {lang === "ar"
+                    ? `عرض ${homeListings.length} من ${homeTotal} إعلان`
+                    : `${homeListings.length} sur ${homeTotal} annonces`}
+                </span>
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="home-all-loaded">
+                <span>
+                  {lang === "ar"
+                    ? "✓ تم عرض جميع الإعلانات الأخيرة"
+                    : "✓ Toutes les annonces récentes sont affichées"}
+                </span>
+              </div>
+            )}
+          </>
         ) : (
           <EmptyState
             icon="tag"
