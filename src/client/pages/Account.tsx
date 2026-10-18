@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import type { MetaResponse, SessionUser } from "../../shared/types";
-import { Alert, Avatar, Button, Field, Input, Spinner, Textarea } from "../components/ui";
+import { Avatar, Button, Field, Input, Spinner, Textarea, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { Icon } from "../components/Icons";
+import { PwaInstallCard } from "../components/PwaInstallCard";
 import { api, errorMessage, fieldErrors } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
@@ -33,12 +34,30 @@ export function Account() {
   const isAr = lang === "ar";
   useDocumentTitle(isAr ? "حسابي الشخصي — أزار نغ" : "Mon compte — Azar Neɣ");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { push } = useToast();
   const meta = useAsync(() => api<MetaResponse>("/meta"), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sub-views: "hub" (main menu), "edit" (edit profile & avatar), "follows" (followers & following), "store" (spacious store editor)
-  const [view, setView] = useState<"hub" | "edit" | "follows" | "store">("hub");
+  const initialView = (searchParams.get("view") as "hub" | "edit" | "follows" | "store") || "hub";
+  const [view, setView] = useState<"hub" | "edit" | "follows" | "store">(initialView);
   const [followsTab, setFollowsTab] = useState<"followers" | "following">("followers");
+
+  useEffect(() => {
+    const viewParam = searchParams.get("view");
+    if (viewParam === "store" || viewParam === "edit" || viewParam === "follows" || viewParam === "hub") {
+      setView(viewParam);
+    }
+  }, [searchParams]);
+
+  const handleSetView = (nextView: "hub" | "edit" | "follows" | "store") => {
+    setView(nextView);
+    if (nextView === "hub") {
+      setSearchParams({}, { replace: true });
+    } else {
+      setSearchParams({ view: nextView }, { replace: true });
+    }
+  };
 
   const [stats, setStats] = useState<AccountStats | null>(null);
   const [followsData, setFollowsData] = useState<{ followers: FollowUser[]; following: FollowUser[] } | null>(null);
@@ -46,18 +65,14 @@ export function Account() {
   const [busy, setBusy] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [notice, setNotice] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
 
   const storeLogoInputRef = useRef<HTMLInputElement>(null);
-  const storeBannerInputRef = useRef<HTMLInputElement>(null);
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [storeName, setStoreName] = useState(user?.storeName ?? "");
   const [storeSlug, setStoreSlug] = useState(user?.storeSlug ?? "");
   const [storeLogoUrl, setStoreLogoUrl] = useState(user?.logoUrl ?? "");
-  const [storeBannerUrl, setStoreBannerUrl] = useState(user?.bannerUrl ?? "");
   const [commune, setCommune] = useState(user?.commune ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
   const [openingHours, setOpeningHours] = useState(user?.openingHours ?? "");
@@ -73,7 +88,6 @@ export function Account() {
     setStoreName(user.storeName ?? "");
     setStoreSlug(user.storeSlug ?? "");
     setStoreLogoUrl(user.logoUrl ?? "");
-    setStoreBannerUrl(user.bannerUrl ?? "");
     setCommune(user.commune ?? "");
     setAddress(user.address ?? "");
     setOpeningHours(user.openingHours ?? "");
@@ -108,23 +122,22 @@ export function Account() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setNotice({
-        tone: "danger",
-        text: isAr ? "يرجى اختيار ملف صورة صالح (JPG أو PNG أو WebP)." : "Veuillez choisir un format d'image valide (JPG, PNG ou WebP).",
-      });
+      push(
+        isAr ? "يرجى اختيار ملف صورة صالح (JPG أو PNG أو WebP)." : "Veuillez choisir un format d'image valide (JPG, PNG ou WebP).",
+        "error",
+      );
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setNotice({
-        tone: "danger",
-        text: isAr ? "حجم الصورة يجب ألا يتجاوز 5 ميغابايت." : "L'image ne doit pas dépasser 5 Mo.",
-      });
+      push(
+        isAr ? "حجم الصورة يجب ألا يتجاوز 5 ميغابايت." : "L'image ne doit pas dépasser 5 Mo.",
+        "error",
+      );
       return;
     }
 
     setUploadingAvatar(true);
-    setNotice(null);
 
     try {
       const formData = new FormData();
@@ -135,14 +148,12 @@ export function Account() {
       });
 
       updateUser({ ...user, avatarUrl: res.avatarUrl });
-      setNotice({
-        tone: "success",
-        text: isAr
-          ? "تم تحديث صورتك الشخصية بنجاح."
-          : "Photo de profil mise à jour avec succès.",
-      });
+      push(
+        isAr ? "تم تحديث صورتك الشخصية بنجاح !" : "Photo de profil mise à jour avec succès !",
+        "success",
+      );
     } catch (err) {
-      setNotice({ tone: "danger", text: errorMessage(err) });
+      push(errorMessage(err), "error");
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -151,18 +162,15 @@ export function Account() {
 
   const handleRemoveAvatar = async () => {
     setUploadingAvatar(true);
-    setNotice(null);
     try {
       await api<{ avatarUrl: null }>("/account/avatar", { method: "DELETE" });
       updateUser({ ...user, avatarUrl: null });
-      setNotice({
-        tone: "success",
-        text: isAr
-          ? "تم حذف الصورة الشخصية بنجاح."
-          : "Photo de profil supprimée.",
-      });
+      push(
+        isAr ? "تم حذف الصورة الشخصية بنجاح." : "Photo de profil supprimée.",
+        "success",
+      );
     } catch (err) {
-      setNotice({ tone: "danger", text: errorMessage(err) });
+      push(errorMessage(err), "error");
     } finally {
       setUploadingAvatar(false);
     }
@@ -177,14 +185,13 @@ export function Account() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      setNotice({
-        tone: "danger",
-        text: isAr ? "حجم الشعار يجب ألا يتجاوز 5 ميغابايت." : "Le logo ne doit pas dépasser 5 Mo.",
-      });
+      push(
+        isAr ? "حجم الصورة يجب ألا يتجاوز 5 ميغابايت." : "Le logo ne doit pas dépasser 5 Mo.",
+        "error",
+      );
       return;
     }
     setUploadingLogo(true);
-    setNotice(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -193,58 +200,21 @@ export function Account() {
         body: formData,
       });
       setStoreLogoUrl(res.image.url);
-      setNotice({
-        tone: "success",
-        text: isAr
-          ? "تم رفع شعار المتجر بنجاح. اضغط 'حفظ' لتثبيت التعديل."
-          : "Logo téléversé. Cliquez sur Enregistrer pour valider.",
-      });
+      push(
+        isAr ? "تم رفع صورة المتجر بنجاح ! اضغط حفظ لتثبيت التعديل." : "Photo du magasin téléversée ! Cliquez sur Enregistrer.",
+        "success",
+      );
     } catch (err) {
-      setNotice({ tone: "danger", text: errorMessage(err) });
+      push(errorMessage(err), "error");
     } finally {
       setUploadingLogo(false);
       if (storeLogoInputRef.current) storeLogoInputRef.current.value = "";
     }
   };
 
-  const handleStoreBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setNotice({
-        tone: "danger",
-        text: isAr ? "حجم الغلاف يجب ألا يتجاوز 5 ميغابايت." : "La bannière ne doit pas dépasser 5 Mo.",
-      });
-      return;
-    }
-    setUploadingBanner(true);
-    setNotice(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await api<{ image: { id: string; url: string } }>("/images", {
-        method: "POST",
-        body: formData,
-      });
-      setStoreBannerUrl(res.image.url);
-      setNotice({
-        tone: "success",
-        text: isAr
-          ? "تم رفع غلاف المتجر بنجاح. اضغط 'حفظ' لتثبيت التعديل."
-          : "Bannière téléversée. Cliquez sur Enregistrer pour valider.",
-      });
-    } catch (err) {
-      setNotice({ tone: "danger", text: errorMessage(err) });
-    } finally {
-      setUploadingBanner(false);
-      if (storeBannerInputRef.current) storeBannerInputRef.current.value = "";
-    }
-  };
-
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    setNotice(null);
     setFields({});
     try {
       const data = await api<{ user: SessionUser }>("/auth/store", {
@@ -256,7 +226,6 @@ export function Account() {
           commune: commune.trim() || null,
           address: address.trim() || null,
           openingHours: openingHours.trim() || null,
-          bannerUrl: storeBannerUrl.trim() || null,
           logoUrl: storeLogoUrl.trim() || null,
           phone,
           phonePublic,
@@ -266,12 +235,12 @@ export function Account() {
         },
       });
       updateUser(data.user);
-      setNotice({
-        tone: "success",
-        text: isAr ? "تم حفظ التعديلات بنجاح." : "Modifications enregistrées avec succès.",
-      });
+      push(
+        isAr ? "تم حفظ التعديلات بنجاح !" : "Modifications enregistrées avec succès !",
+        "success",
+      );
     } catch (error) {
-      setNotice({ tone: "danger", text: errorMessage(error) });
+      push(errorMessage(error), "error");
       setFields(fieldErrors(error));
     } finally {
       setBusy(false);
@@ -320,10 +289,7 @@ export function Account() {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setNotice(null);
-                setView("hub");
-              }}
+              onClick={() => handleSetView("hub")}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <Icon name="arrow-right" size={16} style={{ transform: isAr ? "rotate(0deg)" : "rotate(180deg)" }} />
@@ -412,13 +378,6 @@ export function Account() {
             <h3 style={{ fontSize: "var(--text-base)", fontWeight: 600, marginBottom: 14 }}>
               {isAr ? "المعلومات الشخصية والبيانات" : "Informations personnelles & boutique"}
             </h3>
-
-            {notice ? (
-              <div className="mb-4">
-                <Alert tone={notice.tone}>{notice.text}</Alert>
-              </div>
-            ) : null}
-
             <form onSubmit={save} className="stack" style={{ gap: "var(--space-4)" }}>
               <div className="form-grid">
                 <Field
@@ -585,14 +544,14 @@ export function Account() {
                 </label>
               </div>
 
-              <div className="form-actions" style={{ marginTop: "var(--space-2)" }}>
+              <div className="form-actions" style={{ marginTop: "var(--space-2)", paddingBottom: "calc(var(--tabbar-height, 68px) + 32px)" }}>
                 <Button type="submit" loading={busy}>
                   {t("account.saveProfile")}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setView("hub")}
+                  onClick={() => handleSetView("hub")}
                 >
                   {isAr ? "إلغاء" : "Annuler"}
                 </Button>
@@ -609,7 +568,7 @@ export function Account() {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => setView("hub")}
+              onClick={() => handleSetView("hub")}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <Icon name="arrow-right" size={16} style={{ transform: isAr ? "rotate(0deg)" : "rotate(180deg)" }} />
@@ -745,10 +704,7 @@ export function Account() {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setNotice(null);
-                setView("hub");
-              }}
+              onClick={() => handleSetView("hub")}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <Icon name="arrow-right" size={16} style={{ transform: isAr ? "rotate(0deg)" : "rotate(180deg)" }} />
@@ -772,11 +728,9 @@ export function Account() {
             )}
           </div>
 
-          {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
-
           {/* Form */}
           <form onSubmit={save} className="stack" style={{ gap: "var(--space-4)" }}>
-            {/* Visual Branding Card (Banner & Logo) */}
+            {/* Visual Branding Card (Photo de la boutique) */}
             <div
               className="panel stack"
               style={{
@@ -788,60 +742,8 @@ export function Account() {
               }}
             >
               <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
-                {isAr ? "الهوية البصرية للمتجر (الغلاف والشعار)" : "Identité visuelle (Bannière & Logo)"}
+                {isAr ? "صورة أو شعار المتجر" : "Photo / Logo de la boutique"}
               </h3>
-
-              {/* Banner Area */}
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  height: 160,
-                  borderRadius: "var(--radius-md)",
-                  overflow: "hidden",
-                  background: storeBannerUrl
-                    ? `url(${storeBannerUrl}) center/cover no-repeat`
-                    : "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-900) 100%)",
-                  display: "flex",
-                  alignItems: "flex-end",
-                  padding: 12,
-                  boxShadow: "inset 0 0 40px rgba(0,0,0,0.3)",
-                }}
-              >
-                <input
-                  ref={storeBannerInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  style={{ display: "none" }}
-                  onChange={handleStoreBannerUpload}
-                />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => storeBannerInputRef.current?.click()}
-                    disabled={uploadingBanner}
-                    style={{
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(4px)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {uploadingBanner ? <Spinner /> : <Icon name="camera" size={14} />}
-                    <span>{isAr ? "تغيير الغلاف" : "Changer la bannière"}</span>
-                  </button>
-                  {storeBannerUrl ? (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setStoreBannerUrl("")}
-                      style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
-                    >
-                      <Icon name="x" size={13} />
-                    </button>
-                  ) : null}
-                </div>
-              </div>
 
               {/* Logo Area */}
               <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
@@ -862,12 +764,12 @@ export function Account() {
                 </div>
                 <div className="stack" style={{ gap: 6, flex: 1, minWidth: 200 }}>
                   <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
-                    {isAr ? "شعار المتجر (Logo)" : "Logo officiel de la boutique"}
+                    {isAr ? "الصورة المعتمدة للمتجر" : "Photo officielle du magasin"}
                   </div>
                   <p className="small muted" style={{ margin: 0 }}>
                     {isAr
-                      ? "يظهر في واجهة متجرك وعلى جميع بطاقات منتجاتك بعلامة التوثيق الخضراء."
-                      : "S'affiche sur votre vitrine et sur toutes vos annonces avec le cercle émeraude."}
+                      ? "تظهر كصورة رئيسية لمتجرك وعلى جميع بطاقات منتجاتك بعلامة التوثيق الخضراء."
+                      : "S'affiche comme visuel principal de votre vitrine et sur toutes vos annonces."}
                   </p>
                   <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                     <button
@@ -877,7 +779,7 @@ export function Account() {
                       disabled={uploadingLogo}
                     >
                       {uploadingLogo ? <Spinner /> : <Icon name="camera" size={14} />}
-                      <span>{isAr ? "رفع شعار جديد" : "Téléverser un logo"}</span>
+                      <span>{isAr ? "تغيير صورة المتجر" : "Changer la photo"}</span>
                     </button>
                     {storeLogoUrl ? (
                       <button
@@ -1067,7 +969,7 @@ export function Account() {
                 display: "flex",
                 gap: 12,
                 marginTop: 8,
-                paddingBottom: 40,
+                paddingBottom: "calc(var(--tabbar-height, 68px) + 32px)",
               }}
             >
               <Button type="submit" loading={busy} style={{ flex: 1, padding: "14px 24px", fontSize: "1rem" }}>
@@ -1077,7 +979,7 @@ export function Account() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => setView("hub")}
+                onClick={() => handleSetView("hub")}
                 style={{ padding: "14px 20px" }}
               >
                 {isAr ? "إلغاء" : "Annuler"}
@@ -1154,10 +1056,7 @@ export function Account() {
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() => {
-                setNotice(null);
-                setView("edit");
-              }}
+              onClick={() => handleSetView("edit")}
               style={{
                 width: "100%",
                 justifyContent: "center",
@@ -1278,7 +1177,7 @@ export function Account() {
               {/* Mes Abonnés & Abonnements */}
               <button
                 type="button"
-                onClick={() => setView("follows")}
+                onClick={() => handleSetView("follows")}
                 className="account-menu-item"
                 style={{
                   width: "100%",
@@ -1329,10 +1228,7 @@ export function Account() {
               {/* Configurer / Gérer ma boutique (Spacious Store Editor) */}
               <button
                 type="button"
-                onClick={() => {
-                  setNotice(null);
-                  setView("store");
-                }}
+                onClick={() => handleSetView("store")}
                 className="account-menu-item"
                 style={{
                   width: "100%",
@@ -1653,8 +1549,11 @@ export function Account() {
             </div>
           </div>
 
+          {/* PWA App Installation Card (Android & iOS) */}
+          <PwaInstallCard lang={lang} />
+
           {/* Logout Button (At the very bottom as requested) */}
-          <div style={{ paddingTop: 8, paddingBottom: 24 }}>
+          <div style={{ paddingTop: 14, paddingBottom: "calc(var(--tabbar-height, 68px) + 32px)" }}>
             <button
               type="button"
               onClick={handleLogout}

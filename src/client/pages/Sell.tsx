@@ -405,14 +405,26 @@ export function Sell() {
         if (status === "DRAFT" || status === "REJECTED" || status === "ARCHIVED") {
           await api(`/listings/${listingId}/submit`, { method: "POST" });
         }
-        push("Annonce soumise à la modération.", "success");
+        push(
+          lang === "ar"
+            ? "تم إرسال الإعلان للمراجعة بنجاح."
+            : "Annonce soumise à la modération.",
+          "success",
+        );
         navigate(`/annonces/${listingId}`);
       } else {
-        push("Brouillon enregistré.", "success");
+        push(
+          lang === "ar"
+            ? "تم حفظ مسودة الإعلان بنجاح."
+            : "Brouillon enregistré.",
+          "success",
+        );
         navigate("/compte/annonces?status=DRAFT");
       }
     } catch (err) {
-      setError(errorMessage(err));
+      const msg = errorMessage(err);
+      setError(msg);
+      push(msg, "error");
       setFields(fieldErrors(err));
     } finally {
       setBusy(false);

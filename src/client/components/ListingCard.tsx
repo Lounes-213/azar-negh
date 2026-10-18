@@ -191,7 +191,7 @@ export function ListingCard({
         {/* Shop / Store Row with Store Logo or Seller Avatar */}
         <div className="ali-store-footer">
           <Link
-            to={listing.storeSlug ? `/vendeurs/${listing.storeSlug}` : `/vendeurs/${listing.id}`}
+            to={listing.storeSlug ? `/vendeurs/${listing.storeSlug}` : `/vendeurs/${listing.sellerId || listing.id}`}
             className="ali-store-link"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >

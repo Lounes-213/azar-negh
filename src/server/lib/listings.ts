@@ -104,6 +104,7 @@ export function rowToSummary(row: ListingRow): ListingSummary {
     createdAt: row.created_at,
     publishedAt: row.published_at,
     sellerDisplayName: row.seller_display_name ?? "Vendeur",
+    sellerId: row.seller_id,
     storeName: row.store_name ?? null,
     storeSlug: row.store_slug ?? null,
     sellerAvatarUrl: row.seller_avatar_url ?? null,

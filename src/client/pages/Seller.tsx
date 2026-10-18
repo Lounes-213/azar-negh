@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ListingSummary, Paginated, StoreProfile } from "../../shared/types";
-import { Avatar, Button, Dialog, EmptyState, Field, Input, Pagination, Spinner, Textarea, useToast } from "../components/ui";
+import { Avatar, Button, Dialog, EmptyState, Field, Pagination, Spinner, Textarea, useToast } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { Icon } from "../components/Icons";
 import { api, errorMessage } from "../lib/api";
@@ -17,7 +17,7 @@ interface SellerResponse {
 
 export function Seller() {
   const { id } = useParams();
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const { t, lang } = useI18n();
   const { push } = useToast();
   const navigate = useNavigate();
@@ -39,16 +39,6 @@ export function Seller() {
   const [reviewBusy, setReviewBusy] = useState(false);
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [reviewsCount, setReviewsCount] = useState<number | null>(null);
-
-  // Store edit dialog
-  const [editOpen, setEditOpen] = useState(false);
-  const [editBusy, setEditBusy] = useState(false);
-  const [storeName, setStoreName] = useState("");
-  const [storeSlug, setStoreSlug] = useState("");
-  const [commune, setCommune] = useState("");
-  const [address, setAddress] = useState("");
-  const [openingHours, setOpeningHours] = useState("");
-  const [bio, setBio] = useState("");
 
   // Reordering mode for store owner
   const [reorderMode, setReorderMode] = useState(false);
@@ -77,48 +67,6 @@ export function Seller() {
   const currentFollowersCount = followersCount !== null ? followersCount : seller.followersCount;
   const currentRating = avgRating !== null ? avgRating : seller.averageRating;
   const currentReviewsCount = reviewsCount !== null ? reviewsCount : seller.reviewsCount;
-
-  // Initialize store edit fields when opening dialog
-  const openEditModal = () => {
-    setStoreName(seller.storeName || "");
-    setStoreSlug(seller.storeSlug || "");
-    setCommune(seller.commune || "");
-    setAddress(seller.address || "");
-    setOpeningHours(seller.openingHours || "");
-    setBio(seller.bio || "");
-    setEditOpen(true);
-  };
-
-  const handleSaveStore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setEditBusy(true);
-    try {
-      const res = await api<{ user: any }>("/auth/store", {
-        method: "PATCH",
-        body: {
-          displayName: seller.displayName,
-          storeName: storeName.trim() || null,
-          storeSlug: storeSlug.trim() || null,
-          commune: commune.trim() || null,
-          address: address.trim() || null,
-          openingHours: openingHours.trim() || null,
-          bio: bio.trim() || null,
-          phone: seller.phone || "+213550000000",
-          phonePublic: Boolean(seller.phone),
-          whatsappPublic: seller.whatsappPublic,
-          wilayaId: seller.wilaya.id,
-        },
-      });
-      updateUser(res.user);
-      push(lang === "ar" ? "تم تحديث معلومات المتجر بنجاح !" : "Boutique mise à jour avec succès !", "success");
-      setEditOpen(false);
-      state.reload();
-    } catch (err) {
-      push(errorMessage(err), "error");
-    } finally {
-      setEditBusy(false);
-    }
-  };
 
   const handleToggleFollow = async () => {
     if (!user) {
@@ -228,23 +176,8 @@ export function Seller() {
 
   return (
     <div className="container page page-enter">
-      {/* Store Header Banner */}
+      {/* Store Header Card */}
       <div className="store-header-card mb-6">
-        <div
-          className="store-banner-bg"
-          style={
-            seller.bannerUrl
-              ? {
-                  backgroundImage: `url(${seller.bannerUrl})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }
-              : undefined
-          }
-        >
-          <div className="store-banner-overlay" />
-        </div>
-
         <div className="store-profile-bar">
           <div className="store-avatar-wrap">
             <Avatar
@@ -262,6 +195,28 @@ export function Seller() {
                 <span className="store-slug-badge">@{seller.storeSlug}</span>
               ) : null}
             </div>
+
+            {/* Store Owner Personal Name */}
+            {seller.storeName && seller.displayName ? (
+              <div
+                className="store-owner-badge"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 4,
+                  marginBottom: 6,
+                  fontSize: "0.88rem",
+                  color: "var(--ink-muted)",
+                  fontWeight: 600,
+                }}
+              >
+                <Icon name="user" size={14} />
+                <span>
+                  {lang === "ar" ? `تسيير : ${seller.displayName}` : `Géré par : ${seller.displayName}`}
+                </span>
+              </div>
+            ) : null}
 
             <div className="store-meta-row">
               <span className="store-meta-item">
@@ -313,7 +268,7 @@ export function Seller() {
               </Button>
             ) : (
               <>
-                <Button variant="secondary" size="sm" onClick={openEditModal}>
+                <Button variant="secondary" size="sm" onClick={() => navigate("/compte?view=store")}>
                   <Icon name="edit" size={15} />
                   <span>{lang === "ar" ? "تعديل المتجر" : "Modifier la boutique"}</span>
                 </Button>
@@ -523,93 +478,6 @@ export function Seller() {
           </Field>
         </form>
       </Dialog>
-
-      {/* Edit Store Dialog for Merchant */}
-      {isOwner ? (
-        <Dialog
-          open={editOpen}
-          onClose={() => setEditOpen(false)}
-          title={lang === "ar" ? "تعديل معلومات المتجر والخدمة" : "Personnaliser ma boutique"}
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => setEditOpen(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button onClick={handleSaveStore} loading={editBusy}>
-                {lang === "ar" ? "حفظ التغييرات" : "Enregistrer"}
-              </Button>
-            </>
-          }
-        >
-          <form onSubmit={handleSaveStore} className="stack">
-            <Field label={lang === "ar" ? "اسم المتجر أو الخدمة" : "Nom du magasin ou service"} htmlFor="store-name" required>
-              <Input
-                id="store-name"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
-                placeholder="Ex. Boutique Tech Alger"
-                maxLength={80}
-                required
-              />
-            </Field>
-
-            <Field label={lang === "ar" ? "رابط المتجر الخاص (Slug)" : "Lien personnalisé (Slug)"} htmlFor="store-slug">
-              <Input
-                id="store-slug"
-                value={storeSlug}
-                onChange={(e) => setStoreSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                placeholder="ex: tech-alger"
-                maxLength={60}
-              />
-              <span className="small muted">
-                {window.location.origin}/vendeurs/{storeSlug || "votre-boutique"}
-              </span>
-            </Field>
-
-            <div className="row" style={{ gap: 12 }}>
-              <Field label={lang === "ar" ? "البلدية" : "Commune"} htmlFor="store-commune">
-                <Input
-                  id="store-commune"
-                  value={commune}
-                  onChange={(e) => setCommune(e.target.value)}
-                  placeholder="Ex. Bab Ezzouar"
-                  maxLength={80}
-                />
-              </Field>
-              <Field label={lang === "ar" ? "العنوان أو الحي" : "Adresse physique"} htmlFor="store-address">
-                <Input
-                  id="store-address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Ex. Boulevard Central N° 12"
-                  maxLength={160}
-                />
-              </Field>
-            </div>
-
-            <Field label={lang === "ar" ? "أوقات العمل" : "Horaires d'ouverture"} htmlFor="store-hours">
-              <Input
-                id="store-hours"
-                value={openingHours}
-                onChange={(e) => setOpeningHours(e.target.value)}
-                placeholder="Ex. 09:00 - 19:00 (Sam - Jeu)"
-                maxLength={120}
-              />
-            </Field>
-
-            <Field label={lang === "ar" ? "نبذة عن المتجر" : "Présentation / Bio"} htmlFor="store-bio">
-              <Textarea
-                id="store-bio"
-                rows={3}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Spécialiste de la vente de matériel informatique..."
-                maxLength={500}
-              />
-            </Field>
-          </form>
-        </Dialog>
-      ) : null}
     </div>
   );
 }

@@ -167,15 +167,6 @@ export function MyListings() {
                           <Icon name="refresh" size={14} /> Remettre en ligne
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setDeleteId(listing.id)}
-                        title={t("common.delete")}
-                        style={{ color: "var(--danger)" }}
-                      >
-                        <Icon name="trash" size={14} /> {t("common.delete")}
-                      </Button>
                     </>
                   }
                 />

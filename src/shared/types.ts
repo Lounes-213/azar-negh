@@ -137,6 +137,7 @@ export interface ListingSummary {
   createdAt: string;
   publishedAt: string | null;
   sellerDisplayName: string;
+  sellerId?: string;
   storeName?: string | null;
   storeSlug?: string | null;
   sellerAvatarUrl?: string | null;

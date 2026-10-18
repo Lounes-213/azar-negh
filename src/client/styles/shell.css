@@ -1128,9 +1128,12 @@
   }
 
   .toast-stack {
-    bottom: calc(var(--tabbar-height) + 16px);
+    bottom: calc(var(--tabbar-height, 68px) + 16px);
     inset-inline: 16px;
     max-width: none;
+    z-index: 9999;
+    align-items: center;
+    pointer-events: none;
   }
 
   .footer-grid {
