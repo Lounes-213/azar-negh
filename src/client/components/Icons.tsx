@@ -235,6 +235,17 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M4 16v4h16v-4" />
     </>
   ),
+  maximize: (
+    <>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+    </>
+  ),
+  minimize: (
+    <>
+      <path d="M4 14h6m0 0v6m0-6-7 7m17-11h-6m0 0V4m0 6 7-7" />
+    </>
+  ),
+  square: <rect x="5" y="5" width="14" height="14" rx="2" />,
   image: (
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />

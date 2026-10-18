@@ -80,7 +80,7 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
          LEFT JOIN categories cat ON cat.id = l.category_id
          WHERE ${where}
          ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-         LIMIT 25`,
+         LIMIT 12`,
       )
       .bind(...params)
       .all<{
@@ -110,7 +110,7 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
            LEFT JOIN categories cat ON cat.id = l.category_id
            WHERE l.status = 'APPROVED'
            ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-           LIMIT 20`,
+           LIMIT 10`,
         )
         .all();
     }

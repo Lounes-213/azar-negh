@@ -2397,18 +2397,38 @@ ol {
   }
   .tabbar .tab-sell {
     color: var(--brand-700);
+    position: relative;
   }
   .tabbar .tab-sell .tab-icon {
-    background: var(--brand-700);
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: #fff;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     display: grid;
     place-items: center;
-    margin-top: -18px;
-    border: 3px solid var(--surface);
-    box-shadow: var(--shadow-sm);
+    margin-top: -22px;
+    border: 3.5px solid var(--surface);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+    animation: sellPulseGlow 3s infinite ease-in-out;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+    position: relative;
+  }
+  .tabbar .tab-sell .tab-icon::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid rgba(16, 185, 129, 0.4);
+    animation: sellRippleRing 3s infinite ease-out;
+    pointer-events: none;
+  }
+  .tabbar .tab-sell:hover .tab-icon {
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+  }
+  .tabbar .tab-sell:active .tab-icon {
+    transform: scale(0.92);
   }
   .toast-stack {
     bottom: calc(var(--tabbar-height) + 16px);
@@ -3297,10 +3317,23 @@ ol {
   overflow: hidden;
   animation: panelSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1000;
+  transition: width 0.22s ease, height 0.22s ease, border-radius 0.22s ease;
+}
+
+.azarbot-panel.is-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  z-index: 999999 !important;
 }
 
 @media (max-width: 640px) {
-  .azarbot-panel {
+  .azarbot-panel:not(.is-fullscreen) {
     position: fixed;
     inset-inline-start: 10px;
     inset-inline-end: 10px;
@@ -3447,22 +3480,22 @@ ol {
   box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.04);
 }
 
-/* Green bold highlights for words between ** ** matching app colors */
+/* Green bold highlights for words between ** ** matching app colors - lighter & vibrant */
 .azarbot-highlight {
-  color: #047857;
+  color: #059669;
   font-weight: 700;
 }
 
 .bot-bubble strong,
 .bot-bubble b {
-  color: #047857;
+  color: #059669;
   font-weight: 700;
 }
 
 .user-bubble .azarbot-highlight,
 .user-bubble strong,
 .user-bubble b {
-  color: #d1fae5;
+  color: #a7f3d0;
   font-weight: 700;
 }
 
@@ -3497,35 +3530,50 @@ ol {
   font-family: monospace;
 }
 
-/* Comparison Tables */
+/* Comparison Tables - compact, clear, smooth horizontal scroll */
 .azarbot-table-wrap {
   width: 100%;
   overflow-x: auto;
-  margin: 10px 0;
-  border-radius: 12px;
+  -webkit-overflow-scrolling: touch;
+  margin: 8px 0;
+  border-radius: 10px;
   border: 1px solid var(--brand-200);
   background: var(--surface);
-  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 4px -1px rgba(0, 0, 0, 0.05);
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-300) transparent;
+}
+
+.azarbot-table-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+
+.azarbot-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--brand-300);
+  border-radius: 4px;
 }
 
 .azarbot-table {
   width: 100%;
+  min-width: 380px;
   border-collapse: collapse;
-  font-size: 0.82rem;
+  font-size: 0.77rem;
   text-align: start;
+  line-height: 1.35;
 }
 
 .azarbot-table th {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.08));
-  color: var(--brand-800);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.05));
+  color: #059669;
   font-weight: 700;
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--brand-300);
+  padding: 6px 10px;
+  border-bottom: 1.5px solid var(--brand-300);
   white-space: nowrap;
+  font-size: 0.75rem;
 }
 
 .azarbot-table td {
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--line);
   color: var(--ink);
   vertical-align: middle;
@@ -3922,6 +3970,43 @@ ol {
 .azarbot-send-btn:not(:disabled):hover {
   background: var(--brand-700);
   transform: scale(1.05);
+}
+
+.azarbot-stop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  animation: stopPulse 1.8s infinite ease-in-out;
+}
+
+.azarbot-stop-btn:hover {
+  background: #dc2626;
+  transform: scale(1.04);
+}
+
+.azarbot-stop-btn:active {
+  transform: scale(0.96);
+}
+
+@keyframes stopPulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  }
+  50% {
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.6);
+  }
 }
 
 
