@@ -57,13 +57,14 @@ export interface DynamicAiConfig {
   keys: string[];
 }
 
-export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
+export async function getAllActiveAiConfigs(env: Env): Promise<DynamicAiConfig[]> {
+  const configs: DynamicAiConfig[] = [];
   try {
-    const row = await env.DB.prepare(
-      "SELECT provider, model_name, api_keys FROM ai_config WHERE is_active = 1 ORDER BY updated_at DESC LIMIT 1",
-    ).first<{ provider: string; model_name: string; api_keys: string }>();
+    const rows = await env.DB.prepare(
+      "SELECT provider, model_name, api_keys FROM ai_config WHERE is_active = 1 ORDER BY updated_at DESC",
+    ).all<{ provider: string; model_name: string; api_keys: string }>();
 
-    if (row) {
+    for (const row of rows.results || []) {
       let keys: string[] = [];
       try {
         const parsed = JSON.parse(row.api_keys);
@@ -72,163 +73,199 @@ export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
         }
       } catch {}
       if (keys.length > 0) {
-        return {
+        configs.push({
           provider: row.provider || "gemini",
-          model: row.model_name || "gemini-3.8-flash",
+          model: row.model_name || "gemini-3.5-flash-lite",
           keys,
-        };
+        });
       }
     }
   } catch {
     // ai_config table query fallback
   }
 
-  return {
-    provider: "gemini",
-    model: (env as any).GEMINI_MODEL || "gemini-3.5-flash",
-    keys: getGeminiKeys(env),
-  };
+  const defaultKeys = getGeminiKeys(env);
+  if (!configs.some((c) => c.provider === "gemini") && defaultKeys.length > 0) {
+    configs.push({
+      provider: "gemini",
+      model: (env as any).GEMINI_MODEL || "gemini-3.5-flash-lite",
+      keys: defaultKeys,
+    });
+  }
+
+  return configs;
+}
+
+export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
+  const configs = await getAllActiveAiConfigs(env);
+  return (
+    configs[0] || {
+      provider: "gemini",
+      model: (env as any).GEMINI_MODEL || "gemini-3.5-flash-lite",
+      keys: getGeminiKeys(env),
+    }
+  );
 }
 
 /**
- * Universal AI Caller supporting Gemini, OpenAI, DeepSeek, Groq, and Claude dynamically.
+ * Universal AI Caller supporting seamless failover across models, keys, and providers.
+ * When a key or model hits quota (429), it automatically fails over to the next key or next provider.
  */
 async function callGemini(
   env: Env,
   contents: GeminiContent[],
   systemInstruction?: string,
 ): Promise<string | null> {
-  const config = await getActiveAiConfig(env);
-  const keys = config.keys;
-  if (keys.length === 0) return null;
+  const configs = await getAllActiveAiConfigs(env);
+  if (configs.length === 0) return null;
 
-  // OpenAI / DeepSeek / Groq (OpenAI-compatible endpoints)
-  if (["openai", "deepseek", "groq"].includes(config.provider)) {
-    const endpointMap: Record<string, string> = {
-      openai: "https://api.openai.com/v1/chat/completions",
-      deepseek: "https://api.deepseek.com/chat/completions",
-      groq: "https://api.groq.com/openai/v1/chat/completions",
-    };
-    const endpoint = endpointMap[config.provider] || "https://api.openai.com/v1/chat/completions";
-    for (const key of keys) {
-      try {
-        const messages: any[] = [];
-        if (systemInstruction) {
-          messages.push({ role: "system", content: systemInstruction });
-        }
-        for (const msg of contents) {
-          const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
-          messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
-        }
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${key}`,
-          },
-          body: JSON.stringify({
-            model: config.model,
-            messages,
-            temperature: 0.7,
-            max_tokens: 1000,
-          }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          const reply = data?.choices?.[0]?.message?.content;
-          if (reply && typeof reply === "string") return reply.trim();
-        }
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
+  for (const config of configs) {
+    const keys = config.keys;
+    if (keys.length === 0) continue;
 
-  // Claude / Anthropic
-  if (config.provider === "claude") {
-    for (const key of keys) {
-      try {
-        const messages: any[] = [];
-        for (const msg of contents) {
-          const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
-          messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
-        }
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: config.model || "claude-3-5-sonnet-20241022",
-            system: systemInstruction || undefined,
-            messages,
-            max_tokens: 1000,
-          }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          const reply = data?.content?.[0]?.text;
-          if (reply && typeof reply === "string") return reply.trim();
-        }
-      } catch {
-        continue;
-      }
-    }
-    return null;
-  }
-
-  // Google Gemini (with round-robin and fallback)
-  const modelsToTry = [config.model, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest", "gemini-3.8-flash"];
-  const uniqueModels = [...new Set(modelsToTry)];
-
-  for (const model of uniqueModels) {
-    for (let attempt = 0; attempt < keys.length; attempt++) {
-      const key = keys[(currentKeyIndex + attempt) % keys.length];
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-        const payload: any = {
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000,
-            thinkingConfig: {
-              thinkingBudget: 0,
+    // OpenAI / DeepSeek / Groq (OpenAI-compatible endpoints)
+    if (["openai", "deepseek", "groq"].includes(config.provider)) {
+      const endpointMap: Record<string, string> = {
+        openai: "https://api.openai.com/v1/chat/completions",
+        deepseek: "https://api.deepseek.com/chat/completions",
+        groq: "https://api.groq.com/openai/v1/chat/completions",
+      };
+      const endpoint = endpointMap[config.provider] || "https://api.openai.com/v1/chat/completions";
+      for (const key of keys) {
+        try {
+          const messages: any[] = [];
+          if (systemInstruction) {
+            messages.push({ role: "system", content: systemInstruction });
+          }
+          for (const msg of contents) {
+            const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
+            messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
+          }
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${key}`,
             },
-          },
-        };
+            body: JSON.stringify({
+              model: config.model,
+              messages,
+              temperature: 0.7,
+              max_tokens: 1000,
+            }),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as any;
+            const reply = data?.choices?.[0]?.message?.content;
+            if (reply && typeof reply === "string") return reply.trim();
+          }
+        } catch {
+          continue;
+        }
+      }
+      continue;
+    }
 
-        if (systemInstruction) {
-          payload.systemInstruction = {
-            parts: [{ text: systemInstruction }],
+    // Claude / Anthropic
+    if (config.provider === "claude") {
+      for (const key of keys) {
+        try {
+          const messages: any[] = [];
+          for (const msg of contents) {
+            const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
+            messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
+          }
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": key,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: config.model || "claude-3-5-sonnet-20241022",
+              system: systemInstruction || undefined,
+              messages,
+              max_tokens: 1000,
+            }),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as any;
+            const reply = data?.content?.[0]?.text;
+            if (reply && typeof reply === "string") return reply.trim();
+          }
+        } catch {
+          continue;
+        }
+      }
+      continue;
+    }
+
+    // Google Gemini (with round-robin, multi-model and multi-key quota failover)
+    const modelsToTry = [
+      config.model,
+      "gemini-3.5-flash-lite",
+      "gemini-flash-lite-latest",
+      "gemini-3.1-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-3.6-flash",
+      "gemini-flash-latest",
+      "gemini-3.8-flash",
+    ];
+    const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
+
+    for (const model of uniqueModels) {
+      for (let attempt = 0; attempt < keys.length; attempt++) {
+        const key = keys[(currentKeyIndex + attempt) % keys.length];
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+          const payload: any = {
+            contents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1000,
+              thinkingConfig: {
+                thinkingBudget: 0,
+              },
+            },
           };
-        }
 
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+          if (systemInstruction) {
+            payload.systemInstruction = {
+              parts: [{ text: systemInstruction }],
+            };
+          }
 
-        if (res.status === 429 || res.status === 403 || res.status === 503) {
-          currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (res.status === 429 || res.status === 403 || res.status === 503) {
+            const errData = ((await res.json().catch(() => null)) || {}) as any;
+            const errMsg = String(errData?.error?.message || "");
+            // If Google reports daily limit for this specific model, break to immediately try next model
+            if (errMsg.includes("limit: 20") || errMsg.includes("FreeTier") || errMsg.includes("PerDay")) {
+              break;
+            }
+            currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+            continue;
+          }
+
+          if (!res.ok) {
+            continue;
+          }
+
+          const data = (await res.json()) as any;
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && typeof text === "string") {
+            currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
+            return text.trim();
+          }
+        } catch {
           continue;
         }
-
-        if (!res.ok) {
-          continue;
-        }
-
-        const data = (await res.json()) as any;
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && typeof text === "string") {
-          currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
-          return text.trim();
-        }
-      } catch {
-        continue;
       }
     }
   }
