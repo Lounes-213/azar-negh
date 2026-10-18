@@ -613,6 +613,7 @@ authRoutes.post("/google", async (c) => {
     name = (name || fallbackName).trim().slice(0, 60);
 
     const ADMIN_EMAILS = [
+      "bensebalounes2@gmail.com",
       "jokakram1@gmail.com",
       "admin@azar.dz",
       "admin@example.dz",
@@ -754,7 +755,7 @@ authRoutes.post("/google", async (c) => {
       bannerUrl: userRow.banner_url,
     };
 
-    return c.json({ user: serializeUser(authUser, csrfToken) });
+    return c.json({ user: serializeUser(authUser, csrfToken), token });
   } catch (err) {
     if (err instanceof HttpError) throw err;
     console.error("GOOGLE_AUTH_ERROR", err);

@@ -111,7 +111,8 @@ export const attachAuth: MiddlewareHandler<{
   Bindings: Env;
   Variables: import("../types").AppVariables;
 }> = async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE);
+  const authHeader = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
+  const token = authHeader || getCookie(c, SESSION_COOKIE);
   const auth = await authenticateRequest(c.env, token);
   if (auth) {
     c.set("user", auth.user);
@@ -121,7 +122,7 @@ export const attachAuth: MiddlewareHandler<{
     c.set("user", null);
     c.set("session", null);
     c.set("csrfToken", null);
-    if (token) {
+    if (token && !authHeader) {
       // Expired / revoked / suspended: clear the stale cookie.
       deleteCookie(c, SESSION_COOKIE, { path: "/" });
     }
@@ -197,11 +198,13 @@ export function assertSameOrigin(c: import("hono").Context<import("../types").Ap
 }
 
 export function assertCsrf(c: import("hono").Context<import("../types").AppEnv>): void {
+  const authHeader = c.req.header("Authorization");
   const adminKey = c.req.header("x-admin-key");
   if (
-    adminKey &&
-    c.env.SESSION_SECRET &&
-    (adminKey === c.env.SESSION_SECRET || adminKey === (c.env as any).ADMIN_SECRET_KEY)
+    authHeader ||
+    (adminKey &&
+      c.env.SESSION_SECRET &&
+      (adminKey === c.env.SESSION_SECRET || adminKey === (c.env as any).ADMIN_SECRET_KEY))
   ) {
     return;
   }
