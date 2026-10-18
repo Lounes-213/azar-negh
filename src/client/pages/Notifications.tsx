@@ -126,41 +126,6 @@ export function PushNotificationCard() {
     }
   };
 
-  const testPush = async () => {
-    try {
-      setLoading(true);
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        push(isAr ? "يرجى تفعيل الإشعارات أولاً." : "Veuillez activer les notifications d'abord.", "default");
-        return;
-      }
-
-      if ("Notification" in window && Notification.permission === "granted") {
-        try {
-          if (reg?.showNotification) {
-            reg.showNotification("Azar Neɣ", {
-              body: isAr ? "إشعار تجريبي: النظام يعمل بنجاح في الخلفية." : "Test de notification : Le système fonctionne en arrière-plan.",
-              icon: "/brand/icon-192.png",
-              badge: "/brand/icon-192.png",
-              data: { url: "/compte/notifications" },
-            } as any);
-          }
-        } catch {}
-      }
-
-      await api("/push/test", {
-        method: "POST",
-        body: { endpoint: sub.endpoint },
-      });
-      push(isAr ? "تم إرسال إشعار تجريبي إلى جهازك." : "Notification de test envoyée.", "success");
-    } catch {
-      push(isAr ? "تعذر إرسال الإشعار التجريبي." : "Échec de l'envoi de la notification de test.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div
       className="card"
@@ -200,17 +165,6 @@ export function PushNotificationCard() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {isSubscribed ? (
-          <button
-            type="button"
-            onClick={testPush}
-            disabled={loading}
-            className="btn btn-secondary btn-sm"
-          >
-            {isAr ? "تجربة" : "Tester"}
-          </button>
-        ) : null}
-
         <button
           type="button"
           onClick={toggleSubscription}

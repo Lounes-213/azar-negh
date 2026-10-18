@@ -178,7 +178,7 @@ export function Account() {
   const { t, lang, setLang } = useI18n();
   const { theme, setTheme } = useTheme();
   const isAr = lang === "ar";
-  useDocumentTitle(isAr ? "حسابي والإعدادات — أزار نغ" : "Mon compte & Paramètres — Azar Neɣ");
+  useDocumentTitle(isAr ? "حسابي والإعدادات — أزار نغ" : "Mon compte & Paramètres — Aẓar Neɣ");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { push } = useToast();
@@ -537,7 +537,7 @@ export function Account() {
               </div>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
-                  {isAr ? "مرحباً بك في أزار نغ" : "Bienvenue sur Azar Neɣ"}
+                  {isAr ? "مرحباً بك في أزار نغ" : <>Bienvenue sur Aẓar <span className="brand-negh">Neɣ</span></>}
                 </h2>
                 <p className="small muted" style={{ margin: "4px 0 0 0" }}>
                   {isAr
@@ -681,7 +681,7 @@ export function Account() {
 
           <div style={{ textAlign: "center", padding: "16px 0 calc(var(--tabbar-height, 68px) + 24px) 0" }}>
             <p className="small muted" style={{ margin: 0 }}>
-              Azar Neɣ · {isAr ? "النسخة 2.0 — السوق الجزائري المحلي" : "Version 2.0 — Marketplace Algérie"}
+              Aẓar <span className="brand-negh">Neɣ</span> · {isAr ? "النسخة 2.0 — السوق الجزائري المحلي" : "Version 2.0 — Marketplace Algérie"}
             </p>
           </div>
         </div>
@@ -1614,9 +1614,6 @@ export function Account() {
                     <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
                       {storeName || displayName}
                     </h3>
-                    <span className="badge badge-brand" style={{ fontWeight: 700, fontSize: "0.75rem" }}>
-                      PRO
-                    </span>
                   </div>
                   {storeSlug ? (
                     <p className="small muted" style={{ margin: "0 0 6px 0" }}>
@@ -2264,7 +2261,7 @@ export function Account() {
                   </div>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--brand-800)" }}>
-                      {isAr ? "تهيئة وتعديل متجري (Boutique Pro)" : "Configurer & modifier ma boutique"}
+                      {isAr ? "تهيئة وتعديل متجري" : "Configurer & modifier ma boutique"}
                     </div>
                     <div className="small muted">
                       {isAr
@@ -2274,9 +2271,6 @@ export function Account() {
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span className="badge badge-brand" style={{ fontWeight: 600, fontSize: "0.75rem" }}>
-                    PRO
-                  </span>
                   <Icon name="arrow-right" size={16} style={{ color: "var(--brand-700)", transform: isAr ? "rotate(180deg)" : "none" }} />
                 </div>
               </button>

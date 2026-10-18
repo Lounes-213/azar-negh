@@ -6,7 +6,7 @@ import { Link } from "react-router";
 export function Terms() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  useDocumentTitle(isAr ? "شروط الاستخدام — أزار نغ" : "Conditions d'utilisation — Azar Neɣ");
+  useDocumentTitle(isAr ? "شروط الاستخدام — أزار نغ" : "Conditions d'utilisation — Aẓar Neɣ");
 
   return (
     <div className="container page" style={{ maxWidth: 880 }}>
@@ -31,7 +31,7 @@ export function Terms() {
               {isAr ? "شروط الاستخدام" : "Conditions Générales d'Utilisation"}
             </h1>
             <p className="small muted" style={{ margin: "4px 0 0" }}>
-              {isAr ? "آخر تحديث : أكتوبر 2026 • منصة أزار نغ (Azar Neɣ)" : "Dernière mise à jour : Octobre 2026 • Plateforme Azar Neɣ"}
+              {isAr ? "آخر تحديث : أكتوبر 2026 • منصة أزار نغ (Aẓar Neɣ)" : "Dernière mise à jour : Octobre 2026 • Plateforme Aẓar Neɣ"}
             </p>
           </div>
         </div>
@@ -44,7 +44,7 @@ export function Terms() {
                   1. طبيعة المنصة والهدف منها
                 </h2>
                 <p>
-                  منصة <strong>أزار نغ (Azar Neɣ)</strong> هي فضاء إلكتروني محلي وسيط يهدف إلى تسهيل التواصل والتبادل التجاري المباشر بين المشترين والبائعين المحليين. المنصة تقدم خدمات عرض الإعلانات والمتاجر، ولا تتدخل في عمليات الدفع أو استلام المنتجات أو الاتفاقيات المباشرة بين الأطراف.
+                  منصة <strong>أزار نغ (Aẓar Neɣ)</strong> هي فضاء إلكتروني محلي وسيط يهدف إلى تسهيل التواصل والتبادل التجاري المباشر بين المشترين والبائعين المحليين. المنصة تقدم خدمات عرض الإعلانات والمتاجر، ولا تتدخل في عمليات الدفع أو استلام المنتجات أو الاتفاقيات المباشرة بين الأطراف.
                 </p>
               </section>
 
@@ -106,7 +106,7 @@ export function Terms() {
                   1. Objet et présentation de la plateforme
                 </h2>
                 <p>
-                  La plateforme <strong>Azar Neɣ</strong> est un service numérique de proximité dédié à la mise en relation directe entre acheteurs et vendeurs locaux. Elle permet aux particuliers et commerçants de publier des annonces et de valoriser leurs commerces de quartier en toute simplicité. Azar Neɣ n'intervient pas comme partie prenante dans les transactions financières directes ni dans la livraison physique des biens.
+                  La plateforme <strong>Aẓar <span className="brand-negh">Neɣ</span></strong> est un service numérique de proximité dédié à la mise en relation directe entre acheteurs et vendeurs locaux. Elle permet aux particuliers et commerçants de publier des annonces et de valoriser leurs commerces de quartier en toute simplicité. Aẓar Neɣ n'intervient pas comme partie prenante dans les transactions financières directes ni dans la livraison physique des biens.
                 </p>
               </section>
 

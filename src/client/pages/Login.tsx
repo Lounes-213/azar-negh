@@ -63,7 +63,7 @@ export function Login() {
 
   const btnContainerRef = useRef<HTMLDivElement>(null);
 
-  useDocumentTitle(lang === "ar" ? "تسجيل الدخول — Azar Neɣ" : "Connexion — Azar Neɣ");
+  useDocumentTitle(lang === "ar" ? "تسجيل الدخول — Aẓar Neɣ" : "Connexion — Aẓar Neɣ");
 
   if (!loading && user) {
     const target = !next || next === "/connexion" ? "/compte" : next;
@@ -220,7 +220,7 @@ export function Login() {
                 <Link to="/confidentialite" className="legal-link">
                   سياسة الخصوصية
                 </Link>{" "}
-                الخاصة بمنصة Azar Neɣ.
+                الخاصة بمنصة Aẓar <span className="brand-negh">Neɣ</span>.
               </>
             ) : (
               <>
@@ -232,7 +232,7 @@ export function Login() {
                 <Link to="/confidentialite" className="legal-link">
                   Politique de confidentialité
                 </Link>{" "}
-                d'Azar Neɣ.
+                d'Aẓar <span className="brand-negh">Neɣ</span>.
               </>
             )}
           </p>

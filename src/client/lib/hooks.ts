@@ -55,6 +55,6 @@ export function useDebounced<T>(value: T, delay = 350): T {
 
 export function useDocumentTitle(title: string): void {
   useEffect(() => {
-    document.title = title ? `${title} · Azar Neɣ` : "Azar Neɣ — Petites annonces en Algérie";
+    document.title = title ? `${title} · Aẓar Neɣ` : "Aẓar Neɣ — Petites annonces en Algérie";
   }, [title]);
 }

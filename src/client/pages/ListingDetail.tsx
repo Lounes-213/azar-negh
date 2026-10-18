@@ -130,7 +130,7 @@ export function ListingDetail() {
       try {
         await navigator.share({
           title: listing.title,
-          text: `${listing.title} — ${listing.priceDa} DA sur Azar Neɣ`,
+          text: `${listing.title} — ${listing.priceDa} DA sur Aẓar Neɣ`,
           url: shareUrl,
         });
         return;
@@ -381,7 +381,7 @@ export function ListingDetail() {
                       className="btn btn-secondary"
                       href={whatsappLink(
                         listing.contactPhone,
-                        `Bonjour, je souhaite commander votre article « ${listing.title} » au prix de ${listing.priceDa} DA sur Azar Neɣ.`,
+                        `Bonjour, je souhaite commander votre article « ${listing.title} » au prix de ${listing.priceDa} DA sur Aẓar Neɣ.`,
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -544,7 +544,7 @@ export function ListingDetail() {
               className="btn btn-secondary"
               href={whatsappLink(
                 listing.contactPhone,
-                `Bonjour, je souhaite commander votre article « ${listing.title} » au prix de ${listing.priceDa} DA sur Azar Neɣ.`,
+                `Bonjour, je souhaite commander votre article « ${listing.title} » au prix de ${listing.priceDa} DA sur Aẓar Neɣ.`,
               )}
               target="_blank"
               rel="noopener noreferrer"

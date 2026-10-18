@@ -101,7 +101,7 @@ export function Seller() {
       try {
         await navigator.share({
           title,
-          text: `Découvrez la boutique ${title} sur Azar Neɣ :`,
+          text: `Découvrez la boutique ${title} sur Aẓar Neɣ :`,
           url: storeLink,
         });
         return;

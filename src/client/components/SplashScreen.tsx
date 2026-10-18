@@ -47,7 +47,7 @@ export function SplashScreen({ onFinish }: { onFinish?: () => void }) {
 
         {/* Brand Name & Tagline */}
         <div className="app-splash-brand">
-          <h1 className="app-splash-title">Azar Neɣ</h1>
+          <h1 className="app-splash-title">Aẓar <span className="brand-negh">Neɣ</span></h1>
           <p className="app-splash-subtitle">
             {isAr ? "سوق الجزائر الذكي" : "Le marché digital en Algérie"}
           </p>

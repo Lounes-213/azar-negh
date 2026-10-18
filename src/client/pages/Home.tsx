@@ -93,9 +93,29 @@ export function Home() {
             <span>
               <Icon name="phone" size={15} /> {t("home.trust2")}
             </span>
-            <span>
-              <Icon name="map-pin" size={15} /> {t("home.trust3")}
-            </span>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("azar:open-location"))}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid rgba(16, 185, 129, 0.2)",
+                borderRadius: "var(--radius-pill)",
+                padding: "4px 12px",
+                color: "var(--brand-700)",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: "inherit",
+                transition: "background 0.15s ease",
+              }}
+              title={lang === "ar" ? "عرض المتاجر القريبة على الخريطة" : "Voir les magasins proches sur la carte"}
+            >
+              <Icon name="map-pin" size={15} />
+              <span>{t("home.trust3")}</span>
+              <span style={{ fontSize: "0.75rem", opacity: 0.85 }}>📍 {lang === "ar" ? "المتاجر القريبة" : "Magasins proches"}</span>
+            </button>
           </div>
         </div>
       </section>

@@ -8,6 +8,104 @@ import { randomId } from "../lib/crypto";
 
 export const sellerRoutes = new Hono<AppEnv>();
 
+// List all active registered stores, optionally filtered or sorted by proximity to GPS coords
+sellerRoutes.get("/sellers", async (c) => {
+  const wilayaId = c.req.query("wilayaId");
+  const latStr = c.req.query("lat");
+  const lngStr = c.req.query("lng");
+  const userLat = latStr ? parseFloat(latStr) : null;
+  const userLng = lngStr ? parseFloat(lngStr) : null;
+
+  let query = `
+    SELECT u.id, u.avatar_url, p.display_name, p.logo_url, p.store_name, p.store_slug,
+           p.commune, p.address, p.latitude, p.longitude, p.wilaya_id, p.banner_url,
+           w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+           (SELECT COUNT(*) FROM listings l WHERE l.seller_id = u.id AND l.status = 'APPROVED') AS listings_count
+    FROM users u
+    JOIN seller_profiles p ON p.user_id = u.id
+    JOIN wilayas w ON w.id = p.wilaya_id
+    WHERE u.status = 'ACTIVE' AND (p.store_name IS NOT NULL OR p.store_slug IS NOT NULL)
+  `;
+  const params: unknown[] = [];
+
+  if (wilayaId) {
+    query += " AND p.wilaya_id = ?";
+    params.push(Number(wilayaId));
+  }
+
+  query += " ORDER BY listings_count DESC LIMIT 60";
+
+  const rows = await c.env.DB.prepare(query)
+    .bind(...params)
+    .all<{
+      id: string;
+      avatar_url: string | null;
+      display_name: string;
+      logo_url: string | null;
+      store_name: string | null;
+      store_slug: string | null;
+      commune: string | null;
+      address: string | null;
+      latitude: number | null;
+      longitude: number | null;
+      wilaya_id: number;
+      banner_url: string | null;
+      wilaya_name_fr: string;
+      wilaya_name_ar: string;
+      listings_count: number;
+    }>();
+
+  const stores = (rows.results ?? []).map((row) => {
+    let distanceKm: number | null = null;
+    if (userLat !== null && userLng !== null && row.latitude && row.longitude) {
+      const R = 6371; // km
+      const dLat = ((row.latitude - userLat) * Math.PI) / 180;
+      const dLon = ((row.longitude - userLng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((userLat * Math.PI) / 180) *
+          Math.cos((row.latitude * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const cVal = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      distanceKm = Math.round(R * cVal * 10) / 10;
+    }
+
+    return {
+      id: row.id,
+      displayName: row.display_name,
+      storeName: row.store_name,
+      storeSlug: row.store_slug,
+      logoUrl: row.logo_url || row.avatar_url,
+      commune: row.commune,
+      address: row.address,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      bannerUrl: row.banner_url,
+      wilaya: {
+        id: row.wilaya_id,
+        nameFr: row.wilaya_name_fr,
+        nameAr: row.wilaya_name_ar,
+      },
+      listingsCount: row.listings_count,
+      distanceKm,
+    };
+  });
+
+  if (userLat !== null && userLng !== null) {
+    stores.sort((a, b) => {
+      if (a.distanceKm !== null && b.distanceKm !== null) {
+        return a.distanceKm - b.distanceKm;
+      }
+      if (a.distanceKm !== null) return -1;
+      if (b.distanceKm !== null) return 1;
+      return b.listingsCount - a.listingsCount;
+    });
+  }
+
+  return c.json({ stores });
+});
+
 sellerRoutes.get("/sellers/:id", async (c) => {
   const idOrSlug = c.req.param("id");
   const { page, perPage } = parseQuery(c.req.query(), paginationSchema);

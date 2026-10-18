@@ -85,6 +85,17 @@
   --tabbar-height: 64px;
 
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(229, 238, 232, 0.9);
+  --brand-negh-color: #10b981;
+}
+
+/* Styled text for the "Neɣ" part of "Aẓar Neɣ" */
+.brand-negh {
+  color: var(--brand-negh-color, #10b981);
+  font-weight: 800;
+  display: inline;
 }
 
 /* Arabic locale switches to the Arabic-first stack (Cairo pairs with Poppins). */
@@ -123,5 +134,198 @@ html[lang="ar"] {
   --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.8);
 
   --grad-soft: linear-gradient(180deg, #131e17 0%, #0b130e 100%);
+  --glass-bg: rgba(14, 23, 17, 0.96);
+  --glass-border: rgba(34, 54, 42, 0.9);
+  --brand-negh-color: #34d399;
   color-scheme: dark;
+}
+
+/* Dark Mode Comprehensive Component Overrides */
+[data-theme="dark"] .topbar {
+  background: var(--glass-bg) !important;
+  border-bottom: 1px solid var(--line) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme="dark"] .tabbar {
+  background: var(--glass-bg) !important;
+  border-top: 1px solid var(--line) !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme="dark"] .tabbar a {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .tabbar a.active {
+  color: var(--brand-300) !important;
+}
+
+[data-theme="dark"] .tabbar .tab-sell .tab-icon {
+  border-color: var(--surface) !important;
+}
+
+[data-theme="dark"] .sidebar {
+  background: var(--surface) !important;
+  border-inline-end: 1px solid var(--line) !important;
+}
+
+[data-theme="dark"] .nav-link {
+  color: var(--ink-soft);
+}
+
+[data-theme="dark"] .nav-link:hover {
+  background: var(--surface-muted);
+  color: var(--brand-300);
+}
+
+[data-theme="dark"] .topbar-search {
+  background: var(--surface-muted) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .topbar-search:focus-within {
+  background: var(--surface) !important;
+  border-color: var(--brand-400) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25) !important;
+}
+
+[data-theme="dark"] .topbar-search input {
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .search-suggestions {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .category-bar-mobile {
+  background: var(--glass-bg) !important;
+  border-bottom-color: var(--line) !important;
+}
+
+[data-theme="dark"] .panel,
+[data-theme="dark"] .card {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .dialog,
+[data-theme="dark"] .dialog-card {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .dialog-backdrop {
+  background: rgba(0, 0, 0, 0.78) !important;
+}
+
+[data-theme="dark"] .dropdown {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .dropdown-item {
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+  background: var(--surface-muted) !important;
+}
+
+[data-theme="dark"] .input,
+[data-theme="dark"] .select,
+[data-theme="dark"] .textarea {
+  background: var(--surface) !important;
+  border-color: var(--line-strong) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .input::placeholder,
+[data-theme="dark"] .textarea::placeholder {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .input:focus,
+[data-theme="dark"] .select:focus,
+[data-theme="dark"] .textarea:focus {
+  border-color: var(--brand-400) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25) !important;
+}
+
+[data-theme="dark"] .fav-btn {
+  background: rgba(19, 30, 23, 0.88) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .ali-card {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+}
+
+[data-theme="dark"] .ali-action-btn {
+  background: rgba(19, 30, 23, 0.9) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .ali-action-btn:hover {
+  background: var(--surface-muted) !important;
+}
+
+[data-theme="dark"] .ali-wilaya-pill {
+  background: rgba(19, 30, 23, 0.9) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .btn-secondary {
+  background: var(--surface-muted) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background: var(--line) !important;
+}
+
+[data-theme="dark"] .btn-outline {
+  border-color: var(--line-strong) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .btn-outline:hover {
+  background: var(--surface-muted) !important;
+}
+
+[data-theme="dark"] .btn-ghost {
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .btn-ghost:hover {
+  background: var(--surface-muted) !important;
+}
+
+[data-theme="dark"] .btn-google {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+[data-theme="dark"] .btn-google:hover:not(:disabled) {
+  background: var(--surface-muted) !important;
+}
+
+[data-theme="dark"] .account-menu-item:hover {
+  background: var(--surface-muted) !important;
+}
+
+[data-theme="dark"] .divider {
+  background: var(--line) !important;
 }
