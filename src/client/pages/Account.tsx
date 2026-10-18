@@ -73,6 +73,7 @@ export function Account() {
   const [storeName, setStoreName] = useState(user?.storeName ?? "");
   const [storeSlug, setStoreSlug] = useState(user?.storeSlug ?? "");
   const [storeLogoUrl, setStoreLogoUrl] = useState(user?.logoUrl ?? "");
+  const [storeBannerColor, setStoreBannerColor] = useState(user?.bannerUrl || "#10b981");
   const [commune, setCommune] = useState(user?.commune ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
   const [openingHours, setOpeningHours] = useState(user?.openingHours ?? "");
@@ -88,6 +89,7 @@ export function Account() {
     setStoreName(user.storeName ?? "");
     setStoreSlug(user.storeSlug ?? "");
     setStoreLogoUrl(user.logoUrl ?? "");
+    setStoreBannerColor(user.bannerUrl || "#10b981");
     setCommune(user.commune ?? "");
     setAddress(user.address ?? "");
     setOpeningHours(user.openingHours ?? "");
@@ -227,6 +229,7 @@ export function Account() {
           address: address.trim() || null,
           openingHours: openingHours.trim() || null,
           logoUrl: storeLogoUrl.trim() || null,
+          bannerUrl: storeBannerColor.trim() || null,
           phone,
           phonePublic,
           whatsappPublic,
@@ -793,6 +796,138 @@ export function Account() {
                     ) : null}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Store Slim Banner Color Picker Panel */}
+            <div
+              className="panel stack"
+              style={{
+                gap: 12,
+                padding: "clamp(1rem, 3vw, 1.5rem)",
+                borderRadius: "var(--radius-lg)",
+                border: "1px solid var(--line)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
+                    {isAr ? "لون شريط البانير للمتجر" : "Couleur de la bannière du magasin"}
+                  </h3>
+                  <p className="small muted" style={{ margin: "2px 0 0 0" }}>
+                    {isAr
+                      ? "شريط أنيق وصغير يظهر أعلى واجهة متجرك باللون الذي تختاره (الافتراضي هو الأخضر المميز لـ Azar Neɣ)."
+                      : "Une fine bannière élégante s'affiche en haut de votre boutique avec la couleur de votre choix."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Mini Preview of Store Header with selected color */}
+              <div
+                style={{
+                  height: "56px",
+                  borderRadius: "var(--radius-md)",
+                  background: storeBannerColor && storeBannerColor.startsWith("#")
+                    ? `linear-gradient(135deg, ${storeBannerColor} 0%, ${storeBannerColor}dd 100%)`
+                    : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px rgba(0,0,0,0.06)",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 16px",
+                  gap: 12,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: "var(--surface)",
+                    border: "2px solid rgba(255,255,255,0.85)",
+                    display: "grid",
+                    placeItems: "center",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  <Icon name="store" size={16} />
+                </div>
+                <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "0.9rem", textShadow: "0 1px 2px rgba(0,0,0,0.25)" }}>
+                  {storeName || displayName || (isAr ? "معاينة شريط المتجر" : "Aperçu de la bannière")}
+                </span>
+              </div>
+
+              {/* Preset Palette + Custom Color Picker */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+                {[
+                  { hex: "#10b981", label: isAr ? "أخضر آزار نغ (افتراضي)" : "Émeraude Azar (défaut)" },
+                  { hex: "#059669", label: isAr ? "أخضر غابي" : "Vert forêt" },
+                  { hex: "#0284c7", label: isAr ? "أزرق محيطي" : "Bleu océan" },
+                  { hex: "#6366f1", label: isAr ? "نيلي عصري" : "Indigo moderne" },
+                  { hex: "#8b5cf6", label: isAr ? "بنفسجي ملكي" : "Violet royal" },
+                  { hex: "#e11d48", label: isAr ? "أحمر ياقوتي" : "Rose rubis" },
+                  { hex: "#ea580c", label: isAr ? "برتقالي دافئ" : "Ambre chaud" },
+                  { hex: "#1e293b", label: isAr ? "كلاسيكي داكن" : "Ardoise sombre" },
+                ].map((color) => {
+                  const isSelected = storeBannerColor.toLowerCase() === color.hex.toLowerCase();
+                  return (
+                    <button
+                      key={color.hex}
+                      type="button"
+                      title={color.label}
+                      onClick={() => setStoreBannerColor(color.hex)}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        background: color.hex,
+                        border: isSelected ? "3px solid var(--ink)" : "2px solid #ffffff",
+                        boxShadow: isSelected ? "0 0 0 2px var(--brand-500)" : "0 1px 4px rgba(0,0,0,0.15)",
+                        cursor: "pointer",
+                        display: "grid",
+                        placeItems: "center",
+                        transition: "transform 0.15s ease",
+                        transform: isSelected ? "scale(1.12)" : "scale(1)",
+                      }}
+                    >
+                      {isSelected ? <span style={{ color: "#fff", fontSize: 13, fontWeight: "bold" }}>✓</span> : null}
+                    </button>
+                  );
+                })}
+
+                {/* Custom Color Input */}
+                <label
+                  title={isAr ? "اختيار لون مخصص" : "Couleur personnalisée"}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 10px",
+                    borderRadius: "var(--radius-pill)",
+                    border: "1px solid var(--line)",
+                    background: "var(--surface-muted)",
+                    cursor: "pointer",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  <input
+                    type="color"
+                    value={storeBannerColor && storeBannerColor.startsWith("#") ? storeBannerColor : "#10b981"}
+                    onChange={(e) => setStoreBannerColor(e.target.value)}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      border: "none",
+                      borderRadius: "50%",
+                      padding: 0,
+                      cursor: "pointer",
+                      background: "none",
+                    }}
+                  />
+                  <span>{isAr ? "لون مخصص" : "Personnaliser"}</span>
+                </label>
               </div>
             </div>
 

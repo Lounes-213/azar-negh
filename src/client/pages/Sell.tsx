@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ItemType, ListingDetail, MetaResponse } from "../../shared/types";
-import { Alert, Button, Field, Input, Spinner, Textarea, useToast } from "../components/ui";
+import { Alert, Button, Dialog, Field, Input, Spinner, Textarea, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { Icon } from "../components/Icons";
 import { api, errorMessage, fieldErrors } from "../lib/api";
@@ -40,6 +40,10 @@ export function Sell() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  // Delete listing state
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const [itemType, setItemType] = useState<ItemType>("PRODUCT");
   const [title, setTitle] = useState("");
@@ -431,18 +435,45 @@ export function Sell() {
     }
   };
 
+  const handleDeleteListing = async () => {
+    if (!id) return;
+    setDeleteBusy(true);
+    try {
+      await api(`/listings/${id}`, { method: "DELETE" });
+      push(lang === "ar" ? "تم حذف الإعلان بنجاح." : "Annonce supprimée avec succès.", "success");
+      navigate("/compte/annonces");
+    } catch (err) {
+      push(errorMessage(err), "error");
+      setDeleteBusy(false);
+    }
+  };
+
   const previewPrice = Number(priceDa || 0);
 
   return (
     <div className="container page">
       <div className="page-head">
         <div>
-          <h1>{editing ? "Modifier l'annonce" : t("sell.new")}</h1>
+          <h1>{editing ? (lang === "ar" ? "تعديل الإعلان" : "Modifier l'annonce") : t("sell.new")}</h1>
           <p>{t("sell.publishNote")}</p>
         </div>
-        <Link to="/compte/annonces" className="btn btn-ghost btn-sm">
-          <Icon name="arrow-left" size={16} /> {t("common.back")}
-        </Link>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {editing ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirmDelete(true)}
+              style={{ color: "var(--danger)", border: "1px solid rgba(239, 68, 68, 0.3)" }}
+            >
+              <Icon name="trash" size={15} />
+              <span>{lang === "ar" ? "حذف الإعلان" : "Supprimer"}</span>
+            </Button>
+          ) : null}
+          <Link to="/compte/annonces" className="btn btn-ghost btn-sm">
+            <Icon name="arrow-left" size={16} /> {t("common.back")}
+          </Link>
+        </div>
       </div>
 
       {notEditable ? (
@@ -1223,6 +1254,40 @@ export function Sell() {
           </div>
         </aside>
       </div>
+
+      {/* Confirmation Dialog for Listing Deletion */}
+      <Dialog
+        open={confirmDelete}
+        onClose={() => !deleteBusy && setConfirmDelete(false)}
+        title={lang === "ar" ? "حذف الإعلان نهائياً" : "Supprimer l'annonce"}
+      >
+        <div className="stack" style={{ gap: 14 }}>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>
+            {lang === "ar"
+              ? "هل أنت متأكد من رغبتك في حذف هذا الإعلان نهائياً؟ سيتم حذف جميع الصور والبيانات المرتبطة به ولا يمكن استرجاعها."
+              : "Êtes-vous sûr de vouloir supprimer définitivement cette annonce ? Cette action est irréversible et toutes les photos seront effacées."}
+          </p>
+          <div className="dialog-actions" style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 12 }}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleteBusy}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteListing}
+              loading={deleteBusy}
+              style={{ background: "#ef4444", borderColor: "#ef4444", color: "#fff" }}
+            >
+              <Icon name="trash" size={15} />
+              <span>{lang === "ar" ? "تأكيد الحذف" : "Supprimer définitivement"}</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

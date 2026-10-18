@@ -32,12 +32,32 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Skip API routes and non-GET requests so dynamic calls and uploads always go to network
-  if (url.pathname.startsWith("/api/") || event.request.method !== "GET") {
+  // Cached product and avatar images from R2
+  const isImageApi = url.pathname.startsWith("/api/images/");
+
+  // Dynamic API calls (except immutable images) and non-GET requests always go to network
+  if ((url.pathname.startsWith("/api/") && !isImageApi) || event.request.method !== "GET") {
     return;
   }
 
-  // Stale-while-revalidate or Network-first with cache fallback
+  // Cache-first for images to drastically cut R2 calls & cellular data usage
+  if (isImageApi) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for static shell assets
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {

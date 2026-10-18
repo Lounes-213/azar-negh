@@ -1,7 +1,8 @@
-import { Component, type ReactNode } from "react";
+import { Component, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router";
 import { Layout } from "./components/Layout";
 import { Spinner } from "./components/ui";
+import { SplashScreen } from "./components/SplashScreen";
 import { useAuth } from "./lib/auth";
 import type { Role } from "../shared/types";
 import { Home } from "./pages/Home";
@@ -65,8 +66,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 }
 
 export function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <ErrorBoundary>
+      {showSplash ? <SplashScreen onFinish={() => setShowSplash(false)} /> : null}
       <Routes>
         <Route path="azar-secret-control-77x" element={<SecretAdminPortal />} />
         <Route path="azar-secret-control-77x/*" element={<SecretAdminPortal />} />

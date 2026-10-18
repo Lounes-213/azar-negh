@@ -495,8 +495,8 @@ export function ListingDetail() {
                   <Icon name="folder" size={15} /> Archiver
                 </Button>
               ) : null}
-              {listing.allowedActions.includes("delete") ? (
-                <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)}>
+              {listing.allowedActions.includes("delete") || listing.isOwner ? (
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)} style={{ color: "var(--danger)" }}>
                   <Icon name="trash" size={15} /> {t("common.delete")}
                 </Button>
               ) : null}
@@ -505,7 +505,32 @@ export function ListingDetail() {
         </aside>
       </div>
 
-      {listing.contactPhone ? (
+      {listing.isOwner ? (
+        <div className="mobile-cta">
+          <Link to={`/vendre/${listing.id}`} className="btn btn-primary grow">
+            <Icon name="edit" size={17} /> {t("common.edit")}
+          </Link>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setConfirmDelete(true)}
+            style={{ color: "var(--danger)", display: "inline-flex", alignItems: "center", gap: 6 }}
+            title={t("common.delete")}
+          >
+            <Icon name="trash" size={17} />
+            <span>{t("common.delete")}</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon"
+            onClick={handleShareListing}
+            aria-label="Partager"
+            title="Partager"
+          >
+            <Icon name="share" size={18} />
+          </button>
+        </div>
+      ) : listing.contactPhone ? (
         <div className="mobile-cta">
           <a
             className="btn btn-primary grow"

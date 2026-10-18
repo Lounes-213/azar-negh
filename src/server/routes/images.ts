@@ -239,6 +239,12 @@ imageRoutes.get("/images/:id", async (c) => {
   );
   headers.set("ETag", object.httpEtag);
   if (!isPublic) headers.set("Vary", "Cookie");
+
+  const ifNoneMatch = c.req.header("if-none-match");
+  if (ifNoneMatch && (ifNoneMatch === object.httpEtag || ifNoneMatch.includes(object.httpEtag))) {
+    return new Response(null, { status: 304, headers });
+  }
+
   return new Response(object.body, { headers });
 });
 
@@ -255,6 +261,13 @@ imageRoutes.get("/images/avatar/:userId/:filename", async (c) => {
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Content-Disposition", "inline");
   headers.set("Cache-Control", "public, max-age=86400");
+  if (object.httpEtag) {
+    headers.set("ETag", object.httpEtag);
+    const ifNoneMatch = c.req.header("if-none-match");
+    if (ifNoneMatch && (ifNoneMatch === object.httpEtag || ifNoneMatch.includes(object.httpEtag))) {
+      return new Response(null, { status: 304, headers });
+    }
+  }
   return new Response(object.body, { headers });
 });
 

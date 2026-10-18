@@ -94,6 +94,8 @@ export function ListingCard({
             <img
               src={listing.coverImage}
               alt={listing.title}
+              width={400}
+              height={400}
               loading="lazy"
               decoding="async"
               className="ali-img"
@@ -199,6 +201,10 @@ export function ListingCard({
               <img
                 src={listing.storeLogoUrl || listing.sellerAvatarUrl!}
                 alt=""
+                width={20}
+                height={20}
+                loading="lazy"
+                decoding="async"
                 className="ali-store-avatar"
                 style={{
                   width: 20,

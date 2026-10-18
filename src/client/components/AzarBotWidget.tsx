@@ -112,8 +112,8 @@ async function compressImageForVision(file: File): Promise<{
  * - `code` -> inline code
  */
 function renderInlineMarkdown(text: string, onNavigate?: () => void): React.ReactNode[] {
-  // Regex matches **bold**, [link](url), and `code`
-  const tokenRegex = /(\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`)/g;
+  // Regex matches **bold**, [link](url) with optional whitespace, and `code`
+  const tokenRegex = /(\*\*([^*]+)\*\*|\[([^\]]+)\]\s*\(([^)\s]+)\)|`([^`]+)`)/g;
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;

@@ -178,8 +178,21 @@ export function Seller() {
     <div className="container page page-enter">
       {/* Store Header Card */}
       <div className="store-header-card mb-6">
-        <div className="store-profile-bar">
-          <div className="store-avatar-wrap">
+        {/* Sleek, customizable slim banner for all stores (default brand green, color-customizable) */}
+        <div
+          className="store-slim-banner"
+          style={{
+            height: "74px",
+            width: "100%",
+            background: seller.bannerUrl && (seller.bannerUrl.startsWith("#") || seller.bannerUrl.startsWith("rgb"))
+              ? `linear-gradient(135deg, ${seller.bannerUrl} 0%, ${seller.bannerUrl}dd 100%)`
+              : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            boxShadow: "inset 0 -1px 0 rgba(0, 0, 0, 0.08)",
+          }}
+        />
+
+        <div className="store-profile-bar" style={{ paddingTop: "14px" }}>
+          <div className="store-avatar-wrap" style={{ marginTop: "-48px", position: "relative", zIndex: 2 }}>
             <Avatar
               name={seller.storeName || seller.displayName}
               imageUrl={seller.logoUrl || seller.avatarUrl}
