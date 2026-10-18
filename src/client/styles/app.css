@@ -2331,10 +2331,14 @@ ol {
   }
   .wizard {
     grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
   .preview-card {
     position: static;
-    order: -1;
+    order: 2;
+  }
+  .preview-card.preview-card-mobile-hide {
+    display: none !important;
   }
   .queue-grid {
     grid-template-columns: 1fr;

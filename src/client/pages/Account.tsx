@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { MetaResponse, SessionUser } from "../../shared/types";
-import { Avatar, Button, Field, Input, Spinner, Textarea, useToast } from "../components/ui";
+import { Avatar, Button, Field, Input, Spinner, StatusBadge, Textarea, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { Icon } from "../components/Icons";
 import { PwaInstallCard } from "../components/PwaInstallCard";
@@ -9,8 +9,10 @@ import { api, errorMessage, fieldErrors } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
-import { formatPhoneForInput } from "../lib/format";
+import { formatPhoneForInput, formatPrice } from "../lib/format";
 import { PushNotificationCard } from "./Notifications";
+import { useTheme } from "../lib/theme";
+import type { ListingSummary, Paginated } from "../../shared/types";
 
 interface AccountStats {
   listingsCount: number;
@@ -29,122 +31,143 @@ interface FollowUser {
   store_slug: string | null;
 }
 
-function LanguageSelectorCard({
+function PreferencesPanel({
   lang,
   setLang,
   isAr,
+  theme,
+  setTheme,
 }: {
   lang: "fr" | "ar";
   setLang: (l: "fr" | "ar") => void;
   isAr: boolean;
+  theme: "light" | "dark";
+  setTheme: (t: "light" | "dark") => void;
 }) {
   return (
     <div
       className="panel stack"
       style={{
         gap: 12,
-        padding: "clamp(1rem, 3vw, 1.5rem)",
+        padding: "14px 18px",
         borderRadius: "var(--radius-lg)",
         border: "1px solid var(--line)",
       }}
     >
-      <div>
-        <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
-          {isAr ? "لغة المنصة والعرض" : "Langue de l'application"}
-        </h3>
-        <p className="small muted" style={{ margin: "2px 0 0 0" }}>
-          {isAr
-            ? "اختر لغتك المفضلة، يتم تحديث واجهة المنصة فوراً."
-            : "Choisissez votre langue. L'affichage s'adapte instantanément."}
-        </p>
+      {/* Simple Language row: NO flags, NO extra text */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Icon name="globe" size={18} style={{ color: "var(--brand-600)" }} />
+          <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+            {isAr ? "اللغة" : "Langue"}
+          </span>
+        </div>
+        <div
+          style={{
+            display: "inline-flex",
+            background: "var(--surface-muted)",
+            padding: 3,
+            borderRadius: "var(--radius-pill)",
+            border: "1px solid var(--line)",
+            gap: 4,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setLang("ar")}
+            className={`btn btn-sm ${lang === "ar" ? "btn-primary" : "btn-ghost"}`}
+            style={{
+              borderRadius: "var(--radius-pill)",
+              padding: "4px 16px",
+              fontSize: "0.85rem",
+              height: 32,
+              fontWeight: 600,
+            }}
+          >
+            العربية
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("fr")}
+            className={`btn btn-sm ${lang === "fr" ? "btn-primary" : "btn-ghost"}`}
+            style={{
+              borderRadius: "var(--radius-pill)",
+              padding: "4px 16px",
+              fontSize: "0.85rem",
+              height: 32,
+              fontWeight: 600,
+            }}
+          >
+            Français
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-        {/* Arabic option */}
-        <button
-          type="button"
-          onClick={() => setLang("ar")}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 14px",
-            borderRadius: "var(--radius-md)",
-            border: lang === "ar" ? "2px solid var(--brand-600)" : "1px solid var(--line)",
-            background: lang === "ar" ? "var(--brand-50, rgba(16, 185, 129, 0.08))" : "var(--surface)",
-            cursor: "pointer",
-            textAlign: "start",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>🇩🇿</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--ink)" }}>العربية</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>من اليمين لليسار (RTL)</div>
-            </div>
-          </div>
-          {lang === "ar" ? (
-            <span
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                background: "var(--brand-600)",
-                color: "#fff",
-                display: "grid",
-                placeItems: "center",
-                fontSize: "12px",
-                fontWeight: "bold",
-              }}
-            >
-              ✓
-            </span>
-          ) : null}
-        </button>
+      <div className="divider" style={{ margin: "2px 0" }} />
 
-        {/* French option */}
-        <button
-          type="button"
-          onClick={() => setLang("fr")}
+      {/* Dark Theme row: simple & direct */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: "1.1rem" }}>{theme === "dark" ? "🌙" : "☀️"}</span>
+          <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+            {isAr ? "المظهر" : "Thème"}
+          </span>
+        </div>
+        <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 14px",
-            borderRadius: "var(--radius-md)",
-            border: lang === "fr" ? "2px solid var(--brand-600)" : "1px solid var(--line)",
-            background: lang === "fr" ? "var(--brand-50, rgba(16, 185, 129, 0.08))" : "var(--surface)",
-            cursor: "pointer",
-            textAlign: "start",
-            transition: "all 0.15s ease",
+            display: "inline-flex",
+            background: "var(--surface-muted)",
+            padding: 3,
+            borderRadius: "var(--radius-pill)",
+            border: "1px solid var(--line)",
+            gap: 4,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>🇫🇷</span>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--ink)" }}>Français</div>
-              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>De gauche à droite (LTR)</div>
-            </div>
-          </div>
-          {lang === "fr" ? (
-            <span
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                background: "var(--brand-600)",
-                color: "#fff",
-                display: "grid",
-                placeItems: "center",
-                fontSize: "12px",
-                fontWeight: "bold",
-              }}
-            >
-              ✓
-            </span>
-          ) : null}
-        </button>
+          <button
+            type="button"
+            onClick={() => setTheme("light")}
+            className={`btn btn-sm ${theme === "light" ? "btn-primary" : "btn-ghost"}`}
+            style={{
+              borderRadius: "var(--radius-pill)",
+              padding: "4px 14px",
+              fontSize: "0.85rem",
+              height: 32,
+              fontWeight: 600,
+            }}
+          >
+            {isAr ? "فاتح" : "Clair"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTheme("dark")}
+            className={`btn btn-sm ${theme === "dark" ? "btn-primary" : "btn-ghost"}`}
+            style={{
+              borderRadius: "var(--radius-pill)",
+              padding: "4px 14px",
+              fontSize: "0.85rem",
+              height: 32,
+              fontWeight: 600,
+            }}
+          >
+            {isAr ? "داكن" : "Sombre"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -153,6 +176,7 @@ function LanguageSelectorCard({
 export function Account() {
   const { user, loading: authLoading, updateUser, logout } = useAuth();
   const { t, lang, setLang } = useI18n();
+  const { theme, setTheme } = useTheme();
   const isAr = lang === "ar";
   useDocumentTitle(isAr ? "حسابي والإعدادات — أزار نغ" : "Mon compte & Paramètres — Azar Neɣ");
   const navigate = useNavigate();
@@ -164,6 +188,113 @@ export function Account() {
   const initialView = (searchParams.get("view") as "hub" | "edit" | "follows" | "store") || "hub";
   const [view, setView] = useState<"hub" | "edit" | "follows" | "store">(initialView);
   const [followsTab, setFollowsTab] = useState<"followers" | "following">("followers");
+
+  // Store Management View States
+  const [showStoreSettings, setShowStoreSettings] = useState(false);
+  const [storeListings, setStoreListings] = useState<ListingSummary[]>([]);
+  const [storeListingsLoading, setStoreListingsLoading] = useState(false);
+  const [storeSortBy, setStoreSortBy] = useState<"pinned" | "newest" | "price_asc" | "price_desc">("pinned");
+  const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
+    if (typeof window === "undefined" || !user?.id) return [];
+    try {
+      const raw = localStorage.getItem(`azar.store_pinned_${user.id}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Load merchant listings when entering the store management view
+  const fetchStoreListings = () => {
+    if (!user) return;
+    setStoreListingsLoading(true);
+    api<{ listings: Paginated<ListingSummary> }>("/account/listings?perPage=100")
+      .then((data) => {
+        setStoreListings(data.listings.items || []);
+      })
+      .catch(() => {})
+      .finally(() => setStoreListingsLoading(false));
+  };
+
+  useEffect(() => {
+    if (view === "store" && user) {
+      fetchStoreListings();
+    }
+  }, [view, user]);
+
+  const syncStoreOrder = async (orderedList: ListingSummary[], newPinned: string[]) => {
+    if (!user) return;
+    setPinnedIds(newPinned);
+    try {
+      localStorage.setItem(`azar.store_pinned_${user.id}`, JSON.stringify(newPinned));
+    } catch {}
+
+    try {
+      await api("/sellers/my-store/reorder", {
+        method: "POST",
+        body: { listingIds: orderedList.map((item) => item.id) },
+      });
+    } catch {}
+  };
+
+  const handleTogglePin = async (listingId: string) => {
+    const isCurrentlyPinned = pinnedIds.includes(listingId);
+    const nextPinned = isCurrentlyPinned
+      ? pinnedIds.filter((id) => id !== listingId)
+      : [listingId, ...pinnedIds];
+
+    const pinnedItems = nextPinned
+      .map((id) => storeListings.find((item) => item.id === id))
+      .filter((item): item is ListingSummary => Boolean(item));
+    const unpinnedItems = storeListings.filter((item) => !nextPinned.includes(item.id));
+    const nextListings = [...pinnedItems, ...unpinnedItems];
+
+    setStoreListings(nextListings);
+    await syncStoreOrder(nextListings, nextPinned);
+
+    push(
+      !isCurrentlyPinned
+        ? (isAr ? "تم تثبيت المنتج في واجهة متجرك (Présenti) ⭐ !" : "Produit mis en vitrine (Présenti) ⭐ !")
+        : (isAr ? "تم إلغاء التثبيت من الواجهة" : "Retiré de la vitrine"),
+      "success",
+    );
+  };
+
+  const handleMoveStoreItem = async (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= storeListings.length) return;
+    const items = [...storeListings];
+    const currentItem = items[index];
+    const targetItem = items[targetIndex];
+    if (!currentItem || !targetItem) return;
+    items[index] = targetItem;
+    items[targetIndex] = currentItem;
+    setStoreListings(items);
+    await syncStoreOrder(items, pinnedIds);
+  };
+
+  const sortedStoreListings = [...storeListings].sort((a, b) => {
+    if (storeSortBy === "pinned") {
+      const aPinned = pinnedIds.includes(a.id);
+      const bPinned = pinnedIds.includes(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      if (aPinned && bPinned) {
+        return pinnedIds.indexOf(a.id) - pinnedIds.indexOf(b.id);
+      }
+      return 0;
+    }
+    if (storeSortBy === "newest") {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+    if (storeSortBy === "price_asc") {
+      return (a.priceDa ?? 0) - (b.priceDa ?? 0);
+    }
+    if (storeSortBy === "price_desc") {
+      return (b.priceDa ?? 0) - (a.priceDa ?? 0);
+    }
+    return 0;
+  });
 
   useEffect(() => {
     const viewParam = searchParams.get("view");
@@ -361,6 +492,7 @@ export function Account() {
         },
       });
       updateUser(data.user);
+      setShowStoreSettings(false);
       push(
         isAr ? "تم حفظ التعديلات بنجاح !" : "Modifications enregistrées avec succès !",
         "success",
@@ -435,8 +567,8 @@ export function Account() {
             </div>
           </div>
 
-          {/* Language Selector Component */}
-          <LanguageSelectorCard lang={lang} setLang={setLang} isAr={isAr} />
+          {/* Preferences: Simple Language (no flags/fluff) & Dark Theme */}
+          <PreferencesPanel lang={lang} setLang={setLang} isAr={isAr} theme={theme} setTheme={setTheme} />
 
           {/* Push Notification Card */}
           <PushNotificationCard />
@@ -1014,32 +1146,65 @@ export function Account() {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => handleSetView("hub")}
+              onClick={() => {
+                if (showStoreSettings) {
+                  setShowStoreSettings(false);
+                } else {
+                  handleSetView("hub");
+                }
+              }}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <Icon name="arrow-right" size={16} style={{ transform: isAr ? "rotate(0deg)" : "rotate(180deg)" }} />
-              {isAr ? "العودة للحساب" : "Retour"}
+              {showStoreSettings
+                ? (isAr ? "العودة للمنتجات" : "Retour aux produits")
+                : (isAr ? "العودة للحساب" : "Retour")}
             </button>
             <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
               <span>🏪</span>
-              <span>{isAr ? "تهيئة وإدارة متجري" : "Gestion de ma boutique"}</span>
+              <span>{isAr ? "إدارة ومعروضات متجري" : "Gestion & Vitrine de ma boutique"}</span>
             </h2>
             {storeSlug ? (
               <Link
                 to={`/vendeurs/${storeSlug}`}
                 className="btn btn-sm btn-outline"
-                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               >
-                <Icon name="share" size={14} />
-                <span>{isAr ? "معاينة" : "Aperçu"}</span>
+                <Icon name="eye" size={15} />
+                <span>{isAr ? "المتجر العام" : "Vitrine"}</span>
               </Link>
             ) : (
               <div style={{ width: 60 }} />
             )}
           </div>
 
-          {/* Form */}
-          <form onSubmit={save} className="stack" style={{ gap: "var(--space-4)" }}>
+          {showStoreSettings ? (
+            /* ----------------- SUB-VIEW: STORE PROFILE SETTINGS FORM ----------------- */
+            <form onSubmit={save} className="stack" style={{ gap: "var(--space-4)" }}>
+              {/* Back to shelf banner button */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px 14px",
+                  background: "var(--surface-muted)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--line)",
+                }}
+              >
+                <span className="small muted">
+                  {isAr ? "تعديل إعدادات وبيانات المتجر" : "Modification des informations du magasin"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowStoreSettings(false)}
+                  className="btn btn-sm btn-ghost"
+                  style={{ fontWeight: 600, color: "var(--brand-700)" }}
+                >
+                  {isAr ? "← العودة لمعروضات المتجر" : "← Retour aux produits"}
+                </button>
+              </div>
             {/* Visual Branding Card (Photo de la boutique) */}
             <div
               className="panel stack"
@@ -1414,15 +1579,417 @@ export function Account() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => handleSetView("hub")}
+                onClick={() => setShowStoreSettings(false)}
                 className="store-cancel-btn"
               >
-                {isAr ? "إلغاء والعودة" : "Annuler"}
+                {isAr ? "إلغاء والعودة للمنتجات" : "Annuler et retourner"}
               </Button>
             </div>
           </form>
-        </div>
-      ) : null}
+        ) : (
+          /* ----------------- SUB-VIEW: STORE PRODUCTS SHELF & VITRINE MANAGER (DEFAULT) ----------------- */
+          <div className="stack" style={{ gap: 16 }}>
+            {/* Quick Store Summary Header Card */}
+            <div
+              className="panel stack"
+              style={{
+                gap: 16,
+                padding: "clamp(1.25rem, 3vw, 1.75rem)",
+                borderRadius: "var(--radius-lg)",
+                border: "1px solid var(--line)",
+                background: "linear-gradient(135deg, var(--surface) 0%, var(--surface-muted) 100%)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ position: "relative" }}>
+                  <Avatar
+                    name={storeName || displayName}
+                    imageUrl={storeLogoUrl || user.avatarUrl}
+                    size="xl"
+                    withGreenRing={true}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <h3 style={{ fontSize: "var(--text-lg)", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
+                      {storeName || displayName}
+                    </h3>
+                    <span className="badge badge-brand" style={{ fontWeight: 700, fontSize: "0.75rem" }}>
+                      PRO
+                    </span>
+                  </div>
+                  {storeSlug ? (
+                    <p className="small muted" style={{ margin: "0 0 6px 0" }}>
+                      azar-neg.com/vendeurs/<strong>{storeSlug}</strong>
+                    </p>
+                  ) : null}
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                    <span className="small muted" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Icon name="map-pin" size={14} />
+                      {wilayaId ? (meta.data?.wilayas.find((w) => String(w.id) === String(wilayaId))?.[isAr ? "nameAr" : "nameFr"] || `Wilaya ${wilayaId}`) : "Algérie"}
+                    </span>
+                    <span className="small" style={{ fontWeight: 600, color: "var(--brand-700)" }}>
+                      {storeListings.length} {isAr ? "منتج في المتجر" : "produits en rayon"}
+                    </span>
+                    {pinnedIds.length > 0 ? (
+                      <span className="badge" style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a", fontWeight: 700, fontSize: "0.75rem" }}>
+                        ⭐ {pinnedIds.length} {isAr ? "في الصدارة (Présenti)" : "en vitrine"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Button to open Store Settings */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowStoreSettings(true)}
+                    className="btn btn-outline"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontWeight: 600,
+                      padding: "10px 16px",
+                    }}
+                  >
+                    <Icon name="settings" size={16} />
+                    <span>{isAr ? "تعديل بيانات المتجر" : "Modifier les infos du magasin"}</span>
+                  </button>
+                  {storeSlug ? (
+                    <Link
+                      to={`/vendeurs/${storeSlug}`}
+                      className="btn btn-secondary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontWeight: 600,
+                        padding: "10px 16px",
+                      }}
+                    >
+                      <Icon name="share" size={15} />
+                      <span>{isAr ? "زيارة المتجر" : "Voir ma vitrine"}</span>
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Shelf Manager Controls: Title, Sort Options, Add Product */}
+            <div
+              className="panel"
+              style={{
+                padding: "14px 18px",
+                borderRadius: "var(--radius-lg)",
+                border: "1px solid var(--line)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: "1.2rem" }}>📦</span>
+                <div>
+                  <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
+                    {isAr ? "معروضات وكتالوج المتجر" : "Catalogue & Vitrine de produits"}
+                  </h3>
+                  <p className="small muted" style={{ margin: 0 }}>
+                    {isAr
+                      ? "رتّب منتجاتك وحدد السلع التي تظهر في الصدارة (Présenti) أمام الزبائن."
+                      : "Organisez vos articles et mettez en avant vos meilleurs produits en vitrine."}
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                to="/vendre"
+                className="btn btn-primary btn-sm"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}
+              >
+                <Icon name="plus" size={16} />
+                <span>{isAr ? "إضافة منتج جديد" : "Ajouter un produit"}</span>
+              </Link>
+            </div>
+
+            {/* Sort Selector Bar */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+                padding: "8px 12px",
+                background: "var(--surface)",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--line)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span className="small muted" style={{ fontWeight: 600 }}>
+                  {isAr ? "الترتيب حسب:" : "Trier par :"}
+                </span>
+                <div style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => setStoreSortBy("pinned")}
+                    className={`btn btn-sm ${storeSortBy === "pinned" ? "btn-primary" : "btn-ghost"}`}
+                    style={{ borderRadius: "var(--radius-pill)", height: 32, fontSize: "0.8rem", fontWeight: 600 }}
+                  >
+                    ⭐ {isAr ? "في الصدارة (Présenti)" : "En vitrine (Présenti)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreSortBy("newest")}
+                    className={`btn btn-sm ${storeSortBy === "newest" ? "btn-primary" : "btn-ghost"}`}
+                    style={{ borderRadius: "var(--radius-pill)", height: 32, fontSize: "0.8rem", fontWeight: 600 }}
+                  >
+                    {isAr ? "الأحدث" : "Plus récents"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreSortBy("price_asc")}
+                    className={`btn btn-sm ${storeSortBy === "price_asc" ? "btn-primary" : "btn-ghost"}`}
+                    style={{ borderRadius: "var(--radius-pill)", height: 32, fontSize: "0.8rem", fontWeight: 600 }}
+                  >
+                    {isAr ? "الأقل سعراً" : "Prix croissant"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreSortBy("price_desc")}
+                    className={`btn btn-sm ${storeSortBy === "price_desc" ? "btn-primary" : "btn-ghost"}`}
+                    style={{ borderRadius: "var(--radius-pill)", height: 32, fontSize: "0.8rem", fontWeight: 600 }}
+                  >
+                    {isAr ? "الأعلى سعراً" : "Prix décroissant"}
+                  </button>
+                </div>
+              </div>
+
+              <span className="small muted">
+                {sortedStoreListings.length} {isAr ? "معروضة" : "affichés"}
+              </span>
+            </div>
+
+            {/* Products Shelf Listing */}
+            {storeListingsLoading ? (
+              <div style={{ display: "grid", placeItems: "center", padding: "40px 0" }}>
+                <Spinner />
+              </div>
+            ) : sortedStoreListings.length === 0 ? (
+              <div
+                className="panel stack"
+                style={{
+                  alignItems: "center",
+                  textAlign: "center",
+                  padding: "48px 24px",
+                  borderRadius: "var(--radius-lg)",
+                  border: "1px dashed var(--line)",
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    color: "var(--brand-700)",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  <Icon name="store" size={32} />
+                </div>
+                <h4 style={{ fontSize: "var(--text-lg)", fontWeight: 700, margin: 0 }}>
+                  {isAr ? "لا توجد منتجات معروضة بعد" : "Aucun produit dans votre catalogue"}
+                </h4>
+                <p className="small muted" style={{ margin: 0, maxWidth: 440 }}>
+                  {isAr
+                    ? "ابدأ بنشر منتجاتك وسلعك لتظهر في واجهة متجرك الإلكتروني للزبائن في كامل ولايات الجزائر."
+                    : "Publiez vos premiers articles pour alimenter la vitrine de votre boutique et recevoir des commandes."}
+                </p>
+                <Link to="/vendre" className="btn btn-primary" style={{ marginTop: 8 }}>
+                  <Icon name="plus" size={17} />
+                  <span>{isAr ? "نشر أول منتج في المتجر" : "Publier mon premier produit"}</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="stack" style={{ gap: 10 }}>
+                {sortedStoreListings.map((item, index) => {
+                  const isPinned = pinnedIds.includes(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className="panel"
+                      style={{
+                        padding: "12px 16px",
+                        borderRadius: "var(--radius-md)",
+                        border: isPinned ? "1.5px solid #f59e0b" : "1px solid var(--line)",
+                        background: isPinned ? "linear-gradient(135deg, var(--surface) 0%, rgba(245, 158, 11, 0.04) 100%)" : "var(--surface)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 14,
+                        flexWrap: "wrap",
+                        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                      }}
+                    >
+                      {/* Thumbnail & Product Details */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 220, flex: 1 }}>
+                        <div
+                          style={{
+                            width: 68,
+                            height: 68,
+                            borderRadius: "var(--radius-sm)",
+                            overflow: "hidden",
+                            background: "var(--surface-muted)",
+                            border: "1px solid var(--line)",
+                            flexShrink: 0,
+                            display: "grid",
+                            placeItems: "center",
+                          }}
+                        >
+                          {item.coverImage ? (
+                            <img
+                              src={item.coverImage}
+                              alt={item.title}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <Icon name="image" size={24} style={{ color: "var(--ink-muted)" }} />
+                          )}
+                        </div>
+
+                        <div className="stack" style={{ gap: 4, minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <Link
+                              to={`/annonces/${item.id}`}
+                              style={{
+                                fontWeight: 700,
+                                fontSize: "0.95rem",
+                                color: "var(--ink)",
+                                textDecoration: "none",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                maxWidth: "280px",
+                              }}
+                            >
+                              {item.title}
+                            </Link>
+                            {isPinned ? (
+                              <span
+                                className="badge"
+                                style={{
+                                  background: "#fef3c7",
+                                  color: "#b45309",
+                                  border: "1px solid #fde68a",
+                                  fontWeight: 700,
+                                  fontSize: "0.72rem",
+                                  padding: "2px 8px",
+                                }}
+                              >
+                                ⭐ {isAr ? "في الصدارة (Présenti)" : "Présenti"}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <span style={{ fontWeight: 800, color: "var(--brand-700)", fontSize: "0.95rem" }}>
+                              {formatPrice(item.priceDa, lang)}
+                            </span>
+                            <StatusBadge status={item.status} />
+                            <span className="small muted">
+                              {isAr ? item.wilaya.nameAr : item.wilaya.nameFr}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions: Pin / Présenti Button, Reorder Up/Down, Edit, View */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {/* Pin / Présenti button */}
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePin(item.id)}
+                          className="btn btn-sm"
+                          style={{
+                            background: isPinned ? "#fef3c7" : "transparent",
+                            color: isPinned ? "#92400e" : "var(--ink)",
+                            borderColor: isPinned ? "#fde68a" : "var(--line)",
+                            fontWeight: 700,
+                            fontSize: "0.8rem",
+                            height: 32,
+                            padding: "4px 12px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                          title={isAr ? "تثبيت المنتج في صدارة واجهة المتجر" : "Mettre en avant au début de la boutique"}
+                        >
+                          <span>⭐</span>
+                          <span>{isPinned ? (isAr ? "في الصدارة" : "Présenti") : (isAr ? "تثبيت (Présenti)" : "Mettre en vitrine")}</span>
+                        </button>
+
+                        {/* Up & Down Arrows (only active when in pinned sort mode) */}
+                        {storeSortBy === "pinned" ? (
+                          <div style={{ display: "inline-flex", gap: 2 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveStoreItem(index, "up")}
+                              disabled={index === 0}
+                              className="btn btn-sm btn-ghost"
+                              style={{ height: 32, width: 32, padding: 0, justifyContent: "center" }}
+                              title={isAr ? "تقديم للأعلى" : "Monter"}
+                            >
+                              <Icon name="chevron-down" size={16} style={{ transform: "rotate(180deg)" }} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveStoreItem(index, "down")}
+                              disabled={index === sortedStoreListings.length - 1}
+                              className="btn btn-sm btn-ghost"
+                              style={{ height: 32, width: 32, padding: 0, justifyContent: "center" }}
+                              title={isAr ? "تأخير للأسفل" : "Descendre"}
+                            >
+                              <Icon name="chevron-down" size={16} />
+                            </button>
+                          </div>
+                        ) : null}
+
+                        {/* Edit Listing */}
+                        <Link
+                          to={`/vendre?edit=${item.id}`}
+                          className="btn btn-sm btn-ghost"
+                          style={{ height: 32, width: 32, padding: 0, justifyContent: "center" }}
+                          title={isAr ? "تعديل المنتج" : "Modifier"}
+                        >
+                          <Icon name="edit" size={15} />
+                        </Link>
+
+                        {/* View Listing */}
+                        <Link
+                          to={`/annonces/${item.id}`}
+                          className="btn btn-sm btn-ghost"
+                          style={{ height: 32, width: 32, padding: 0, justifyContent: "center" }}
+                          title={isAr ? "معاينة المنتج" : "Voir"}
+                        >
+                          <Icon name="arrow-right" size={15} style={{ transform: isAr ? "rotate(180deg)" : "none" }} />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    ) : null}
 
       {/* ---------------------------------------------------------------- VIEW: MAIN ACCOUNT HUB */}
       {view === "hub" ? (
@@ -1984,8 +2551,8 @@ export function Account() {
             </div>
           </div>
 
-          {/* Language Selector in Member Hub */}
-          <LanguageSelectorCard lang={lang} setLang={setLang} isAr={isAr} />
+          {/* Preferences: Simple Language (no flags/fluff) & Dark Theme */}
+          <PreferencesPanel lang={lang} setLang={setLang} isAr={isAr} theme={theme} setTheme={setTheme} />
 
           {/* Device Push Notifications Card */}
           <PushNotificationCard />

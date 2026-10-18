@@ -238,30 +238,6 @@ export function Layout() {
           </div>
 
           <div className="topbar-actions">
-            <button
-              type="button"
-              className="lang-switch-topbar"
-              onClick={() => setLang(lang === "fr" ? "ar" : "fr")}
-              aria-label={lang === "fr" ? "التحويل إلى العربية" : "Passer au français"}
-              title={lang === "fr" ? "العربية" : "Français"}
-              style={{
-                height: 34,
-                padding: "0 10px",
-                borderRadius: 99,
-                border: "1px solid var(--line)",
-                background: "var(--surface)",
-                color: "var(--ink)",
-                fontWeight: 700,
-                fontSize: "0.82rem",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              <Icon name="globe" size={15} />
-              <span>{lang === "fr" ? "عربي" : "FR"}</span>
-            </button>
             <Link
               to="/compte/notifications"
               className="mobile-bell"

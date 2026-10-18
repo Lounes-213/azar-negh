@@ -489,9 +489,18 @@ export function Sell() {
         </div>
       ) : null}
 
-      <div className="wizard">
+      <div className="wizard" style={{ paddingBottom: "calc(var(--tabbar-height, 68px) + 36px)" }}>
         <div>
-          <div className="steps" aria-label="Étapes">
+          <div
+            className="steps"
+            aria-label="Étapes"
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+              width: "100%",
+            }}
+          >
             {[1, 2, 3].map((index) => (
               <button
                 key={index}
@@ -499,9 +508,16 @@ export function Sell() {
                 className={`step ${step === index ? "active" : step > index ? "done" : ""}`}
                 onClick={() => setStep(index)}
                 aria-current={step === index ? "step" : undefined}
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  padding: "9px 8px",
+                  fontSize: "0.85rem",
+                  borderRadius: "var(--radius-pill)",
+                }}
               >
                 <b>{step > index ? <Icon name="check" size={12} /> : index}</b>
-                {t(`sell.step${index}`)}
+                <span>{t(`sell.step${index}`)}</span>
               </button>
             ))}
           </div>
@@ -1070,11 +1086,11 @@ export function Sell() {
                 <span>Proposer un contact WhatsApp</span>
               </label>
 
-              <div className="form-actions">
-                <Button type="button" onClick={() => setStep(2)}>
+              <div className="form-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+                <Button type="button" onClick={() => setStep(2)} style={{ flex: 2, minWidth: 160, justifyContent: "center", height: 44 }}>
                   {t("common.next")} <Icon name="arrow-right" size={16} />
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy}>
+                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy} style={{ flex: 1, minWidth: 120, justifyContent: "center", height: 44 }}>
                   {t("sell.draft")}
                 </Button>
               </div>
@@ -1137,8 +1153,8 @@ export function Sell() {
                 </Alert>
               ) : null}
 
-              <div className="form-actions">
-                <Button type="button" variant="secondary" onClick={() => setStep(1)}>
+              <div className="form-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+                <Button type="button" variant="secondary" onClick={() => setStep(1)} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
                   {t("common.back")}
                 </Button>
                 <Button
@@ -1151,10 +1167,11 @@ export function Sell() {
                     setError(null);
                     setStep(3);
                   }}
+                  style={{ flex: 2, minWidth: 160, justifyContent: "center", height: 44 }}
                 >
                   {t("common.next")} <Icon name="arrow-right" size={16} />
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy}>
+                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
                   {t("sell.draft")}
                 </Button>
               </div>
@@ -1209,8 +1226,8 @@ export function Sell() {
                 </div>
               </dl>
 
-              <div className="form-actions">
-                <Button type="button" variant="secondary" onClick={() => setStep(2)}>
+              <div className="form-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+                <Button type="button" variant="secondary" onClick={() => setStep(2)} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
                   {t("common.back")}
                 </Button>
                 <Button
@@ -1218,10 +1235,11 @@ export function Sell() {
                   onClick={() => save(true)}
                   loading={busy}
                   disabled={notEditable}
+                  style={{ flex: 2, minWidth: 160, justifyContent: "center", height: 44 }}
                 >
                   <Icon name="send" size={16} /> {t("sell.publish")}
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy}>
+                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
                   {t("sell.draft")}
                 </Button>
               </div>
@@ -1230,7 +1248,7 @@ export function Sell() {
           ) : null}
         </div>
 
-        <aside className="preview-card" aria-label="Aperçu de l'annonce">
+        <aside className={`preview-card ${step !== 3 ? "preview-card-mobile-hide" : ""}`} aria-label="Aperçu de l'annonce">
           <div className="listing-media">
             {images[0] ? (
               <img src={images[0].url} alt="" />

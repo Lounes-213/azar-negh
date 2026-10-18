@@ -23,6 +23,10 @@ import { AuthProvider } from "./lib/auth";
 import { RealtimeProvider } from "./lib/realtime";
 import { ToastProvider } from "./components/ui";
 import { App } from "./App";
+import { applyTheme, getInitialTheme } from "./lib/theme";
+
+// Apply theme before render to eliminate flash
+applyTheme(getInitialTheme());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

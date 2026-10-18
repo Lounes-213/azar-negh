@@ -91,3 +91,37 @@
 html[lang="ar"] {
   --font-sans: var(--font-arabic);
 }
+
+/* Dark Theme Palette */
+[data-theme="dark"] {
+  --bg: #0b130e;
+  --surface: #131e17;
+  --surface-muted: #19271e;
+  --sand: #16241b;
+  --line: #22362a;
+  --line-strong: #2e4738;
+  --ink: #f0f7f3;
+  --ink-soft: #cde0d5;
+  --muted: #8ea598;
+  --muted-strong: #a5bcaf;
+
+  --brand-950: #e8f7ee;
+  --brand-900: #c2f2d3;
+  --brand-50: #12291c;
+  --brand-100: #173826;
+  --brand-200: #1b4d32;
+
+  --accent-soft: #2a2210;
+  --danger-soft: #301715;
+  --warning-soft: #2e210a;
+  --info-soft: #112338;
+  --success-soft: #112d1c;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 10px 26px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 22px 55px rgba(0, 0, 0, 0.8);
+
+  --grad-soft: linear-gradient(180deg, #131e17 0%, #0b130e 100%);
+  color-scheme: dark;
+}
