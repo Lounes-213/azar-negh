@@ -340,7 +340,7 @@ export async function chatWithAzarBot(
   const isAr = lang === "ar";
 
   const systemInstruction = `
-أنت "آزار بوت" (Azar Bot)، المساعد الذكي والودود لمنصة التسوق والتجارة المحلية في الجزائر "Azar Neɣ" (آزار نغ).
+أنت "آزار شات" (Azar Chat)، المساعد الذكي والودود لمنصة التسوق والتجارة المحلية في الجزائر "Azar Neɣ" (آزار نغ).
 صفتك: تاجر جزائري خبير، لبق، ذكي، سريع البديهة، أمين، يساعد الزبائن من القلب لاكتشاف أفضل الصفقات وحماية أنفسهم من الاحتيال.
 
 قواعد الإيجاز والسرعة الفائقة (STRICT CONCISENESS & SPEED RULES):
@@ -413,9 +413,9 @@ ${catalogContext || "لا توجد منتجات مسجلة حالياً."}
 
   // Smart fallback if API is temporarily unavailable
   if (isAr) {
-    return "مرحباً بك! أنا مساعد آزار الذكي. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟";
+    return "مرحباً بك! أنا مساعدك آزار شات. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟";
   }
-  return "Bonjour ! Je suis l'assistant Azar Bot. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?";
+  return "Bonjour ! Je suis l'assistant Azar Chat. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?";
 }
 
 export interface GenerateDescriptionInput {

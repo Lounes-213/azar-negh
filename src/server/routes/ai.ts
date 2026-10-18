@@ -279,8 +279,8 @@ aiRoutes.post("/ai/chat", async (c) => {
     return c.json({
       reply:
         input.lang === "ar"
-          ? "مرحباً بك! أنا مساعد آزار الذكي. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟"
-          : "Bonjour ! Je suis l'assistant Azar Bot. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?",
+          ? "مرحباً بك! أنا مساعدك آزار شات. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟"
+          : "Bonjour ! Je suis l'assistant Azar Chat. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?",
       products: [],
     });
   }

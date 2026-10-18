@@ -1098,26 +1098,19 @@ export function Account() {
               </div>
             </div>
 
-            {/* SPACIOUS ACTION BUTTONS - High padding prevents collision with mobile bottom nav bar */}
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                marginTop: 8,
-                paddingBottom: "calc(var(--tabbar-height, 68px) + 32px)",
-              }}
-            >
-              <Button type="submit" loading={busy} style={{ flex: 1, padding: "14px 24px", fontSize: "1rem" }}>
+            {/* RESPONSIVE ACTION BUTTONS - Prevents mobile viewport stretching & horizontal overflow */}
+            <div className="store-form-actions">
+              <Button type="submit" loading={busy} className="store-save-btn">
                 <Icon name="check" size={18} />
-                {isAr ? "حفظ وتثبيت معلومات المتجر" : "Enregistrer la boutique"}
+                <span>{isAr ? "حفظ وتثبيت معلومات المتجر" : "Enregistrer la boutique"}</span>
               </Button>
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => handleSetView("hub")}
-                style={{ padding: "14px 20px" }}
+                className="store-cancel-btn"
               >
-                {isAr ? "إلغاء" : "Annuler"}
+                {isAr ? "إلغاء والعودة" : "Annuler"}
               </Button>
             </div>
           </form>

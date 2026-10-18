@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Icon } from "./Icons";
 import { api, errorMessage } from "../lib/api";
@@ -297,9 +297,11 @@ export function AzarBotWidget() {
   } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatBodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hasOpenedRef = useRef(false);
 
   const closeChat = () => {
     setIsOpen(false);
@@ -343,8 +345,8 @@ export function AzarBotWidget() {
           id: "welcome",
           role: "model",
           content: isAr
-            ? `مرحباً بك${user ? ` **${user.displayName || ""}**` : ""}! أنا **آزار بوت**، مساعدك الذكي للتسوق في الجزائر.\nاسألني عن أي منتج، قارن بين **الأسعار والمواصفات**، أو ارفع **صورة لأي سلعة** للبحث عنها فوراً!`
-            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Azar Bot**, votre assistant shopping intelligent.\nPosez-moi vos questions, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
+            ? `مرحباً بك${user ? ` **${user.displayName || ""}**` : ""}! أنا **آزار شات**، مساعدك الذكي للتسوق في الجزائر.\nاسألني عن أي منتج، قارن بين **الأسعار والمواصفات**، أو ارفع **صورة لأي سلعة** للبحث عنها فوراً!`
+            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Azar Chat**, votre assistant shopping intelligent.\nPosez-moi vos questions, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
           createdAt: Date.now(),
         };
         setMessages([initial]);
@@ -365,12 +367,45 @@ export function AzarBotWidget() {
     }
   }, [messages]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom: Instant on open (no animation from top), smooth only on new incoming messages
   useEffect(() => {
     if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (!hasOpenedRef.current) {
+        hasOpenedRef.current = true;
+        // Instantly position scroll at the bottom
+        if (chatBodyRef.current) {
+          chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+        }
+      } else {
+        if (chatBodyRef.current) {
+          chatBodyRef.current.scrollTo({
+            top: chatBodyRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }
+    } else {
+      hasOpenedRef.current = false;
     }
   }, [messages, isOpen, loading]);
+
+  // Immediate layout effect & animation frame to ensure the opened modal displays from bottom immediately
+  useLayoutEffect(() => {
+    if (isOpen && chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const raf = requestAnimationFrame(() => {
+        if (chatBodyRef.current) {
+          chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+        }
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isOpen]);
 
   const clearChat = () => {
     const resetMsg: Message = {
@@ -527,8 +562,8 @@ export function AzarBotWidget() {
           }}
           onMouseEnter={() => setIsCollapsed(false)}
           onMouseLeave={() => setIsCollapsed(true)}
-          aria-label="Ouvrir l'assistant Azar Bot"
-          title="Azar Bot — Assistant Shopping IA"
+          aria-label={isAr ? "فتح آزار شات" : "Ouvrir Azar Chat"}
+          title={isAr ? "آزار شات — مساعد التسوق الذكي" : "Azar Chat — Assistant Shopping IA"}
         >
           <div className="azarbot-robot-avatar">
             <svg viewBox="0 0 48 48" width="34" height="34" fill="none">
@@ -546,7 +581,15 @@ export function AzarBotWidget() {
           </div>
 
           <span className="azarbot-launcher-label">
-            <span>Azar Bot</span>
+            {isAr ? (
+              <span>
+                آزار <span style={{ color: "#34d399", fontWeight: 800 }}>شات</span>
+              </span>
+            ) : (
+              <span>
+                Azar <span style={{ color: "#34d399", fontWeight: 800 }}>Chat</span>
+              </span>
+            )}
           </span>
 
           {!hasPromptedGreeting && !isCollapsed ? (
@@ -580,7 +623,15 @@ export function AzarBotWidget() {
               </div>
               <div>
                 <h3 id="azarbot-title" className="azarbot-header-name">
-                  Azar Bot
+                  {isAr ? (
+                    <span>
+                      آزار <span style={{ color: "#10b981", fontWeight: 800 }}>شات</span>
+                    </span>
+                  ) : (
+                    <span>
+                      Azar <span style={{ color: "#10b981", fontWeight: 800 }}>Chat</span>
+                    </span>
+                  )}
                 </h3>
                 <small className="azarbot-header-desc">
                   {isAr ? "مساعد التسوق والبحث بالصور" : "Assistant shopping & recherche par image"}
@@ -620,7 +671,7 @@ export function AzarBotWidget() {
           </div>
 
           {/* Messages Feed */}
-          <div className="azarbot-body">
+          <div className="azarbot-body" ref={chatBodyRef}>
             {messages.map((msg) => (
               <div key={msg.id} className={`azarbot-message-row ${msg.role === "user" ? "user-row" : "bot-row"}`}>
                 <div className={`azarbot-bubble ${msg.role === "user" ? "user-bubble" : "bot-bubble"}`}>
