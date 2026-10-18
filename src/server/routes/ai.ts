@@ -39,8 +39,81 @@ const STOPWORDS = new Set([
   "من", "في", "على", "إلى", "هل", "عندكم", "كاين", "سلام", "عليكم", "حاب", "نحوس", "اريد", "بدي", "عطيني", "واش", "عندك"
 ]);
 
+const SYNONYM_MAP: Record<string, string[]> = {
+  // Football / Sports
+  كرة: ["ballon", "foot", "sport"],
+  قدم: ["ballon", "foot", "sport"],
+  كورة: ["ballon", "foot", "sport"],
+  بالو: ["ballon", "foot", "sport"],
+  ballon: ["كرة", "قدم", "foot", "sport"],
+  foot: ["كرة", "قدم", "ballon", "sport"],
+  football: ["كرة", "قدم", "ballon", "sport"],
+  dabax: ["كرة", "قدم", "ballon", "sport"],
+
+  // Phones & Smartphones
+  هاتف: ["iphone", "samsung", "galaxy", "smartphone", "portable", "telephone", "tilifun"],
+  هواتف: ["iphone", "samsung", "galaxy", "smartphone", "portable", "telephone", "tilifun"],
+  تليفون: ["iphone", "samsung", "galaxy", "smartphone", "portable", "telephone", "tilifun"],
+  تيليفون: ["iphone", "samsung", "galaxy", "smartphone", "portable", "telephone", "tilifun"],
+  موبايل: ["iphone", "samsung", "galaxy", "smartphone", "portable", "telephone"],
+  tilifun: ["iphone", "samsung", "galaxy", "smartphone", "portable", "telephone", "هاتف"],
+  telephone: ["iphone", "samsung", "galaxy", "smartphone", "هاتف", "هواتف"],
+  portable: ["iphone", "samsung", "galaxy", "smartphone", "هاتف", "هواتف"],
+  smartphone: ["iphone", "samsung", "galaxy", "هاتف", "هواتف"],
+  iphone: ["آيفون", "ايفون", "apple", "promax", "هاتف"],
+  samsung: ["سامسونج", "سامسونغ", "galaxy", "ultra", "هاتف"],
+
+  // Computers / Laptops
+  حاسوب: ["macbook", "ordinateur", "laptop", "pc", "informatique"],
+  كمبيوتر: ["macbook", "ordinateur", "laptop", "pc", "informatique"],
+  بيسي: ["macbook", "ordinateur", "laptop", "pc"],
+  ordinateur: ["macbook", "laptop", "pc", "حاسوب"],
+  laptop: ["macbook", "ordinateur", "pc", "حاسوب"],
+  macbook: ["apple", "laptop", "ordinateur", "حاسوب"],
+
+  // Headphones / Audio
+  سماعات: ["airpods", "ecouteurs", "casque", "audio"],
+  ليزيكوتور: ["airpods", "ecouteurs", "casque"],
+  ecouteurs: ["airpods", "سماعات"],
+  airpods: ["سماعات", "apple", "ecouteurs"],
+
+  // Cars / Auto Parts
+  سيارة: ["voiture", "clio", "golf", "audi", "renault", "volkswagen", "jantes", "phares"],
+  طوموبيل: ["voiture", "clio", "golf", "audi", "renault", "volkswagen", "jantes", "phares"],
+  سيارات: ["voiture", "vehicules", "مركبات"],
+  voiture: ["سيارة", "clio", "golf", "audi"],
+  golf: ["volkswagen", "phares", "led", "سيارة"],
+  clio: ["renault", "distribution", "سيارة"],
+  audi: ["jantes", "sline", "سيارة"],
+  جوانط: ["jantes", "audi", "aluminium"],
+  jantes: ["جوانط", "audi", "roue"],
+  أضواء: ["phares", "led", "golf"],
+  phares: ["أضواء", "led", "golf"],
+
+  // Traditional Berber / Pottery / Jewelry / Carpets
+  زربية: ["tapis", "berbere", "laine"],
+  زرابي: ["tapis", "berbere", "laine"],
+  tapis: ["زربية", "berbere", "laine"],
+  فخار: ["vase", "poterie", "argile", "terre"],
+  مزهرية: ["vase", "poterie"],
+  vase: ["فخار", "مزهرية", "poterie"],
+  فضة: ["argent", "bracelet", "tabzimt", "bijoux"],
+  مجوهرات: ["argent", "bracelet", "tabzimt", "bijoux"],
+  bracelet: ["فضة", "tabzimt", "argent", "سوار"],
+  tabzimt: ["فضة", "argent", "bracelet"],
+
+  // Furniture / House
+  صالون: ["salon", "canape", "fauteuil", "meuble"],
+  salon: ["صالون", "angle", "canape"],
+  طاولة: ["table", "manger", "chaises", "meuble"],
+  طابلة: ["table", "manger", "chaises", "meuble"],
+  table: ["طاولة", "manger", "bois", "chaises"],
+  meuble: ["أثاث", "salon", "table"],
+  أثاث: ["meubles", "salon", "table"],
+};
+
 /**
- * Extracts searchable keywords from a query string.
+ * Extracts searchable keywords from a query string and expands them with multi-lingual synonyms.
  */
 function extractKeywords(query?: string): string[] {
   if (!query) return [];
@@ -49,7 +122,17 @@ function extractKeywords(query?: string): string[] {
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
     .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
-  return Array.from(new Set(words)).slice(0, 5);
+
+  const expanded = new Set<string>();
+  for (const w of words) {
+    expanded.add(w);
+    if (SYNONYM_MAP[w]) {
+      for (const syn of SYNONYM_MAP[w]) {
+        expanded.add(syn);
+      }
+    }
+  }
+  return Array.from(expanded).slice(0, 10);
 }
 
 /**
@@ -59,69 +142,71 @@ function extractKeywords(query?: string): string[] {
 async function loadCatalogContext(db: D1Database, query?: string): Promise<CatalogContextResult> {
   try {
     const keywords = extractKeywords(query);
-    let where = "l.status = 'APPROVED'";
-    const params: string[] = [];
+    const seenIds = new Set<string>();
+    const allResults: any[] = [];
 
+    // 1. If we have keywords, fetch keyword/synonym-matching listings first
     if (keywords.length > 0) {
-      const conditions = keywords.map(() => "(l.title LIKE ? OR l.description LIKE ?)");
-      where += ` AND (${conditions.join(" OR ")})`;
+      const conditions = keywords.map(
+        () => "(l.title LIKE ? OR l.description LIKE ? OR cat.name_ar LIKE ? OR cat.name_fr LIKE ? OR w.name_ar LIKE ? OR w.name_fr LIKE ?)",
+      );
+      const params: string[] = [];
       for (const kw of keywords) {
-        params.push(`%${kw}%`, `%${kw}%`);
+        params.push(`%${kw}%`, `%${kw}%`, `%${kw}%`, `%${kw}%`, `%${kw}%`, `%${kw}%`);
       }
-    }
 
-    let rows = await db
-      .prepare(
-        `SELECT l.id, l.title, l.price_da, l.original_price_da, l.condition, l.item_type,
-                w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
-                cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
-                (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
-         FROM listings l
-         LEFT JOIN wilayas w ON w.id = l.wilaya_id
-         LEFT JOIN categories cat ON cat.id = l.category_id
-         WHERE ${where}
-         ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-         LIMIT 12`,
-      )
-      .bind(...params)
-      .all<{
-        id: string;
-        title: string;
-        price_da: number;
-        original_price_da: number | null;
-        condition: string;
-        item_type: string;
-        wilaya_name_fr: string;
-        wilaya_name_ar: string;
-        category_name_fr: string;
-        category_name_ar: string;
-        cover_id: string | null;
-      }>();
-
-    // If keyword query yielded 0 results, fall back to top general catalog
-    if ((!rows.results || rows.results.length === 0) && keywords.length > 0) {
-      rows = await db
+      const kwRows = await db
         .prepare(
-          `SELECT l.id, l.title, l.price_da, l.original_price_da, l.condition, l.item_type,
+          `SELECT l.id, l.title, l.description, l.price_da, l.original_price_da, l.condition, l.item_type,
                   w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
                   cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
                   (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
            FROM listings l
            LEFT JOIN wilayas w ON w.id = l.wilaya_id
            LEFT JOIN categories cat ON cat.id = l.category_id
-           WHERE l.status = 'APPROVED'
+           WHERE l.status = 'APPROVED' AND (${conditions.join(" OR ")})
            ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-           LIMIT 10`,
+           LIMIT 20`,
         )
-        .all();
+        .bind(...params)
+        .all<any>();
+
+      for (const row of kwRows.results || []) {
+        if (!seenIds.has(row.id)) {
+          seenIds.add(row.id);
+          allResults.push(row);
+        }
+      }
     }
 
-    const results = rows.results || [];
-    if (results.length === 0) {
-      return { contextText: "لا توجد منتجات مسجلة حالياً.", candidates: [] };
+    // 2. ALWAYS append all other approved listings (up to 30) so the AI has full visibility of the platform inventory
+    const generalRows = await db
+      .prepare(
+        `SELECT l.id, l.title, l.description, l.price_da, l.original_price_da, l.condition, l.item_type,
+                w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+                cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
+                (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
+         FROM listings l
+         LEFT JOIN wilayas w ON w.id = l.wilaya_id
+         LEFT JOIN categories cat ON cat.id = l.category_id
+         WHERE l.status = 'APPROVED'
+         ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
+         LIMIT 30`,
+      )
+      .all<any>();
+
+    for (const row of generalRows.results || []) {
+      if (!seenIds.has(row.id)) {
+        seenIds.add(row.id);
+        allResults.push(row);
+      }
     }
 
-    const candidates: BotProductCard[] = results.map((r) => ({
+    if (allResults.length === 0) {
+      return { contextText: "لا توجد منتجات مسجلة حالياً في قاعدة البيانات.", candidates: [] };
+    }
+
+    const candidates: BotProductCard[] = allResults.map((r) => ({
       id: r.id,
       title: r.title,
       priceDa: r.price_da,
@@ -132,10 +217,10 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
       imageUrl: r.cover_id ? `/api/images/${r.cover_id}` : null,
     }));
 
-    const contextText = results
+    const contextText = allResults
       .map(
         (r) =>
-          `- [${r.title}](/annonces/${r.id}) (ID: ${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} | الحالة: ${r.condition || ""}`,
+          `- [${r.title}](/annonces/${r.id}) (ID: ${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} (${r.category_name_fr || ""}) | الحالة: ${r.condition || "مستعمل"}${r.description ? ` | تفاصيل: ${r.description.slice(0, 100).replace(/\r?\n/g, " ")}` : ""}`,
       )
       .join("\n");
 
@@ -253,8 +338,34 @@ aiRoutes.post("/ai/chat", async (c) => {
         .filter(Boolean);
 
       for (const id of ids) {
-        const found = catalogResult.candidates.find((p) => p.id === id);
-        if (found && !matchedProducts.some((p) => p.id === found.id)) {
+        let found = catalogResult.candidates.find((p) => p.id === id);
+        if (!found) {
+          try {
+            const dbItem = await c.env.DB.prepare(
+              `SELECT l.id, l.title, l.price_da, l.original_price_da, l.condition, l.item_type,
+                      w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+                      (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
+               FROM listings l
+               LEFT JOIN wilayas w ON w.id = l.wilaya_id
+               WHERE l.id = ? AND l.status = 'APPROVED' LIMIT 1`,
+            )
+              .bind(id)
+              .first<any>();
+            if (dbItem) {
+              found = {
+                id: dbItem.id,
+                title: dbItem.title,
+                priceDa: dbItem.price_da,
+                originalPriceDa: dbItem.original_price_da,
+                wilayaName: dbItem.wilaya_name_ar || dbItem.wilaya_name_fr || "الجزائر",
+                condition: dbItem.condition,
+                itemType: dbItem.item_type || "PRODUCT",
+                imageUrl: dbItem.cover_id ? `/api/images/${dbItem.cover_id}` : null,
+              };
+            }
+          } catch {}
+        }
+        if (found && !matchedProducts.some((p) => p.id === found!.id)) {
           matchedProducts.push(found);
           if (matchedProducts.length >= 3) break;
         }
@@ -267,15 +378,52 @@ aiRoutes.post("/ai/chat", async (c) => {
       let linkMatch: RegExpExecArray | null;
       while ((linkMatch = linkRegex.exec(reply)) !== null && matchedProducts.length < 3) {
         const id = linkMatch[1];
-        const found = catalogResult.candidates.find((p) => p.id === id);
-        if (found && !matchedProducts.some((p) => p.id === found.id)) {
+        let found = catalogResult.candidates.find((p) => p.id === id);
+        if (!found) {
+          try {
+            const dbItem = await c.env.DB.prepare(
+              `SELECT l.id, l.title, l.price_da, l.original_price_da, l.condition, l.item_type,
+                      w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+                      (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
+               FROM listings l
+               LEFT JOIN wilayas w ON w.id = l.wilaya_id
+               WHERE l.id = ? AND l.status = 'APPROVED' LIMIT 1`,
+            )
+              .bind(id)
+              .first<any>();
+            if (dbItem) {
+              found = {
+                id: dbItem.id,
+                title: dbItem.title,
+                priceDa: dbItem.price_da,
+                originalPriceDa: dbItem.original_price_da,
+                wilayaName: dbItem.wilaya_name_ar || dbItem.wilaya_name_fr || "الجزائر",
+                condition: dbItem.condition,
+                itemType: dbItem.item_type || "PRODUCT",
+                imageUrl: dbItem.cover_id ? `/api/images/${dbItem.cover_id}` : null,
+              };
+            }
+          } catch {}
+        }
+        if (found && !matchedProducts.some((p) => p.id === found!.id)) {
           matchedProducts.push(found);
         }
       }
     }
 
-    // If user provided an image or audio and matched products are still empty, attach top relevant candidates (max 3)
-    if ((input.image || input.audio) && matchedProducts.length === 0 && catalogResult.candidates.length > 0) {
+    // If matchedProducts is still empty, detect if any candidate listing is explicitly mentioned in reply text
+    if (matchedProducts.length === 0) {
+      for (const cand of catalogResult.candidates) {
+        const cleanTitle = cand.title.toLowerCase();
+        if (cleanTitle.length >= 5 && reply.toLowerCase().includes(cleanTitle)) {
+          matchedProducts.push(cand);
+          if (matchedProducts.length >= 3) break;
+        }
+      }
+    }
+
+    // If user provided an image and matched products are still empty, attach top visual candidates (max 3)
+    if (input.image && matchedProducts.length === 0 && catalogResult.candidates.length > 0) {
       matchedProducts.push(...catalogResult.candidates.slice(0, 3));
     }
 
