@@ -196,21 +196,13 @@ adminRoutes.patch("/admin/users/:id", async (c) => {
 
   const nextRole = input.role ?? target.role;
   const nextStatus = input.status ?? target.status;
-  const losesAdmin =
-    target.role === "ADMIN" &&
-    target.status === "ACTIVE" &&
-    (nextRole !== "ADMIN" || nextStatus !== "ACTIVE");
-  if (losesAdmin) {
-    const admins = await c.env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'",
-    ).first<{ count: number }>();
-    if ((admins?.count ?? 0) <= 1) {
-      throw new HttpError(
-        409,
-        "LAST_ADMIN",
-        "Le dernier administrateur actif ne peut pas être retiré.",
-      );
-    }
+  // Protection: Un administrateur ne peut pas retirer les droits d'administration ni suspendre un autre administrateur
+  if (target.role === "ADMIN" && (nextRole !== "ADMIN" || nextStatus !== "ACTIVE")) {
+    throw new HttpError(
+      403,
+      "CANNOT_DEMOTE_ADMIN",
+      "Un administrateur ne peut pas retirer les privilèges d'administration ni suspendre un autre administrateur.",
+    );
   }
 
   await c.env.DB.prepare("UPDATE users SET role = ?, status = ?, updated_at = ? WHERE id = ?")
@@ -818,9 +810,7 @@ adminRoutes.get("/admin/audit", async (c) => {
           action: row.action,
           entityType: row.entity_type,
           entityId: row.entity_id,
-          metadata: row.metadata_json
-            ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
-            : null,
+          metadata: null,
           createdAt: row.created_at,
         }),
       ),

@@ -119,11 +119,6 @@ export function Layout() {
               <Icon name="shield" size={20} /> {t("nav.moderation")}
             </NavLink>
           ) : null}
-          {user?.role === "ADMIN" ? (
-            <NavLink to="/admin" className={navClass}>
-              <Icon name="settings" size={20} /> {t("nav.admin")}
-            </NavLink>
-          ) : null}
         </nav>
 
         <div className="sidebar-cta">
@@ -171,11 +166,6 @@ export function Layout() {
                   {isStaff ? (
                     <Link to="/mod" className="dropdown-item" role="menuitem">
                       <Icon name="shield" size={17} /> {t("nav.moderation")}
-                    </Link>
-                  ) : null}
-                  {user.role === "ADMIN" ? (
-                    <Link to="/admin" className="dropdown-item" role="menuitem">
-                      <Icon name="settings" size={17} /> {t("nav.admin")}
                     </Link>
                   ) : null}
                   <div className="divider" style={{ margin: "4px 0" }} />

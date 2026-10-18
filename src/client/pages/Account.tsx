@@ -2409,51 +2409,6 @@ export function Account() {
                 </div>
               </Link>
 
-              {/* Espace Admin (if applicable) */}
-              {user.role === "ADMIN" || user.role === "MODERATOR" ? (
-                <Link
-                  to="/admin"
-                  className="account-menu-item"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "14px 16px",
-                    borderRadius: "var(--radius-md)",
-                    color: "var(--ink)",
-                    textDecoration: "none",
-                    transition: "background 0.15s ease",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "10px",
-                        background: "rgba(220, 38, 38, 0.1)",
-                        color: "var(--danger)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Icon name="shield" size={20} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: "var(--text-base)" }}>
-                        {isAr ? "لوحة الإدارة والإشراف" : "Administration & Modération"}
-                      </div>
-                      <div className="small muted">
-                        {isAr ? "مراقبة الإعلانات والتقارير" : "Supervision de la plateforme"}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Icon name="arrow-right" size={16} style={{ color: "var(--ink-muted)", transform: isAr ? "rotate(180deg)" : "none" }} />
-                  </div>
-                </Link>
-              ) : null}
 
               {/* Conditions d'utilisation */}
               <Link

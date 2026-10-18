@@ -9,7 +9,7 @@ import type {
   SortOption,
 } from "../../shared/types";
 import { Icon } from "../components/Icons";
-import { EmptyState, Field, Pagination, SkeletonStack } from "../components/ui";
+import { EmptyState, Field, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { ListingCard } from "../components/ListingCard";
 import { api, errorMessage } from "../lib/api";
@@ -112,10 +112,10 @@ export function Search({ mode }: { mode: Mode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.toString(), effectiveCategory, effectiveWilaya]);
 
+  const { push } = useToast();
   const sort = (params.get("sort") ?? "newest") as SortOption;
-  const page = Math.max(1, Number(params.get("page")) || 1);
 
-  const queryString = useMemo(() => {
+  const baseFilterQuery = useMemo(() => {
     const query = new URLSearchParams();
     if (params.get("q")) query.set("q", params.get("q")!);
     if (effectiveCategory) query.set("category", String(effectiveCategory));
@@ -124,16 +124,72 @@ export function Search({ mode }: { mode: Mode }) {
     if (params.get("maxPrice")) query.set("maxPrice", params.get("maxPrice")!);
     if (params.get("condition")) query.set("condition", params.get("condition")!);
     if (params.get("itemType")) query.set("itemType", params.get("itemType")!);
-    query.set("sort", sort);
-    query.set("page", String(page));
-    query.set("perPage", "24");
+    if (sort !== "newest") query.set("sort", sort);
     return query.toString();
-  }, [effectiveCategory, effectiveWilaya, params, sort, page]);
+  }, [effectiveCategory, effectiveWilaya, params, sort]);
 
-  const results = useAsync(
-    () => api<{ listings: Paginated<ListingSummary> }>(`/listings?${queryString}`),
-    [queryString],
-  );
+  const [items, setItems] = useState<ListingSummary[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const loadInitial = () => {
+    setInitialLoading(true);
+    setFetchError(null);
+    setCurrentPage(1);
+
+    const qs = new URLSearchParams(baseFilterQuery);
+    qs.set("page", "1");
+    qs.set("perPage", "8");
+
+    api<{ listings: Paginated<ListingSummary> }>(`/listings?${qs.toString()}`)
+      .then((data) => {
+        setItems(data.listings.items);
+        setTotalCount(data.listings.total);
+        setTotalPages(data.listings.totalPages);
+        setInitialLoading(false);
+      })
+      .catch((err) => {
+        setFetchError(errorMessage(err));
+        setInitialLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadInitial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseFilterQuery]);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || currentPage >= totalPages) return;
+    setLoadingMore(true);
+
+    const nextPage = currentPage + 1;
+    const qs = new URLSearchParams(baseFilterQuery);
+    qs.set("page", String(nextPage));
+    qs.set("perPage", "8");
+
+    try {
+      const data = await api<{ listings: Paginated<ListingSummary> }>(`/listings?${qs.toString()}`);
+      setItems((prev) => {
+        const seen = new Set(prev.map((it) => it.id));
+        const fresh = data.listings.items.filter((it) => !seen.has(it.id));
+        return [...prev, ...fresh];
+      });
+      setCurrentPage(nextPage);
+      setTotalCount(data.listings.total);
+      setTotalPages(data.listings.totalPages);
+    } catch (err) {
+      push(errorMessage(err), "error");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const hasMore = items.length < totalCount && currentPage < totalPages;
 
   const title =
     mode === "category" && categoryFromSlug
@@ -193,12 +249,6 @@ export function Search({ mode }: { mode: Mode }) {
     setParams(new URLSearchParams());
   };
 
-  const changePage = (nextPage: number) => {
-    const next = new URLSearchParams(params);
-    next.set("page", String(nextPage));
-    setParams(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
 
   const categoryOptions = useMemo(
     () => flattenCategories(meta.data?.categories ?? [], lang),
@@ -265,9 +315,9 @@ export function Search({ mode }: { mode: Mode }) {
         <div>
           <h1>{title}</h1>
           <p>
-            {results.loading
+            {initialLoading
               ? t("common.loading")
-              : `${results.data?.listings.total ?? 0} ${t("search.results")}`}
+              : `${totalCount} ${t("search.results")}`}
             {mode === "wilaya"
               ? ` · ${lang === "ar" ? "كل الولايات" : "wilaya"} ${wilayaFromSlug?.id ?? ""}`
               : ""}
@@ -469,7 +519,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentCategory ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("category");
@@ -484,7 +534,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentWilaya ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("wilaya");
@@ -499,7 +549,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentMinPrice ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("minPrice");
@@ -514,7 +564,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentMaxPrice ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("maxPrice");
@@ -529,7 +579,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentCondition ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("condition");
@@ -544,7 +594,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentItemType ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("itemType");
@@ -559,7 +609,7 @@ export function Search({ mode }: { mode: Mode }) {
               {currentQ ? (
                 <button
                   type="button"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  style={{ background: "rgba(22, 163, 74, 0.12)", border: "1px solid var(--brand-600)", color: "var(--brand-700)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("q");
@@ -581,33 +631,189 @@ export function Search({ mode }: { mode: Mode }) {
               </button>
             </div>
           ) : null}
-          {results.loading ? (
-            <SkeletonStack count={6} />
-          ) : results.error ? (
+          {initialLoading ? (
+            <div className="results-grid">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="ali-card"
+                  style={{
+                    height: 320,
+                    padding: 12,
+                    background: "var(--surface)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      height: 180,
+                      background: "var(--surface-muted)",
+                      borderRadius: 12,
+                      animation: "pulse 1.5s infinite ease-in-out",
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: 16,
+                      width: "75%",
+                      background: "var(--surface-muted)",
+                      borderRadius: 6,
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: 14,
+                      width: "45%",
+                      background: "var(--surface-muted)",
+                      borderRadius: 6,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : fetchError ? (
             <EmptyState
               icon="alert"
               title={t("common.error")}
-              text={errorMessage(results.error)}
+              text={fetchError}
               action={
-                <button type="button" className="btn" onClick={results.reload}>
+                <button type="button" className="btn" onClick={loadInitial}>
                   {t("common.retry")}
                 </button>
               }
             />
-          ) : results.data && results.data.listings.items.length > 0 ? (
+          ) : items.length > 0 ? (
             <>
               <div className="results-grid">
-                {results.data.listings.items.map((listing, index) => (
-                  <div key={listing.id} className="card-animated-wrap" style={{ animationDelay: `${index * 40}ms` }}>
+                {items.map((listing, index) => (
+                  <div
+                    key={listing.id}
+                    className="card-animated-wrap"
+                    style={{ animationDelay: `${(index % 8) * 35}ms` }}
+                  >
                     <ListingCard listing={listing} />
                   </div>
                 ))}
               </div>
-              <Pagination
-                page={results.data.listings.page}
-                totalPages={results.data.listings.totalPages}
-                onChange={changePage}
-              />
+
+              {/* Load more controls */}
+              <div
+                className="load-more-section"
+                style={{
+                  marginTop: 36,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 14,
+                  paddingBottom: 24,
+                }}
+              >
+                {hasMore ? (
+                  <button
+                    type="button"
+                    className="btn btn-load-more"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      minWidth: 220,
+                      padding: "13px 36px",
+                      borderRadius: "var(--radius-pill)",
+                      fontWeight: 700,
+                      fontSize: "0.95rem",
+                      background: "var(--brand-700)",
+                      color: "#fff",
+                      border: "none",
+                      boxShadow: "0 6px 20px rgba(20, 131, 63, 0.35)",
+                      cursor: loadingMore ? "wait" : "pointer",
+                      transition: "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease",
+                    }}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <span
+                          className="spinner"
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderWidth: 2,
+                            borderColor: "rgba(255, 255, 255, 0.3)",
+                            borderTopColor: "#fff",
+                          }}
+                        />
+                        <span>{t("search.loadingMore")}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="plus" size={18} />
+                        <span>{t("search.loadMore")}</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div
+                    className="all-loaded-banner"
+                    style={{
+                      padding: "10px 22px",
+                      borderRadius: "var(--radius-pill)",
+                      background: "var(--surface-muted)",
+                      border: "1px solid var(--line)",
+                      color: "var(--muted)",
+                      fontSize: "0.88rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Icon name="check" size={16} className="text-success" />
+                    <span>{t("search.allLoaded")} ({totalCount})</span>
+                  </div>
+                )}
+
+                {/* Progress bar and counter */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 6,
+                    width: "100%",
+                    maxWidth: 260,
+                  }}
+                >
+                  <span className="small muted" style={{ fontWeight: 600, fontSize: "0.82rem" }}>
+                    {lang === "ar"
+                      ? `تم عرض ${items.length} من أصل ${totalCount} منتج`
+                      : `Affichage de ${items.length} sur ${totalCount} produits`}
+                  </span>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 5,
+                      background: "var(--surface-muted)",
+                      borderRadius: 99,
+                      overflow: "hidden",
+                      border: "1px solid var(--line)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${totalCount > 0 ? Math.min(100, Math.round((items.length / totalCount) * 100)) : 100}%`,
+                        background: "var(--brand-600)",
+                        borderRadius: 99,
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </>
           ) : (
             <EmptyState

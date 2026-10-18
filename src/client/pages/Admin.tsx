@@ -131,9 +131,11 @@ function UserRow({ user, onSaved }: { user: AdminUser; onSaved: () => void }) {
   const [role, setRole] = useState<Role>(user.role);
   const [status, setStatus] = useState(user.status);
   const [busy, setBusy] = useState(false);
-  const dirty = role !== user.role || status !== user.status;
+  const isAdmin = user.role === "ADMIN";
+  const dirty = !isAdmin && (role !== user.role || status !== user.status);
 
   const save = async () => {
+    if (isAdmin) return;
     setBusy(true);
     try {
       await api(`/admin/users/${user.id}`, { method: "PATCH", body: { role, status } });
@@ -160,6 +162,8 @@ function UserRow({ user, onSaved }: { user: AdminUser; onSaved: () => void }) {
           onChange={(event) => setRole(event.target.value as Role)}
           aria-label="Rôle"
           style={{ minWidth: 130 }}
+          disabled={isAdmin}
+          title={isAdmin ? "Les droits d'un administrateur ne peuvent pas être modifiés" : undefined}
         >
           <option value="USER">USER</option>
           <option value="MODERATOR">MODERATOR</option>
@@ -172,6 +176,8 @@ function UserRow({ user, onSaved }: { user: AdminUser; onSaved: () => void }) {
           onChange={(event) => setStatus(event.target.value as "ACTIVE" | "SUSPENDED")}
           aria-label="Statut"
           style={{ minWidth: 130 }}
+          disabled={isAdmin}
+          title={isAdmin ? "Le compte d'un administrateur ne peut pas être suspendu" : undefined}
         >
           <option value="ACTIVE">ACTIVE</option>
           <option value="SUSPENDED">SUSPENDED</option>
@@ -183,7 +189,7 @@ function UserRow({ user, onSaved }: { user: AdminUser; onSaved: () => void }) {
         <Button
           size="sm"
           variant={dirty ? "primary" : "ghost"}
-          disabled={!dirty}
+          disabled={!dirty || isAdmin}
           loading={busy}
           onClick={save}
         >
@@ -678,7 +684,6 @@ function AuditSection() {
                   <th>Acteur</th>
                   <th>Action</th>
                   <th>Entité</th>
-                  <th>Détails</th>
                 </tr>
               </thead>
               <tbody>
@@ -690,9 +695,6 @@ function AuditSection() {
                     <td className="small muted">
                       {entry.entityType ?? "—"}
                       {entry.entityId ? ` · ${entry.entityId.slice(0, 8)}…` : ""}
-                    </td>
-                    <td className="small muted" style={{ maxWidth: 300, overflowWrap: "anywhere" }}>
-                      {entry.metadata ? JSON.stringify(entry.metadata) : "—"}
                     </td>
                   </tr>
                 ))}
