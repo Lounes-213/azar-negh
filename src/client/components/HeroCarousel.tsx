@@ -30,6 +30,19 @@ const BANNERS: BannerSlide[] = [
     gradient: "linear-gradient(135deg, #094726 0%, #15803d 100%)",
   },
   {
+    id: "banner-chat",
+    titleFr: "Azar Chat - Assistant IA",
+    titleAr: "آزار شات - المساعد الذكي",
+    subFr: "Recherche par texte, voix ou photo",
+    subAr: "ابحث عن أي سلعة بالصوت أو الصورة",
+    btnFr: "Discuter",
+    btnAr: "تحدث مع آزار شات",
+    link: "#azar-chat",
+    isBot: true,
+    image: "/brand/banner_4.jpg",
+    gradient: "linear-gradient(135deg, #065f46 0%, #10b981 100%)",
+  },
+  {
     id: "banner-tech",
     titleFr: "Promos & Tech Neuf",
     titleAr: "عروض الهواتف والإلكترونيات",
@@ -52,19 +65,6 @@ const BANNERS: BannerSlide[] = [
     link: "/annonces?itemType=PRODUCT",
     image: "/brand/banner_3.jpg",
     gradient: "linear-gradient(135deg, #084c2e 0%, #16a34a 100%)",
-  },
-  {
-    id: "banner-bot",
-    titleFr: "Azar Bot - Assistant IA",
-    titleAr: "آزار بوت - المساعد الذكي",
-    subFr: "Recherche par texte, voix ou photo",
-    subAr: "ابحث عن أي سلعة بالصوت أو الصورة",
-    btnFr: "Discuter",
-    btnAr: "تحدث مع البوت",
-    link: "#azar-bot",
-    isBot: true,
-    image: "/brand/banner_4.jpg",
-    gradient: "linear-gradient(135deg, #065f46 0%, #10b981 100%)",
   },
 ];
 
@@ -229,17 +229,7 @@ export function HeroCarousel() {
         );
       })}
 
-      {/* Thin animated white progress bar showing time left for current banner */}
-      <div
-        key={`prog-${activeIdx}`}
-        className="hero-banner-progress"
-        style={{
-          animationPlayState: isPaused ? "paused" : "running",
-        }}
-        aria-hidden="true"
-      />
-
-      {/* Discrete bottom dots */}
+      {/* Discrete bottom dots with active countdown fill */}
       <div className="hero-banner-dots" role="tablist">
         {BANNERS.map((banner, idx) => (
           <button
@@ -250,7 +240,17 @@ export function HeroCarousel() {
             aria-label={`Banner ${idx + 1}`}
             className={`hero-banner-dot ${idx === activeIdx ? "is-active" : ""}`}
             onClick={() => setActiveIdx(idx)}
-          />
+          >
+            {idx === activeIdx && (
+              <span
+                key={`dot-prog-${activeIdx}`}
+                className="hero-banner-dot-fill"
+                style={{
+                  animationPlayState: isPaused ? "paused" : "running",
+                }}
+              />
+            )}
+          </button>
         ))}
       </div>
     </div>

@@ -3412,9 +3412,14 @@ ol {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: panelSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: bottom right;
+  animation: panelSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1000;
   transition: width 0.22s ease, height 0.22s ease, border-radius 0.22s ease;
+}
+
+[dir="rtl"] .azarbot-panel {
+  transform-origin: bottom left;
 }
 
 .azarbot-panel.is-fullscreen {
@@ -3440,13 +3445,18 @@ ol {
     height: calc(100dvh - var(--header-height) - var(--tabbar-height) - 24px);
     max-height: 84vh;
     border-radius: 20px;
+    transform-origin: calc(100% - 32px) 100%;
+  }
+
+  [dir="rtl"] .azarbot-panel:not(.is-fullscreen) {
+    transform-origin: 32px 100%;
   }
 }
 
 @keyframes panelSlideIn {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.96);
+    transform: translateY(24px) scale(0.35);
   }
   to {
     opacity: 1;

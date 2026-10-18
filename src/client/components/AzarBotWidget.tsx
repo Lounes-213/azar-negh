@@ -608,9 +608,6 @@ export function AzarBotWidget() {
     const handleOpenBot = () => {
       setIsOpen(true);
       setIsCollapsed(false);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 150);
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
