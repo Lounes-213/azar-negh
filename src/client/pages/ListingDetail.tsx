@@ -23,6 +23,7 @@ import { useAuth } from "../lib/auth";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
 import { formatDate, formatPrice, phoneDisplay, timeAgo, whatsappLink } from "../lib/format";
+import { getListingFallbackImage } from "../lib/productImages";
 
 const REPORT_REASONS = [
   { value: "FRAUD", label: "Arnaque ou fraude" },
@@ -83,7 +84,9 @@ export function ListingDetail() {
   }
 
   const { listing, related } = state.data;
-  const cover = listing.images[imageIndex] ?? listing.images[0];
+  const fallbackCover = getListingFallbackImage(listing.title, listing.category?.slug);
+  const activeImage = listing.images[imageIndex] ?? listing.images[0];
+  const coverUrl = activeImage?.url || fallbackCover;
 
   const runAction = async (name: string, request: () => Promise<unknown>, success: string) => {
     setActionBusy(name);
@@ -246,12 +249,18 @@ export function ListingDetail() {
       <div className="detail-layout">
         <div className="detail-media">
           <div className="gallery-main">
-            {cover ? (
+            {coverUrl ? (
               <img
-                src={cover.url}
+                src={coverUrl}
                 alt={`${listing.title} — photo ${imageIndex + 1}`}
                 width={1200}
                 height={900}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== fallbackCover) {
+                    target.src = fallbackCover;
+                  }
+                }}
               />
             ) : (
               <div className="placeholder">

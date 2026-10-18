@@ -7,6 +7,7 @@ import { api, errorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { formatDa } from "../lib/format";
+import { getListingFallbackImage } from "../lib/productImages";
 
 export function ListingCard({
   listing,
@@ -90,21 +91,27 @@ export function ListingCard({
           aria-hidden="true"
           className="ali-media-link"
         >
-          {listing.coverImage ? (
-            <img
-              src={listing.coverImage}
-              alt={listing.title}
-              width={400}
-              height={400}
-              loading="lazy"
-              decoding="async"
-              className="ali-img"
-            />
-          ) : (
-            <div className="ali-placeholder">
-              <Icon name="image" size={36} />
-            </div>
-          )}
+          {(() => {
+            const fallback = getListingFallbackImage(listing.title, listing.category?.slug);
+            const imageSrc = listing.coverImage || fallback;
+            return (
+              <img
+                src={imageSrc}
+                alt={listing.title}
+                width={400}
+                height={400}
+                loading="lazy"
+                decoding="async"
+                className="ali-img"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== fallback) {
+                    target.src = fallback;
+                  }
+                }}
+              />
+            );
+          })()}
         </Link>
 
         {/* Floating Top Badges */}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Icon, type IconName } from "../components/Icons";
 import { EmptyState, SkeletonStack, Spinner } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
+import { HeroCarousel } from "../components/HeroCarousel";
 import { SearchSuggestions } from "../components/SearchSuggestions";
 import { api } from "../lib/api";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
@@ -183,21 +184,11 @@ export function Home() {
       </section>
 
       <section
-        className="section mobile-only"
-        style={{ marginTop: 20 }}
-        aria-label="Offre du moment"
+        className="section"
+        style={{ marginTop: 12, marginBottom: 8 }}
+        aria-label={lang === "ar" ? "عروض وإعلانات مميزة" : "Offres et bannières"}
       >
-        <div className="promo">
-          <div>
-            <h3>{lang === "ar" ? "0% عمولة" : "0% de commission"}</h3>
-            <p>
-              {lang === "ar" ? "انشر إعلانك مجانًا اليوم" : "Publiez votre annonce gratuitement"}
-            </p>
-          </div>
-          <Link to="/vendre" className="btn btn-sm">
-            {lang === "ar" ? "ابدأ" : "Commencer"}
-          </Link>
-        </div>
+        <HeroCarousel />
       </section>
 
       <section className="section" aria-labelledby="recent-title">
