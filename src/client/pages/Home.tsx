@@ -295,9 +295,7 @@ export function Home() {
                   ) : (
                     <>
                       <Icon name="arrow-down" size={15} />
-                      <span>
-                        {lang === "ar" ? "عرض المزيد (+8)" : "Voir plus de produits (+8)"}
-                      </span>
+                      <span>{t("search.loadMore")}</span>
                     </>
                   )}
                 </button>

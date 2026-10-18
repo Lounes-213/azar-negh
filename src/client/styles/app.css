@@ -2584,6 +2584,12 @@ ol {
   animation: cardEntrance 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@media (max-width: 768px) {
+  .card-animated-wrap {
+    animation: none !important;
+  }
+}
+
 .ali-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -2592,13 +2598,13 @@ ol {
   display: flex;
   flex-direction: column;
   position: relative;
-  content-visibility: auto;
-  contain-intrinsic-size: 0 320px;
-  contain: layout paint;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
 }
 
 @media (hover: hover) {
+  .ali-card {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  }
+
   .ali-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
@@ -2608,10 +2614,6 @@ ol {
   .ali-card:hover .ali-img {
     transform: scale(1.05);
   }
-}
-
-.ali-card:active {
-  transform: scale(0.985);
 }
 
 .ali-media-wrap {
@@ -2683,9 +2685,8 @@ ol {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(4px);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   display: grid;
   place-items: center;
   color: var(--ink-soft);
@@ -2707,8 +2708,8 @@ ol {
   position: absolute;
   bottom: 8px;
   inset-inline-start: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(4px);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
   padding: 3px 8px;
   font-size: 11px;

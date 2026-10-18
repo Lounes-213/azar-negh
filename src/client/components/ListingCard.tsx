@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import type { ListingSummary } from "../../shared/types";
 import { Icon } from "./Icons";
@@ -9,7 +9,7 @@ import { useI18n } from "../lib/i18n";
 import { formatDa } from "../lib/format";
 import { getListingFallbackImage } from "../lib/productImages";
 
-export function ListingCard({
+function ListingCardInner({
   listing,
   showStatus = false,
   ownerActions,
@@ -81,6 +81,11 @@ export function ListingCard({
   };
 
   const conditionLabel = conditionLabels[listing.condition]?.[lang === "ar" ? "ar" : "fr"] ?? listing.condition;
+  const fallback = useMemo(
+    () => getListingFallbackImage(listing.title, listing.category?.slug),
+    [listing.title, listing.category?.slug],
+  );
+  const imageSrc = listing.coverImage || fallback;
 
   return (
     <article className="ali-card">
@@ -91,27 +96,21 @@ export function ListingCard({
           aria-hidden="true"
           className="ali-media-link"
         >
-          {(() => {
-            const fallback = getListingFallbackImage(listing.title, listing.category?.slug);
-            const imageSrc = listing.coverImage || fallback;
-            return (
-              <img
-                src={imageSrc}
-                alt={listing.title}
-                width={400}
-                height={400}
-                loading="lazy"
-                decoding="async"
-                className="ali-img"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (target.src !== fallback) {
-                    target.src = fallback;
-                  }
-                }}
-              />
-            );
-          })()}
+          <img
+            src={imageSrc}
+            alt={listing.title}
+            width={400}
+            height={400}
+            loading="lazy"
+            decoding="async"
+            className="ali-img"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (target.src !== fallback) {
+                target.src = fallback;
+              }
+            }}
+          />
         </Link>
 
         {/* Floating Top Badges */}
@@ -253,3 +252,5 @@ export function ListingCard({
     </article>
   );
 }
+
+export const ListingCard = memo(ListingCardInner);
