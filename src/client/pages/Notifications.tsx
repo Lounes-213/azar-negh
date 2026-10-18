@@ -110,13 +110,15 @@ function PushNotificationCard() {
       }
 
       const jsonSub = sub.toJSON();
-      await api("/push/subscribe", {
-        method: "POST",
-        body: JSON.stringify({
-          endpoint: jsonSub.endpoint,
-          keys: jsonSub.keys,
-        }),
-      });
+      if (jsonSub.endpoint && jsonSub.keys) {
+        await api("/push/subscribe", {
+          method: "POST",
+          body: {
+            endpoint: jsonSub.endpoint,
+            keys: jsonSub.keys,
+          },
+        });
+      }
 
       push("تم تفعيل إشعارات الهاتف بنجاح! ستصلك التنبيهات حتى والشاشة مغلقة 🔔", "success");
     } catch (err) {
@@ -131,14 +133,35 @@ function PushNotificationCard() {
     try {
       setTesting(true);
       const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
+      let sub = await reg.pushManager.getSubscription();
+
+      // Show instant system notification
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          if (reg?.showNotification) {
+            reg.showNotification("Azar Neɣ — تجربة إشعار الهاتف 🔔", {
+              body: "مرحباً بك! إشعارات الهاتف تعمل بنجاح حتى والشاشة مغلقة 🚀",
+              icon: "/brand/icon-192.png",
+              badge: "/brand/icon-192.png",
+              data: { url: "/compte/notifications" },
+            } as any);
+          } else {
+            new Notification("Azar Neɣ — تجربة إشعار الهاتف 🔔", {
+              body: "مرحباً بك! إشعارات الهاتف تعمل بنجاح حتى والشاشة مغلقة 🚀",
+              icon: "/brand/icon-192.png",
+            });
+          }
+        } catch {}
+      }
+
       if (!sub) {
         await enablePush();
         return;
       }
+
       await api("/push/test", {
         method: "POST",
-        body: JSON.stringify({ endpoint: sub.endpoint }),
+        body: { endpoint: sub.endpoint },
       });
       push("تم إرسال إشعار تجريبي! اقفل شاشة الهاتف أو بدّل التطبيق لتشاهد الإشعار المنبثق 📲", "success");
     } catch (err) {

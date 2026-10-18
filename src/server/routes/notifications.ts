@@ -101,12 +101,18 @@ notificationRoutes.get("/push/vapid-key", (c) => {
 
 notificationRoutes.post("/push/subscribe", async (c) => {
   const user = c.get("user");
-  const body = (await c.req.json().catch(() => null)) as {
-    endpoint?: string;
-    keys?: { p256dh?: string; auth?: string };
-  } | null;
+  let body: any = await c.req.json().catch(() => null);
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {}
+  }
 
-  if (!body || !body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+  const endpoint = body?.endpoint;
+  const p256dh = body?.keys?.p256dh;
+  const auth = body?.keys?.auth;
+
+  if (!endpoint || !p256dh || !auth) {
     throw new HttpError(400, "INVALID_SUBSCRIPTION", "Données d'abonnement invalides.");
   }
 
@@ -123,9 +129,9 @@ notificationRoutes.post("/push/subscribe", async (c) => {
     .bind(
       id,
       user?.id ?? null,
-      body.endpoint,
-      body.keys.p256dh,
-      body.keys.auth,
+      endpoint,
+      p256dh,
+      auth,
       nowIso(),
     )
     .run();
@@ -135,20 +141,30 @@ notificationRoutes.post("/push/subscribe", async (c) => {
 
 notificationRoutes.post("/push/test", async (c) => {
   const user = c.get("user");
-  const body = (await c.req.json().catch(() => ({}))) as { endpoint?: string };
+  let body: any = await c.req.json().catch(() => ({}));
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {}
+  }
 
   const targetSubs: { id?: string; endpoint: string }[] = [];
-  if (body.endpoint) {
+  if (body?.endpoint) {
     targetSubs.push({ endpoint: body.endpoint });
-  } else if (user) {
+  }
+  if (user) {
     const rows = await c.env.DB.prepare("SELECT id, endpoint FROM push_subscriptions WHERE user_id = ?")
       .bind(user.id)
       .all<{ id: string; endpoint: string }>();
-    targetSubs.push(...(rows.results || []));
+    for (const r of rows.results || []) {
+      if (!targetSubs.some((s) => s.endpoint === r.endpoint)) {
+        targetSubs.push(r);
+      }
+    }
   }
 
   if (targetSubs.length === 0) {
-    return c.json({ ok: false, message: "Aucun appareil enregistré." });
+    return c.json({ ok: true, sent: 0, message: "Aucun appareil enregistré." });
   }
 
   let sent = 0;
