@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { ListingSummary, Paginated, StoreProfile } from "../../shared/types";
 import { Avatar, Button, Dialog, EmptyState, Field, Pagination, Spinner, Textarea, useToast } from "../components/ui";
@@ -16,7 +16,8 @@ interface SellerResponse {
 }
 
 export function Seller() {
-  const { id } = useParams();
+  const { id: rawId } = useParams();
+  const id = rawId?.startsWith("@") ? rawId.slice(1) : rawId;
   const { user } = useAuth();
   const { t, lang } = useI18n();
   const { push } = useToast();
@@ -40,12 +41,34 @@ export function Seller() {
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [reviewsCount, setReviewsCount] = useState<number | null>(null);
 
+  // PWA & App Launch / Share Dialogs
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [appModalOpen, setAppModalOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+
   // Reordering mode for store owner
   const [reorderMode, setReorderMode] = useState(false);
   const [orderedItems, setOrderedItems] = useState<ListingSummary[] | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
 
-  useDocumentTitle(state.data?.seller.storeName || state.data?.seller.displayName || "Boutique");
+  useEffect(() => {
+    const standaloneMode =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      Boolean((window.navigator as unknown as { standalone?: boolean }).standalone) ||
+      document.referrer.includes("android-app://");
+    setIsStandalone(standaloneMode);
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+  }, []);
+
+  const storeTitle = state.data?.seller.storeName || state.data?.seller.displayName || "Boutique";
+  useDocumentTitle(`${storeTitle} — Boutique Officielle`);
 
   if (state.loading) return <Spinner />;
   if (state.error || !state.data) {
@@ -94,23 +117,79 @@ export function Seller() {
     }
   };
 
-  const handleShareStore = async () => {
-    const storeLink = `${window.location.origin}/vendeurs/${seller.storeSlug || seller.id}`;
-    const title = seller.storeName || seller.displayName;
-    if (navigator.share) {
+  const proLink = seller.storeSlug
+    ? `${window.location.origin}/@${seller.storeSlug}`
+    : `${window.location.origin}/boutique/${seller.id}`;
+
+  // Update dynamic meta tags for clean social sharing
+  useEffect(() => {
+    const titleText = `${seller.storeName || seller.displayName} — Boutique Officielle | Azar Negh`;
+    const descText = `${seller.storeName || seller.displayName} (${lang === "ar" ? seller.wilaya.nameAr : seller.wilaya.nameFr}) sur l'application Azar Negh. Catalogue officiel des produits.`;
+    const imgUrl = seller.logoUrl || seller.bannerUrl || `${window.location.origin}/brand/icon-512.png`;
+
+    const setMeta = (attr: string, key: string, content: string) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
+    };
+
+    setMeta("property", "og:title", titleText);
+    setMeta("property", "og:description", descText);
+    setMeta("property", "og:image", imgUrl);
+    setMeta("property", "og:url", proLink);
+    setMeta("name", "twitter:title", titleText);
+    setMeta("name", "twitter:description", descText);
+    setMeta("name", "twitter:image", imgUrl);
+  }, [seller, proLink, lang]);
+
+  const handleOpenInApp = async () => {
+    if (isStandalone) {
+      push(
+        lang === "ar"
+          ? "أنت تتصفح بالفعل داخل تطبيق أزار نغ الرسمي !"
+          : "Vous êtes déjà dans l'application officielle Azar Negh !",
+        "success",
+      );
+      return;
+    }
+
+    if (deferredPrompt) {
       try {
-        await navigator.share({
-          title,
-          text: `Découvrez la boutique ${title} sur Azar Negh :`,
-          url: storeLink,
-        });
-        return;
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        if (choice.outcome === "accepted") {
+          push(lang === "ar" ? "جاري فتح التطبيق..." : "Ouverture de l'application...", "success");
+          return;
+        }
       } catch {
-        // Fallback
+        // fallback
       }
     }
-    await navigator.clipboard.writeText(storeLink);
-    push(lang === "ar" ? "تم نسخ رابط المتجر !" : "Lien de la boutique copié !", "success");
+
+    const isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      const intentTarget = seller.storeSlug ? `@${seller.storeSlug}` : seller.id;
+      const intentUrl = `intent://${window.location.host}/boutique/${intentTarget}#Intent;scheme=https;package=com.azarnegh.app;action=android.intent.action.VIEW;end;`;
+      try {
+        window.location.href = intentUrl;
+        setTimeout(() => {
+          setAppModalOpen(true);
+        }, 1200);
+        return;
+      } catch {
+        // fallback
+      }
+    }
+
+    setAppModalOpen(true);
+  };
+
+  const handleShareStore = () => {
+    setShareModalOpen(true);
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
@@ -176,6 +255,74 @@ export function Seller() {
 
   return (
     <div className="container page page-enter">
+      {/* Smart App Bar for Browser Users */}
+      {!isStandalone && (
+        <div
+          className="store-smart-app-banner mb-4"
+          style={{
+            background: "linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(21, 128, 61, 0.16) 100%)",
+            border: "1.5px solid rgba(22, 163, 74, 0.3)",
+            borderRadius: "var(--radius-lg)",
+            padding: "12px 18px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+            flexWrap: "wrap",
+            boxShadow: "0 4px 14px rgba(22, 163, 74, 0.08)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: "12px",
+                background: "linear-gradient(135deg, #22c55e, #15803d)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 6,
+                boxShadow: "0 4px 10px rgba(22, 163, 74, 0.25)",
+                flexShrink: 0,
+              }}
+            >
+              <img src="/brand/icon.svg" alt="Azar Neɣ" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <strong style={{ fontSize: "0.95rem" }}>Azar Neɣ</strong>
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    background: "var(--brand-700)",
+                    color: "#fff",
+                    padding: "1px 7px",
+                    borderRadius: 10,
+                  }}
+                >
+                  {lang === "ar" ? "تطبيق رسمي" : "App officielle"}
+                </span>
+              </div>
+              <div className="small muted">
+                {lang === "ar"
+                  ? `تصفح متجر « ${seller.storeName || seller.displayName} » في التطبيق مباشرة`
+                  : `Consultez la boutique « ${seller.storeName || seller.displayName} » directement sur l'application`}
+              </div>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleOpenInApp}
+            style={{ fontWeight: 700, padding: "9px 18px", boxShadow: "0 4px 10px rgba(22, 163, 74, 0.25)", whiteSpace: "nowrap" }}
+          >
+            <Icon name="arrow-right" size={14} style={{ transform: "rotate(90deg)" }} />
+            <span>{lang === "ar" ? "فتح في التطبيق" : "Voir sur l'app"}</span>
+          </Button>
+        </div>
+      )}
+
       {/* Store Header Card */}
       <div className="store-header-card mb-6">
         {/* Sleek, customizable slim banner for all stores (default brand green, color-customizable) */}
@@ -307,6 +454,21 @@ export function Seller() {
             <Button variant="ghost" size="sm" onClick={handleShareStore} title="Partager la boutique">
               <Icon name="share" size={16} />
               <span>{lang === "ar" ? "مشاركة" : "Partager"}</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleOpenInApp}
+              title={lang === "ar" ? "فتح في تطبيق أزار نغ" : "Voir sur l'application"}
+              style={{
+                borderColor: "var(--brand-600)",
+                color: "var(--brand-700)",
+                fontWeight: 700,
+              }}
+            >
+              <Icon name="arrow-right" size={14} style={{ transform: "rotate(90deg)" }} />
+              <span>{lang === "ar" ? "فتح في التطبيق" : "Voir sur l'app"}</span>
             </Button>
 
             {seller.phone ? (
@@ -490,6 +652,214 @@ export function Seller() {
             />
           </Field>
         </form>
+      </Dialog>
+
+      {/* Professional Store Share Dialog */}
+      <Dialog
+        open={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        title={lang === "ar" ? "مشاركة رابط المتجر الاحترافي" : "Partager le lien Pro de la boutique"}
+      >
+        <div className="stack" style={{ gap: 16, padding: "8px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 12, borderBottom: "1px solid var(--line)" }}>
+            <Avatar name={seller.storeName || seller.displayName} imageUrl={seller.logoUrl || seller.avatarUrl} size="lg" withGreenRing />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{seller.storeName || seller.displayName}</div>
+              <div className="small muted">
+                {seller.storeSlug ? `@${seller.storeSlug} · ` : ""}
+                {lang === "ar" ? seller.wilaya.nameAr : seller.wilaya.nameFr}
+              </div>
+            </div>
+          </div>
+
+          <p className="small muted" style={{ margin: 0 }}>
+            {lang === "ar"
+              ? "هذا الرابط مخصص لمتجرك ومعروضاتك فقط، لا يحتوي على إعلانات منافسة أو منتجات خارجية :"
+              : "Lien officiel et sécurisé dédié exclusivement à votre boutique sans aucune annonce externe ni concurrente :"}
+          </p>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="text"
+              readOnly
+              value={proLink}
+              style={{
+                flex: 1,
+                padding: "10px 14px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--line)",
+                background: "var(--surface-muted)",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                color: "var(--brand-800)",
+                direction: "ltr",
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={async () => {
+                await navigator.clipboard.writeText(proLink);
+                push(lang === "ar" ? "تم نسخ الرابط الاحترافي بنجاح !" : "Lien Pro copié avec succès !", "success");
+              }}
+            >
+              <Icon name="copy" size={14} />
+              <span>{lang === "ar" ? "نسخ" : "Copier"}</span>
+            </Button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(`${seller.storeName || seller.displayName} sur Azar Neɣ :\n${proLink}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ justifyContent: "center", gap: 6, fontWeight: 700 }}
+            >
+              <Icon name="whatsapp" size={16} />
+              <span>WhatsApp</span>
+            </a>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                if (navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: `${seller.storeName || seller.displayName} — Boutique Officielle`,
+                      text: `Découvrez la boutique officielle ${seller.storeName || seller.displayName} sur l'application Azar Negh :`,
+                      url: proLink,
+                    });
+                  } catch {
+                    // canceled
+                  }
+                } else {
+                  await navigator.clipboard.writeText(proLink);
+                  push(lang === "ar" ? "تم نسخ الرابط !" : "Lien copié !", "success");
+                }
+              }}
+              style={{ justifyContent: "center", gap: 6, fontWeight: 700 }}
+            >
+              <Icon name="share" size={15} />
+              <span>{lang === "ar" ? "خيارات أكثر" : "Plus d'options"}</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* App Direct Launch / Install Dialog */}
+      <Dialog
+        open={appModalOpen}
+        onClose={() => setAppModalOpen(false)}
+        title={lang === "ar" ? "فتح في تطبيق Azar Negh" : "Ouvrir dans l'application Azar Negh"}
+      >
+        <div className="stack" style={{ gap: 16, padding: "8px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 12, borderBottom: "1px solid var(--line)" }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                background: "linear-gradient(135deg, #22c55e, #15803d)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 6,
+                boxShadow: "0 4px 12px rgba(22, 163, 74, 0.3)",
+                flexShrink: 0,
+              }}
+            >
+              <img src="/brand/icon.svg" alt="Azar Neɣ" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>Azar Neɣ</div>
+              <div className="small muted">
+                {lang === "ar" ? "التطبيق الرسمي للتجارة والمتاجر" : "Application officielle e-commerce & boutiques"}
+              </div>
+            </div>
+          </div>
+
+          <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.5, color: "var(--ink-muted)" }}>
+            {lang === "ar"
+              ? `تصفح متجر « ${seller.storeName || seller.displayName} » في التطبيق مباشرة بدون متصفح، بسرعة أكبر وتجربة سلسة.`
+              : `Consultez la boutique « ${seller.storeName || seller.displayName} » directement dans l'application pour une expérience fluide, rapide et sans navigateur.`}
+          </p>
+
+          {/* Test / Launch App Actions */}
+          <div className="stack" style={{ gap: 10 }}>
+            {deferredPrompt ? (
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  try {
+                    deferredPrompt.prompt();
+                    const choice = await deferredPrompt.userChoice;
+                    if (choice.outcome === "accepted") {
+                      setAppModalOpen(false);
+                      push(lang === "ar" ? "تم تثبيت التطبيق بنجاح !" : "Application installée !", "success");
+                    }
+                  } catch {
+                    // fallback
+                  }
+                }}
+                style={{ width: "100%", justifyContent: "center", padding: "12px 18px", fontWeight: 700 }}
+              >
+                <Icon name="arrow-right" size={16} style={{ transform: "rotate(90deg)" }} />
+                <span>{lang === "ar" ? "تثبيت وفتح التطبيق فوراً" : "Installer & Ouvrir l'application"}</span>
+              </Button>
+            ) : null}
+
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const isAndroid = /android/i.test(navigator.userAgent);
+                if (isAndroid) {
+                  const intentTarget = seller.storeSlug ? `@${seller.storeSlug}` : seller.id;
+                  window.location.href = `intent://${window.location.host}/boutique/${intentTarget}#Intent;scheme=https;package=com.azarnegh.app;action=android.intent.action.VIEW;end;`;
+                } else {
+                  window.open(proLink, "_blank");
+                }
+              }}
+              style={{ width: "100%", justifyContent: "center", fontWeight: 700 }}
+            >
+              <Icon name="phone" size={15} />
+              <span>{lang === "ar" ? "اختبار فتح التطبيق المباشر" : "Tester l'ouverture dans l'app"}</span>
+            </Button>
+          </div>
+
+          {/* Guide for iPhone users if not installed */}
+          <div
+            style={{
+              background: "var(--surface-muted)",
+              borderRadius: "var(--radius-md)",
+              padding: "12px 14px",
+              fontSize: "0.85rem",
+              lineHeight: 1.45,
+              color: "var(--ink)",
+            }}
+          >
+            <strong>{lang === "ar" ? "طريقة التثبيت السريعة :" : "Pour un accès permanent en 1 clic :"}</strong>
+            <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+              <span>
+                {lang === "ar"
+                  ? "• في متصفح Safari (iPhone): اضغط مشاركة (📤) ثم «إضافة إلى الشاشة الرئيسية» (➕)."
+                  : "• Sur iPhone (Safari) : Appuyez sur Partager (📤) puis « Sur l'écran d'accueil » (➕)."}
+              </span>
+              <span>
+                {lang === "ar"
+                  ? "• في Google Chrome (Android): اضغط (⋮) ثم «تثبيت التطبيق»."
+                  : "• Sur Android (Chrome) : Ouvrez le menu (⋮) puis « Installer l'application »."}
+              </span>
+            </div>
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={() => setAppModalOpen(false)}
+            style={{ width: "100%", justifyContent: "center" }}
+          >
+            {lang === "ar" ? "متابعة التصفح على الويب" : "Continuer sur le navigateur"}
+          </Button>
+        </div>
       </Dialog>
     </div>
   );

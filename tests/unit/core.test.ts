@@ -179,7 +179,7 @@ describe("request validation", () => {
     expect(listingInputSchema.safeParse({ ...validListing, condition: "BROKEN" }).success).toBe(
       false,
     );
-    expect(listingInputSchema.safeParse({ ...validListing, wilayaId: 59 }).success).toBe(false);
+    expect(listingInputSchema.safeParse({ ...validListing, wilayaId: 70 }).success).toBe(false);
   });
 
   it("clamps search parameters and defaults sorting", () => {

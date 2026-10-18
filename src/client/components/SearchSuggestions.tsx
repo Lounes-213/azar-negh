@@ -21,9 +21,21 @@ export interface SuggestionCategory {
   nameAr: string;
 }
 
+export interface SuggestionStore {
+  id: string;
+  displayName: string;
+  storeName: string | null;
+  storeSlug: string | null;
+  logoUrl: string | null;
+  commune: string | null;
+  wilaya: { id: number; nameFr: string; nameAr: string };
+  listingsCount: number;
+}
+
 interface SuggestionsData {
   suggestions: SuggestionItem[];
   categories: SuggestionCategory[];
+  stores?: SuggestionStore[];
 }
 
 interface SearchSuggestionsProps {
@@ -89,11 +101,81 @@ export function SearchSuggestions({
   if (!isOpen || trimmed.length < 2) return null;
 
   const hasSuggestions = Boolean(
-    data && (data.suggestions.length > 0 || data.categories.length > 0),
+    data && (data.suggestions.length > 0 || data.categories.length > 0 || (data.stores && data.stores.length > 0)),
   );
 
   return (
     <div ref={containerRef} className="search-suggestions-dropdown" role="listbox">
+      {/* Store / Boutique matches */}
+      {data?.stores && data.stores.length > 0 ? (
+        <div className="search-suggestions-section">
+          <div className="search-suggestions-heading" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Icon name="store" size={13} className="text-accent" />
+            <span>{lang === "ar" ? "المتاجر والبوتيكات" : "Boutiques"}</span>
+          </div>
+          {data.stores.map((store) => (
+            <button
+              key={store.id}
+              type="button"
+              className="search-suggestion-row store-row"
+              onClick={() => {
+                onClose();
+                navigate(`/boutique/${store.storeSlug || store.id}`);
+              }}
+            >
+              <div
+                className="search-suggestion-thumb store-thumb"
+                style={{
+                  borderRadius: "50%",
+                  border: "1.5px solid var(--brand-500)",
+                  padding: 2,
+                }}
+              >
+                {store.logoUrl ? (
+                  <img
+                    src={store.logoUrl}
+                    alt={store.storeName || store.displayName}
+                    loading="lazy"
+                    style={{ borderRadius: "50%" }}
+                  />
+                ) : (
+                  <Icon name="store" size={16} />
+                )}
+              </div>
+              <div className="search-suggestion-details">
+                <div className="search-suggestion-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <strong>{store.storeName || store.displayName}</strong>
+                  {store.storeSlug ? (
+                    <span className="search-suggestion-slug" style={{ fontSize: "0.75rem", color: "var(--brand-700)", fontWeight: 700 }}>
+                      @{store.storeSlug}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="search-suggestion-meta">
+                  <span
+                    style={{
+                      background: "var(--brand-100)",
+                      color: "var(--brand-800)",
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      padding: "1px 6px",
+                      borderRadius: 10,
+                    }}
+                  >
+                    {lang === "ar" ? "متجر معتمد" : "Boutique"}
+                  </span>
+                  <span>·</span>
+                  <span>{lang === "ar" ? store.wilaya.nameAr : store.wilaya.nameFr}</span>
+                  <span>·</span>
+                  <span>{store.listingsCount} {lang === "ar" ? "إعلان" : "articles"}</span>
+                </div>
+              </div>
+              <Icon name="chevron-right" size={13} style={{ marginInlineStart: "auto", opacity: 0.5 }} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {/* Category matches */}
       {data?.categories && data.categories.length > 0 ? (
         <div className="search-suggestions-section">

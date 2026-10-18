@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import type {
   Category,
   ListingCondition,
@@ -9,10 +9,21 @@ import type {
   SortOption,
 } from "../../shared/types";
 import { Icon } from "../components/Icons";
-import { EmptyState, Field, useToast } from "../components/ui";
+import { Avatar, EmptyState, Field, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { ListingCard } from "../components/ListingCard";
 import { api, errorMessage } from "../lib/api";
+
+interface MatchingStore {
+  id: string;
+  displayName: string;
+  storeName: string | null;
+  storeSlug: string | null;
+  logoUrl: string | null;
+  commune: string | null;
+  wilaya: { id: number; nameFr: string; nameAr: string };
+  listingsCount: number;
+}
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
 import { trackCategoryInPersona, trackSearchInPersona, trackWilayaInPersona } from "../lib/persona";
@@ -135,6 +146,26 @@ export function Search({ mode }: { mode: Mode }) {
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [matchingStores, setMatchingStores] = useState<MatchingStore[]>([]);
+
+  useEffect(() => {
+    const q = (params.get("q") ?? "").trim();
+    if (q.length < 2) {
+      setMatchingStores([]);
+      return;
+    }
+    let active = true;
+    api<{ stores: MatchingStore[] }>(`/sellers?q=${encodeURIComponent(q)}`)
+      .then((res) => {
+        if (active) setMatchingStores(res.stores.slice(0, 3));
+      })
+      .catch(() => {
+        if (active) setMatchingStores([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [params.get("q")]);
 
   const loadInitial = () => {
     setInitialLoading(true);
@@ -631,6 +662,85 @@ export function Search({ mode }: { mode: Mode }) {
               </button>
             </div>
           ) : null}
+
+          {/* Matching Stores / Boutiques banner if search matches store name */}
+          {matchingStores.length > 0 && (
+            <div
+              className="matching-stores-banner mb-5"
+              style={{
+                background: "linear-gradient(135deg, rgba(22, 163, 74, 0.06) 0%, rgba(21, 128, 61, 0.12) 100%)",
+                border: "1.5px solid rgba(22, 163, 74, 0.25)",
+                borderRadius: "var(--radius-lg)",
+                padding: "14px 18px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: "0.86rem",
+                  fontWeight: 700,
+                  color: "var(--brand-800)",
+                  marginBottom: 10,
+                }}
+              >
+                <Icon name="store" size={16} />
+                <span>
+                  {lang === "ar"
+                    ? "متاجر وبوتيكات مطابقة لبحثك :"
+                    : "Boutiques correspondantes à votre recherche :"}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {matchingStores.map((st) => (
+                  <div
+                    key={st.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "var(--surface)",
+                      padding: "10px 14px",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--line)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <Avatar name={st.storeName || st.displayName} imageUrl={st.logoUrl} withGreenRing />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: 6 }}>
+                          <span className="truncate">{st.storeName || st.displayName}</span>
+                        </div>
+                        <div className="small muted truncate">
+                          {st.storeSlug ? `@${st.storeSlug} · ` : ""}
+                          {lang === "ar" ? st.wilaya.nameAr : st.wilaya.nameFr}
+                          {` · ${st.listingsCount} ${lang === "ar" ? "منتج" : "articles"}`}
+                        </div>
+                      </div>
+                    </div>
+                    <Link
+                      to={`/boutique/${st.storeSlug || st.id}`}
+                      className="btn btn-secondary btn-sm"
+                      style={{ flexShrink: 0, fontWeight: 700 }}
+                    >
+                      <Icon name="store" size={13} />
+                      <span>{lang === "ar" ? "زيارة" : "Visiter"}</span>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {initialLoading ? (
             <div className="results-grid">
               {Array.from({ length: 8 }).map((_, i) => (

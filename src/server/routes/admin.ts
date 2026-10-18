@@ -209,6 +209,17 @@ adminRoutes.patch("/admin/users/:id", async (c) => {
     .bind(nextRole, nextStatus, nowIso(), id)
     .run();
   if (nextStatus === "SUSPENDED") {
+    const now = nowIso();
+    // Wipe all active traces from app: archive listings, clear boutique, remove follows
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        "UPDATE listings SET status = 'ARCHIVED', updated_at = ? WHERE seller_id = ? AND status != 'ARCHIVED'",
+      ).bind(now, id),
+      c.env.DB.prepare(
+        "UPDATE seller_profiles SET store_name = NULL, store_slug = NULL, banner_url = NULL WHERE user_id = ?",
+      ).bind(id),
+      c.env.DB.prepare("DELETE FROM store_follows WHERE seller_id = ? OR user_id = ?").bind(id, id),
+    ]);
     await revokeAllSessions(c.env, id);
   }
   await recordAudit(c.env.DB, {
@@ -227,11 +238,49 @@ adminRoutes.patch("/admin/users/:id", async (c) => {
     title: "Votre compte a été mis à jour",
     body:
       nextStatus === "SUSPENDED"
-        ? "Votre compte est suspendu. Contactez le support."
+        ? "Votre compte est suspendu. Vos annonces et boutiques ont été retirées."
         : `Nouveau rôle : ${nextRole}.`,
     link: "/compte",
   });
   return c.json({ user: { id, role: nextRole, status: nextStatus } });
+});
+
+adminRoutes.delete("/admin/users/:id", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  const id = c.req.param("id");
+  const target = await c.env.DB.prepare("SELECT id, role FROM users WHERE id = ?")
+    .bind(id)
+    .first<{ id: string; role: Role }>();
+  if (!target) throw new HttpError(404, "NOT_FOUND", "Utilisateur introuvable.");
+  if (target.role === "ADMIN") {
+    throw new HttpError(403, "CANNOT_DELETE_ADMIN", "Impossible de supprimer un administrateur.");
+  }
+
+  // Completely wipe all traces: images, listings, boutique profile, follows, reviews, sessions, user
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "DELETE FROM listing_images WHERE listing_id IN (SELECT id FROM listings WHERE seller_id = ?)",
+    ).bind(id),
+    c.env.DB.prepare("DELETE FROM listings WHERE seller_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM seller_profiles WHERE user_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM store_follows WHERE seller_id = ? OR user_id = ?").bind(id, id),
+    c.env.DB.prepare("DELETE FROM store_reviews WHERE store_seller_id = ? OR reviewer_id = ?").bind(id, id),
+    c.env.DB.prepare("DELETE FROM listing_clicks WHERE user_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM favorites WHERE user_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM notifications WHERE user_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id),
+  ]);
+  await revokeAllSessions(c.env, id);
+
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: "ADMIN_USER_DELETED",
+    entityType: "user",
+    entityId: id,
+  });
+
+  return c.json({ ok: true, deletedUserId: id });
 });
 
 adminRoutes.get("/admin/categories", async (c) => {

@@ -228,7 +228,7 @@ export function Layout() {
             </span>
           </div>
 
-          <div className="topbar-search-wrap">
+          <div className={`topbar-search-wrap ${location.pathname.startsWith("/vendre") ? "mobile-hide-on-sell" : ""}`}>
             <form className="topbar-search" onSubmit={submitSearch} role="search">
               <Icon name="search" size={18} />
               <label className="sr-only" htmlFor="global-search">

@@ -195,7 +195,7 @@ describe("Azar Neɣ — intégration réelle", () => {
     expect(response.data.wilayas).toHaveLength(69);
     expect(response.data.wilayas[15]?.nameFr).toBe("Alger");
     expect(response.data.wilayas[57]?.nameFr).toBe("El Meniaa");
-    expect(response.data.wilayas[68]?.nameFr).toBe("El Aricha");
+    expect(response.data.wilayas[68]?.nameFr).toBe("El Abiodh Sidi Cheikh");
     expect(response.data.categories.length).toBeGreaterThanOrEqual(10);
     expect(response.data.maxImages).toBe(6);
   });

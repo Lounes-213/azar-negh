@@ -766,39 +766,6 @@
   display: block;
 }
 
-/* Gentle floating/vibration animation on active banner 3D illustration */
-.hero-banner-item.is-active .hero-banner-media {
-  animation: bannerMediaGentleBob 3.6s ease-in-out infinite;
-}
-
-.hero-banner-item.is-active .hero-banner-img {
-  animation: bannerImgSlowBreathe 4s ease-in-out infinite;
-}
-
-@keyframes bannerMediaGentleBob {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-2.5px) rotate(0.8deg);
-  }
-  50% {
-    transform: translateY(0.5px) rotate(-0.3deg);
-  }
-  75% {
-    transform: translateY(2px) rotate(-0.8deg);
-  }
-}
-
-@keyframes bannerImgSlowBreathe {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-
 /* Dots / Indicator pills with active countdown */
 .hero-banner-dots {
   position: absolute;
@@ -1081,6 +1048,15 @@
     backdrop-filter: saturate(180%) blur(16px);
     border-bottom: 1px solid var(--line);
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .topbar-search-wrap.mobile-hide-on-sell {
+    display: none !important;
+  }
+
+  .topbar:has(.mobile-hide-on-sell) {
+    grid-template-areas: "brand greet actions";
+    padding-bottom: calc(10px + env(safe-area-inset-top, 0px));
   }
 
   .topbar-brand {

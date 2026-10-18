@@ -32,6 +32,13 @@ export function Sell() {
     () => (editing ? api<{ listing: ListingDetail }>(`/listings/${id}`) : Promise.resolve(null)),
     [id],
   );
+  const quota = useAsync(
+    () =>
+      !editing && user
+        ? api<{ current: number; max: number; canCreate: boolean }>("/account/listing-quota")
+        : Promise.resolve(null),
+    [editing, user?.id],
+  );
 
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -79,15 +86,20 @@ export function Sell() {
   const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
 
   const handleAiAutoFill = async () => {
-    if (itemType === "PRODUCT" && images.length === 0) {
+    const hasImage = images.length > 0;
+    const hasTitle = Boolean(title.trim());
+
+    if (!hasImage && !hasTitle) {
       push(
         lang === "ar"
-          ? "يرجى تحميل صورة واحدة على الأقل لتفعيل عصا الذكاء الاصطناعي."
-          : "Veuillez téléverser au moins une photo pour activer la baguette magique IA.",
-        "error",
+          ? "💡 يرجى إضافة صورة للمنتج أو كتابة كلمة في العنوان لتفعيل عصا الذكاء الاصطناعي."
+          : "💡 Ajoutez une photo ou écrivez quelques mots dans le titre pour activer la baguette magique IA.",
+        "default",
       );
+      document.getElementById("sell-title")?.focus();
       return;
     }
+
     setAiBusy(true);
     try {
       const res = await api<{
@@ -107,12 +119,13 @@ export function Sell() {
         }),
       });
 
-      if (res.title && !editing) setTitle(res.title);
+      if (res.title && (!editing || !title.trim())) setTitle(res.title);
       if (res.categoryId) setCategoryId(String(res.categoryId));
       if (res.condition && itemType !== "SERVICE") setCondition(res.condition);
       if (res.description) setDescription(res.description);
       if (res.suggestedPriceDa && !editing) {
         setSuggestedPrice(res.suggestedPriceDa);
+        if (!priceDa) setPriceDa(String(res.suggestedPriceDa));
       }
       push(
         lang === "ar"
@@ -176,12 +189,17 @@ export function Sell() {
 
   const handleAiGenerate = async () => {
     if (!title.trim()) {
+      if (images.length > 0) {
+        await handleAiAutoFill();
+        return;
+      }
       push(
         lang === "ar"
-          ? "يرجى كتابة عنوان الإعلان أولاً لتوليد الوصف."
-          : "Veuillez d'abord saisir un titre pour générer la description.",
+          ? "يرجى كتابة عنوان الإعلان أولاً أو إضافة صورة لتوليد الوصف."
+          : "Veuillez d'abord saisir un titre ou ajouter une photo pour générer la description.",
         "error",
       );
+      document.getElementById("sell-title")?.focus();
       return;
     }
     setAiBusy(true);
@@ -450,9 +468,81 @@ export function Sell() {
 
   const previewPrice = Number(priceDa || 0);
 
+  if (!editing && quota.data && !quota.data.canCreate) {
+    return (
+      <div className="container page page-sell page-enter" style={{ maxWidth: 620, margin: "24px auto" }}>
+        <div
+          className="quota-limit-card panel"
+          style={{
+            textAlign: "center",
+            padding: "clamp(28px, 5vw, 44px) 24px",
+            borderRadius: "var(--radius-xl)",
+            background: "var(--surface)",
+            border: "1.5px solid rgba(245, 158, 11, 0.35)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: "22px",
+              background: "linear-gradient(135deg, #f59e0b, #d97706)",
+              color: "#fff",
+              display: "grid",
+              placeItems: "center",
+              margin: "0 auto 20px",
+              boxShadow: "0 6px 18px rgba(217, 119, 6, 0.35)",
+              fontSize: "1.6rem",
+              fontWeight: 900,
+              letterSpacing: -1,
+            }}
+          >
+            6/6
+          </div>
+          <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 800, marginBottom: 12 }}>
+            {lang === "ar"
+              ? "لقد وصلت إلى الحد الأقصى الحالي (6 إعلانات)"
+              : "Limite de 6 annonces atteinte"}
+          </h2>
+          <p
+            style={{
+              color: "var(--ink-muted)",
+              fontSize: "0.96rem",
+              lineHeight: 1.6,
+              margin: "0 auto 24px",
+              maxWidth: 500,
+            }}
+          >
+            {lang === "ar"
+              ? "يتيح تطبيق أزار نغ حالياً إمكانية نشر حتى 6 إعلانات مجاناً لكل مستخدم. سنقوم قريباً بتطوير التطبيق وإضافة باقات ورعاة (Sponsors) لتمكينك من نشر عدد أكبر من الإعلانات ! يمكنك إدارة أو حذف أحد إعلاناتك السابقة لإضافة إعلان جديد."
+              : "Azar Neɣ permet actuellement de publier jusqu'à 6 articles gratuitement par utilisateur. Nous développons prochainement l'application avec des sponsors et des packs pros pour vous permettre de publier encore plus d'articles ! Vous pouvez gérer ou archiver une annonce existante pour en publier une nouvelle."}
+          </p>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link
+              to="/compte/annonces"
+              className="btn btn-primary"
+              style={{ padding: "12px 24px", fontWeight: 700 }}
+            >
+              <Icon name="list" size={16} />
+              <span>{lang === "ar" ? "إدارة إعلاناتي (6)" : "Gérer mes annonces (6)"}</span>
+            </Link>
+            <Link
+              to="/"
+              className="btn btn-secondary"
+              style={{ padding: "12px 24px" }}
+            >
+              <span>{lang === "ar" ? "العودة للرئيسية" : "Retour à l'accueil"}</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container page">
-      <div className="page-head">
+    <div className="container page page-sell">
+      <div className="page-head" style={{ marginBottom: 16 }}>
         <div>
           <h1>{editing ? (lang === "ar" ? "تعديل الإعلان" : "Modifier l'annonce") : t("sell.new")}</h1>
           <p>{t("sell.publishNote")}</p>
@@ -642,23 +732,16 @@ export function Sell() {
                     type="button"
                     className="btn btn-sm"
                     onClick={handleAiAutoFill}
-                    disabled={aiBusy || (itemType === "PRODUCT" && images.length === 0)}
+                    disabled={aiBusy}
                     title={
-                      itemType === "PRODUCT" && images.length === 0
-                        ? (lang === "ar"
-                            ? "حمّل صورة واحدة على الأقل لتفعيل عصا الذكاء الاصطناعي"
-                            : "Ajoutez au moins 1 photo pour activer la baguette magique IA")
-                        : (lang === "ar"
-                            ? "تحليل الصور وتعبئة بيانات الإعلان تلقائياً بالذكاء الاصطناعي"
-                            : "Analyser et pré-remplir automatiquement avec Gemini IA")
+                      lang === "ar"
+                        ? "تحليل الصور وتعبئة بيانات الإعلان تلقائياً بالذكاء الاصطناعي"
+                        : "Analyser et pré-remplir automatiquement avec Gemini IA"
                     }
                     style={{
-                      background:
-                        images.length > 0 || itemType === "SERVICE"
-                          ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                          : "var(--surface)",
-                      color: images.length > 0 || itemType === "SERVICE" ? "#fff" : "var(--ink-muted)",
-                      border: images.length > 0 || itemType === "SERVICE" ? "none" : "1px solid var(--line)",
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#fff",
+                      border: "none",
                       borderRadius: "var(--radius-pill)",
                       padding: "8px 16px",
                       fontWeight: 700,
@@ -666,12 +749,8 @@ export function Sell() {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 8,
-                      boxShadow:
-                        images.length > 0 || itemType === "SERVICE"
-                          ? "0 4px 12px rgba(16, 185, 129, 0.3)"
-                          : "none",
-                      cursor:
-                        itemType === "PRODUCT" && images.length === 0 ? "not-allowed" : "pointer",
+                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                      cursor: aiBusy ? "wait" : "pointer",
                       transition: "all 0.2s ease",
                     }}
                   >
@@ -785,7 +864,35 @@ export function Sell() {
               </div>
 
               <Field
-                label={lang === "ar" ? "عنوان الإعلان" : "Titre de l'annonce"}
+                label={
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 8 }}>
+                    <span>{lang === "ar" ? "عنوان الإعلان" : "Titre de l'annonce"} <span style={{ color: "var(--danger)" }}>*</span></span>
+                    {!editing ? (
+                      <button
+                        type="button"
+                        onClick={handleAiAutoFill}
+                        disabled={aiBusy}
+                        className="btn btn-xs"
+                        style={{
+                          background: "rgba(16, 185, 129, 0.12)",
+                          color: "var(--brand-700)",
+                          border: "1px solid var(--brand-300)",
+                          borderRadius: "var(--radius-pill)",
+                          padding: "2px 10px",
+                          fontSize: "0.76rem",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          cursor: aiBusy ? "wait" : "pointer",
+                        }}
+                      >
+                        {aiBusy ? <Spinner /> : <Icon name="sparkles" size={13} style={{ color: "var(--brand-600)" }} />}
+                        <span>{lang === "ar" ? "عصا الذكاء الاصطناعي ✨" : "Baguette Magique ✨"}</span>
+                      </button>
+                    ) : null}
+                  </div>
+                }
                 htmlFor="sell-title"
                 error={fields.title}
                 required
@@ -1086,11 +1193,21 @@ export function Sell() {
                 <span>Proposer un contact WhatsApp</span>
               </label>
 
-              <div className="form-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
-                <Button type="button" onClick={() => setStep(2)} style={{ flex: 2, minWidth: 160, justifyContent: "center", height: 44 }}>
+              <div className="sell-actions">
+                <Button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="sell-primary-btn"
+                >
                   {t("common.next")} <Icon name="arrow-right" size={16} />
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy} style={{ flex: 1, minWidth: 120, justifyContent: "center", height: 44 }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => save(false)}
+                  loading={busy}
+                  className="sell-secondary-btn"
+                >
                   {t("sell.draft")}
                 </Button>
               </div>
@@ -1153,10 +1270,7 @@ export function Sell() {
                 </Alert>
               ) : null}
 
-              <div className="form-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(1)} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
-                  {t("common.back")}
-                </Button>
+              <div className="sell-actions">
                 <Button
                   type="button"
                   onClick={() => {
@@ -1167,13 +1281,29 @@ export function Sell() {
                     setError(null);
                     setStep(3);
                   }}
-                  style={{ flex: 2, minWidth: 160, justifyContent: "center", height: 44 }}
+                  className="sell-primary-btn"
                 >
                   {t("common.next")} <Icon name="arrow-right" size={16} />
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
-                  {t("sell.draft")}
-                </Button>
+                <div className="sell-sub-actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setStep(1)}
+                    style={{ flex: 1, height: 42, justifyContent: "center" }}
+                  >
+                    <Icon name="arrow-left" size={16} /> {t("common.back")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => save(false)}
+                    loading={busy}
+                    style={{ flex: 1, height: 42, justifyContent: "center" }}
+                  >
+                    {t("sell.draft")}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
@@ -1226,22 +1356,35 @@ export function Sell() {
                 </div>
               </dl>
 
-              <div className="form-actions" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(2)} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
-                  {t("common.back")}
-                </Button>
+              <div className="sell-actions">
                 <Button
                   type="button"
                   onClick={() => save(true)}
                   loading={busy}
                   disabled={notEditable}
-                  style={{ flex: 2, minWidth: 160, justifyContent: "center", height: 44 }}
+                  className="sell-primary-btn"
                 >
                   <Icon name="send" size={16} /> {t("sell.publish")}
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => save(false)} loading={busy} style={{ flex: 1, minWidth: 100, justifyContent: "center", height: 44 }}>
-                  {t("sell.draft")}
-                </Button>
+                <div className="sell-sub-actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setStep(2)}
+                    style={{ flex: 1, height: 42, justifyContent: "center" }}
+                  >
+                    <Icon name="arrow-left" size={16} /> {t("common.back")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => save(false)}
+                    loading={busy}
+                    style={{ flex: 1, height: 42, justifyContent: "center" }}
+                  >
+                    {t("sell.draft")}
+                  </Button>
+                </div>
               </div>
               <p className="small muted">{t("sell.publishNote")}</p>
             </div>

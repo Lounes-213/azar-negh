@@ -465,9 +465,14 @@ aiRoutes.post("/ai/assist", async (c) => {
   const actorKey = user ? `user:${user.id}` : `ip:${await hashIp(c.env, ip)}`;
 
   // Rate limit: 40 AI queries per hour
-  const limit = await consumeRateLimit(c.env.DB, `ai:assist:${actorKey}`, 40, 3600);
-  if (!limit.ok) {
-    throw new HttpError(429, "RATE_LIMITED", "Limite de requêtes IA atteinte pour cette heure.");
+  try {
+    const limit = await consumeRateLimit(c.env.DB, `ai:assist:${actorKey}`, 40, 3600);
+    if (!limit.ok) {
+      throw new HttpError(429, "RATE_LIMITED", "Limite de requêtes IA atteinte pour cette heure.");
+    }
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    // Transient rate limit table fallback: gracefully continue
   }
 
   const input = await parseJson(c, aiAssistSchema);

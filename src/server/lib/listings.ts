@@ -45,6 +45,7 @@ export interface ListingRow {
   last_decision_reason: string | null;
   cover_id: string | null;
   is_favorite: number;
+  favorites_count?: number;
   call_clicks?: number;
   order_clicks?: number;
   original_price_da?: number | null;
@@ -71,7 +72,8 @@ const SUMMARY_SELECT = `
     u.avatar_url AS seller_avatar_url,
     COALESCE(p.logo_url, u.avatar_url) AS store_logo_url,
     (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id,
-    EXISTS (SELECT 1 FROM favorites f WHERE f.listing_id = l.id AND f.user_id = ?) AS is_favorite
+    EXISTS (SELECT 1 FROM favorites f WHERE f.listing_id = l.id AND f.user_id = ?) AS is_favorite,
+    (SELECT COUNT(*) FROM favorites f2 WHERE f2.listing_id = l.id) AS favorites_count
   FROM listings l
   JOIN wilayas w ON w.id = l.wilaya_id
   JOIN categories c ON c.id = l.category_id
@@ -112,6 +114,7 @@ export function rowToSummary(row: ListingRow): ListingSummary {
     sellerRemark: row.seller_remark ?? null,
     rejectionReason: row.last_decision_reason ?? null,
     isFavorite: row.is_favorite === 1,
+    favoritesCount: row.favorites_count ?? 0,
     callClicks: row.call_clicks ?? 0,
     orderClicks: row.order_clicks ?? 0,
     averageRating: 5,
@@ -179,7 +182,7 @@ export async function searchListings(
   query: SearchQuery,
   viewerId: string,
 ): Promise<SearchResult> {
-  const where: string[] = ["l.status = 'APPROVED'"];
+  const where: string[] = ["l.status = 'APPROVED'", "u.status = 'ACTIVE'"];
   const params: unknown[] = [viewerId];
 
   if (query.category) {
@@ -212,9 +215,12 @@ export async function searchListings(
     params.push(query.itemType);
   }
   if (query.q) {
-    const term = `%${escapeLike(query.q)}%`;
-    where.push("(l.title LIKE ? ESCAPE '\\' OR l.description LIKE ? ESCAPE '\\')");
-    params.push(term, term);
+    const rawQ = query.q.startsWith("@") ? query.q.slice(1) : query.q;
+    const term = `%${escapeLike(rawQ)}%`;
+    where.push(
+      "(l.title LIKE ? ESCAPE '\\' OR l.description LIKE ? ESCAPE '\\' OR p.store_name LIKE ? ESCAPE '\\' OR p.store_slug LIKE ? ESCAPE '\\' OR p.display_name LIKE ? ESCAPE '\\')",
+    );
+    params.push(term, term, term, term, term);
   }
 
   const orderBy: Record<SortOption, string> = {
@@ -235,7 +241,9 @@ export async function searchListings(
       .bind(...params, query.perPage, offset)
       .all<ListingRow>(),
     db
-      .prepare(`SELECT COUNT(*) AS count FROM listings l WHERE ${whereSql}`)
+      .prepare(
+        `SELECT COUNT(*) AS count FROM listings l JOIN users u ON u.id = l.seller_id LEFT JOIN seller_profiles p ON p.user_id = l.seller_id WHERE ${whereSql}`,
+      )
       .bind(...params.slice(1))
       .first<{ count: number }>(),
   ]);

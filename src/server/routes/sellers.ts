@@ -13,6 +13,8 @@ sellerRoutes.get("/sellers", async (c) => {
   const wilayaId = c.req.query("wilayaId");
   const latStr = c.req.query("lat");
   const lngStr = c.req.query("lng");
+  const q = (c.req.query("q") ?? "").trim();
+  const rawQ = q.startsWith("@") ? q.slice(1) : q;
   const userLat = latStr ? parseFloat(latStr) : null;
   const userLng = lngStr ? parseFloat(lngStr) : null;
 
@@ -31,6 +33,12 @@ sellerRoutes.get("/sellers", async (c) => {
   if (wilayaId) {
     query += " AND p.wilaya_id = ?";
     params.push(Number(wilayaId));
+  }
+
+  if (rawQ) {
+    query += " AND (p.store_name LIKE ? OR p.store_slug LIKE ? OR p.display_name LIKE ? OR p.commune LIKE ?)";
+    const term = `%${rawQ}%`;
+    params.push(term, term, term, term);
   }
 
   query += " ORDER BY listings_count DESC LIMIT 60";
@@ -107,7 +115,8 @@ sellerRoutes.get("/sellers", async (c) => {
 });
 
 sellerRoutes.get("/sellers/:id", async (c) => {
-  const idOrSlug = c.req.param("id");
+  const param = c.req.param("id");
+  const idOrSlug = param.startsWith("@") ? param.slice(1) : param;
   const { page, perPage } = parseQuery(c.req.query(), paginationSchema);
   const viewerId = c.get("user")?.id ?? "";
 

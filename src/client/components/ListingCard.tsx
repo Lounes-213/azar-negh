@@ -24,6 +24,7 @@ function ListingCardInner({
   const navigate = useNavigate();
   const location = useLocation();
   const [favorite, setFavorite] = useState(Boolean(listing.isFavorite));
+  const [likesCount, setLikesCount] = useState(listing.favoritesCount ?? 0);
   const [busy, setBusy] = useState(false);
 
   const toggleFavorite = async (e: React.MouseEvent) => {
@@ -37,10 +38,12 @@ function ListingCardInner({
     setBusy(true);
     const next = !favorite;
     setFavorite(next);
+    setLikesCount((prev) => (next ? prev + 1 : Math.max(0, prev - 1)));
     try {
       await api(`/favorites/${listing.id}`, { method: next ? "POST" : "DELETE" });
     } catch (error) {
       setFavorite(!next);
+      setLikesCount((prev) => (next ? Math.max(0, prev - 1) : prev + 1));
       push(errorMessage(error), "error");
     } finally {
       setBusy(false);
@@ -143,8 +146,21 @@ function ListingCardInner({
             onClick={toggleFavorite}
             aria-label={favorite ? "Retirer des favoris" : t("listing.favorite")}
             aria-pressed={favorite}
+            title={likesCount > 0 ? `${likesCount} j'aime` : undefined}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: likesCount > 0 ? "4px 8px" : "6px",
+              width: "auto",
+              minWidth: 30,
+              borderRadius: 16,
+            }}
           >
-            <Icon name="heart" size={16} filled={favorite} />
+            <Icon name="heart" size={14} filled={favorite} />
+            {likesCount > 0 ? (
+              <span style={{ fontSize: "0.72rem", fontWeight: 800, lineHeight: 1 }}>{likesCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -183,7 +199,7 @@ function ListingCardInner({
           {listing.title}
         </Link>
 
-        {/* Social Proof (Stars & Sales) */}
+        {/* Social Proof (Stars & Sales & Likes) */}
         <div className="ali-social-proof">
           <div className="ali-rating-stars">
             <Icon name="star" size={13} filled className="ali-star-icon" />
@@ -194,6 +210,23 @@ function ListingCardInner({
           ) : (
             <span className="ali-free-tag">{lang === "ar" ? "توصيل مباشر" : "Vendeur direct"}</span>
           )}
+          {likesCount > 0 ? (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 2,
+                fontSize: "0.74rem",
+                fontWeight: 700,
+                color: favorite ? "#ef4444" : "var(--ink-muted)",
+                marginInlineStart: "auto",
+              }}
+              title={`${likesCount} likes`}
+            >
+              <Icon name="heart" size={10} filled={favorite} />
+              <span>{likesCount}</span>
+            </span>
+          ) : null}
         </div>
 
         {/* Shop / Store Row with Store Logo or Seller Avatar */}

@@ -4554,6 +4554,57 @@ ol {
   }
 }
 
+/* ==========================================================================
+   Sell Page & Wizard Mobile Optimization (Centered & Clean)
+   ========================================================================== */
+.page-sell {
+  max-width: 740px !important;
+  margin-inline: auto !important;
+}
+
+.sell-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+  width: 100%;
+}
+
+.sell-primary-btn {
+  width: 100% !important;
+  height: 48px !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  justify-content: center !important;
+  border-radius: var(--radius-pill) !important;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.25) !important;
+}
+
+.sell-secondary-btn {
+  width: 100% !important;
+  height: 40px !important;
+  font-size: 0.88rem !important;
+  justify-content: center !important;
+  color: var(--muted) !important;
+}
+
+.sell-sub-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .wizard {
+    padding-bottom: calc(var(--tabbar-height, 68px) + 85px) !important;
+  }
+  .wizard .panel {
+    padding: 18px 14px !important;
+    border-radius: 16px !important;
+  }
+}
+
 
 
 

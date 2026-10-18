@@ -86,11 +86,12 @@ async function respondDetail(
 listingRoutes.get("/listings/suggestions", async (c) => {
   const q = (c.req.query("q") ?? "").trim();
   if (q.length < 2) {
-    return c.json({ suggestions: [], categories: [] });
+    return c.json({ suggestions: [], categories: [], stores: [] });
   }
 
-  const pattern = `%${q}%`;
-  const [items, categories] = await Promise.all([
+  const rawQ = q.startsWith("@") ? q.slice(1) : q;
+  const pattern = `%${rawQ}%`;
+  const [items, categories, stores] = await Promise.all([
     c.env.DB.prepare(
       `SELECT l.id, l.title, l.price_da, l.wilaya_id,
               w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
@@ -99,11 +100,12 @@ listingRoutes.get("/listings/suggestions", async (c) => {
        FROM listings l
        JOIN wilayas w ON w.id = l.wilaya_id
        JOIN categories cat ON cat.id = l.category_id
-       WHERE l.status = 'APPROVED' AND (l.title LIKE ? OR l.description LIKE ?)
+       LEFT JOIN seller_profiles sp ON sp.user_id = l.seller_id
+       WHERE l.status = 'APPROVED' AND (l.title LIKE ? OR l.description LIKE ? OR sp.store_name LIKE ? OR sp.store_slug LIKE ?)
        ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
        LIMIT 5`,
     )
-      .bind(pattern, pattern)
+      .bind(pattern, pattern, pattern, pattern)
       .all<{
         id: string;
         title: string;
@@ -122,6 +124,31 @@ listingRoutes.get("/listings/suggestions", async (c) => {
     )
       .bind(pattern, pattern)
       .all<{ id: number; slug: string; name_fr: string; name_ar: string }>(),
+    c.env.DB.prepare(
+      `SELECT u.id, u.avatar_url, p.display_name, p.logo_url, p.store_name, p.store_slug,
+              p.commune, p.wilaya_id, w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+              (SELECT COUNT(*) FROM listings l WHERE l.seller_id = u.id AND l.status = 'APPROVED') AS listings_count
+       FROM users u
+       JOIN seller_profiles p ON p.user_id = u.id
+       JOIN wilayas w ON w.id = p.wilaya_id
+       WHERE u.status = 'ACTIVE' AND (p.store_name LIKE ? OR p.store_slug LIKE ? OR p.display_name LIKE ?)
+       ORDER BY listings_count DESC
+       LIMIT 3`,
+    )
+      .bind(pattern, pattern, pattern)
+      .all<{
+        id: string;
+        avatar_url: string | null;
+        display_name: string;
+        logo_url: string | null;
+        store_name: string | null;
+        store_slug: string | null;
+        commune: string | null;
+        wilaya_id: number;
+        wilaya_name_fr: string;
+        wilaya_name_ar: string;
+        listings_count: number;
+      }>(),
   ]);
 
   c.header("Cache-Control", "public, max-age=60");
@@ -139,6 +166,16 @@ listingRoutes.get("/listings/suggestions", async (c) => {
       slug: cat.slug,
       nameFr: cat.name_fr,
       nameAr: cat.name_ar,
+    })),
+    stores: (stores.results ?? []).map((row) => ({
+      id: row.id,
+      displayName: row.display_name,
+      storeName: row.store_name,
+      storeSlug: row.store_slug,
+      logoUrl: row.logo_url || row.avatar_url,
+      commune: row.commune,
+      wilaya: { id: row.wilaya_id, nameFr: row.wilaya_name_fr, nameAr: row.wilaya_name_ar },
+      listingsCount: row.listings_count,
     })),
   });
 });
@@ -198,6 +235,23 @@ listingRoutes.post("/listings", async (c) => {
   if (!limit.ok) {
     throw new HttpError(429, "RATE_LIMITED", "Limite de publications atteinte pour aujourd'hui.");
   }
+
+  // Enforce temporary maximum of 6 listings per user
+  if (user.role === "USER") {
+    const activeCount = await c.env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM listings WHERE seller_id = ? AND status IN ('APPROVED', 'PENDING', 'DRAFT')",
+    )
+      .bind(user.id)
+      .first<{ count: number }>();
+    if ((activeCount?.count ?? 0) >= 6) {
+      throw new HttpError(
+        403,
+        "MAX_LISTINGS_REACHED",
+        "Vous avez atteint la limite de 6 articles pour le moment. Bientôt disponible : packs et sponsors pour publier davantage d'articles sur Azar Neɣ !",
+      );
+    }
+  }
+
   const input = await parseJson(c, listingInputSchema);
   await assertCategoryActive(c.env.DB, input.categoryId);
   await assertWilaya(c.env.DB, input.wilayaId);
@@ -483,6 +537,22 @@ listingRoutes.post("/listings/:id/appeal", async (c) => {
   });
 
   return respondDetail(c, id);
+});
+
+listingRoutes.get("/account/listing-quota", async (c) => {
+  const user = requireUser(c);
+  const row = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM listings WHERE seller_id = ? AND status IN ('APPROVED', 'PENDING', 'DRAFT')",
+  )
+    .bind(user.id)
+    .first<{ count: number }>();
+  const current = row?.count ?? 0;
+  const max = 6;
+  return c.json({
+    current,
+    max,
+    canCreate: user.role !== "USER" || current < max,
+  });
 });
 
 listingRoutes.get("/account/listings", async (c) => {

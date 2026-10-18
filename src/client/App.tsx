@@ -1,5 +1,5 @@
 import { Component, useState, type ReactNode } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router";
 import { Layout } from "./components/Layout";
 import { Spinner } from "./components/ui";
 import { SplashScreen } from "./components/SplashScreen";
@@ -24,6 +24,14 @@ import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import { NotFound } from "./pages/NotFound";
 import { SecretAdminPortal } from "./admin-portal/App";
+
+function HandleOrNotFound() {
+  const { id } = useParams();
+  if (id && id.startsWith("@")) {
+    return <Seller />;
+  }
+  return <NotFound />;
+}
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
   const { user, loading } = useAuth();
@@ -101,6 +109,7 @@ export function App() {
           <Route path="annonces/:id" element={<ListingDetail />} />
           <Route path="vendeurs/:id" element={<Seller />} />
           <Route path="boutique/:id" element={<Seller />} />
+          <Route path="store/:id" element={<Seller />} />
           <Route path="connexion" element={<Login />} />
           <Route path="conditions" element={<Terms />} />
           <Route path="confidentialite" element={<Privacy />} />
@@ -179,6 +188,7 @@ export function App() {
               </Protected>
             }
           />
+          <Route path=":id" element={<HandleOrNotFound />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

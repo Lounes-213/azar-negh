@@ -69,7 +69,7 @@ export function Button({
 
 /* ------------------------------------------------------------------ fields */
 interface FieldProps {
-  label?: string;
+  label?: ReactNode;
   hint?: string;
   error?: string;
   htmlFor?: string;

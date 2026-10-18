@@ -145,6 +145,7 @@ export interface ListingSummary {
   sellerRemark?: string | null;
   itemType?: ItemType;
   isFavorite?: boolean;
+  favoritesCount?: number;
   rejectionReason?: string | null;
   callClicks?: number;
   orderClicks?: number;
