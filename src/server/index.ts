@@ -47,6 +47,23 @@ app.use("*", async (c, next) => {
 });
 
 app.use("/api/*", async (c, next) => {
+  const origin = c.req.header("Origin");
+  if (origin && getAllowedOrigins(c).includes(origin)) {
+    c.header("Access-Control-Allow-Origin", origin);
+    c.header("Access-Control-Allow-Credentials", "true");
+    c.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, x-csrf-token, x-admin-key",
+    );
+    c.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  }
+  if (c.req.method === "OPTIONS") {
+    return c.text("", 204);
+  }
+  await next();
+});
+
+app.use("/api/*", async (c, next) => {
   // Fail closed if the deployment secret is missing: sessions and CSRF depend on it.
   if (!c.env.SESSION_SECRET || c.env.SESSION_SECRET.length < 32) {
     console.error(JSON.stringify({ event: "missing_session_secret" }));

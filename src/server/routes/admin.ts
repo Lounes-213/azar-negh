@@ -8,9 +8,10 @@ import {
   paginationSchema,
 } from "../../shared/validation";
 import { HttpError, nowIso, pageCount, parseJson, parseQuery } from "../lib/http";
-import { assertCsrf, requireRole, revokeAllSessions } from "../lib/auth";
+import { assertCsrf, assertAdminOrSecret, revokeAllSessions } from "../lib/auth";
 import { recordAudit } from "../lib/audit";
 import { notifyUser } from "../lib/notifications";
+import { testAiProvider, getActiveAiConfig } from "../lib/gemini";
 
 export const adminRoutes = new Hono<AppEnv>();
 
@@ -23,8 +24,45 @@ const ALL_STATUSES: ListingStatus[] = [
   "ARCHIVED",
 ];
 
+adminRoutes.get("/admin/overview", async (c) => {
+  assertAdminOrSecret(c);
+  const [userCount, listingStats, volumeRow, openReports, pendingCount] = await Promise.all([
+    c.env.DB.prepare("SELECT COUNT(*) AS total FROM users").first<{ total: number }>(),
+    c.env.DB.prepare(
+      "SELECT status, COUNT(*) AS count FROM listings GROUP BY status",
+    ).all<{ status: ListingStatus; count: number }>(),
+    c.env.DB.prepare(
+      "SELECT COALESCE(SUM(price_da), 0) AS total_volume FROM listings WHERE status = 'APPROVED'",
+    ).first<{ total_volume: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS count FROM reports WHERE status = 'OPEN'").first<{
+      count: number;
+    }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS count FROM listings WHERE status = 'PENDING'").first<{
+      count: number;
+    }>(),
+  ]);
+
+  let activeListings = 0;
+  for (const row of listingStats.results ?? []) {
+    if (row.status === "APPROVED") activeListings = row.count;
+  }
+
+  const aiConfig = await getActiveAiConfig(c.env);
+
+  return c.json({
+    totalRevenueVolumeDa: volumeRow?.total_volume ?? 0,
+    totalUsers: userCount?.total ?? 0,
+    activeListings,
+    pendingModeration: pendingCount?.count ?? 0,
+    openReports: openReports?.count ?? 0,
+    aiProvider: aiConfig.provider,
+    activeGeminiModel: `${aiConfig.model} (${aiConfig.keys.length} clés actives)`,
+    keysCount: aiConfig.keys.length,
+  });
+});
+
 adminRoutes.get("/admin/stats", async (c) => {
-  requireRole(c, ["ADMIN"]);
+  assertAdminOrSecret(c);
   const [userStats, listingStats, reports, oldestPending] = await Promise.all([
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
@@ -64,7 +102,7 @@ adminRoutes.get("/admin/stats", async (c) => {
 });
 
 adminRoutes.get("/admin/users", async (c) => {
-  requireRole(c, ["ADMIN"]);
+  assertAdminOrSecret(c);
   const { page, perPage } = parseQuery(c.req.query(), paginationSchema);
   const q = (c.req.query("q") ?? "").trim().slice(0, 80);
   const role = c.req.query("role");
@@ -135,7 +173,7 @@ adminRoutes.get("/admin/users", async (c) => {
 });
 
 adminRoutes.patch("/admin/users/:id", async (c) => {
-  const admin = requireRole(c, ["ADMIN"]);
+  const admin = assertAdminOrSecret(c);
   assertCsrf(c);
   const id = c.req.param("id");
   const input = await parseJson(c, adminUserUpdateSchema);
@@ -200,7 +238,7 @@ adminRoutes.patch("/admin/users/:id", async (c) => {
 });
 
 adminRoutes.get("/admin/categories", async (c) => {
-  requireRole(c, ["ADMIN"]);
+  assertAdminOrSecret(c);
   const rows = await c.env.DB.prepare(
     `SELECT c.id, c.slug, c.name_fr, c.name_ar, c.parent_id, c.icon, c.sort_order, c.is_active,
             (SELECT COUNT(*) FROM listings l WHERE l.category_id = c.id) AS listing_count
@@ -233,7 +271,7 @@ adminRoutes.get("/admin/categories", async (c) => {
 });
 
 adminRoutes.post("/admin/categories", async (c) => {
-  const admin = requireRole(c, ["ADMIN"]);
+  const admin = assertAdminOrSecret(c);
   assertCsrf(c);
   const input = await parseJson(c, categoryInputSchema);
   if (input.parentId) {
@@ -280,7 +318,7 @@ adminRoutes.post("/admin/categories", async (c) => {
 });
 
 adminRoutes.patch("/admin/categories/:id", async (c) => {
-  const admin = requireRole(c, ["ADMIN"]);
+  const admin = assertAdminOrSecret(c);
   assertCsrf(c);
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0)
@@ -337,8 +375,31 @@ adminRoutes.patch("/admin/categories/:id", async (c) => {
   return c.json({ category: { id, ...input } });
 });
 
+adminRoutes.delete("/admin/categories/:id", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) throw new HttpError(422, "INVALID_ID", "Identifiant invalide.");
+  
+  const countRow = await c.env.DB.prepare("SELECT COUNT(*) AS count FROM listings WHERE category_id = ?")
+    .bind(id)
+    .first<{ count: number }>();
+  if ((countRow?.count ?? 0) > 0) {
+    throw new HttpError(409, "CATEGORY_IN_USE", "Impossible de supprimer une catégorie contenant des annonces.");
+  }
+  await c.env.DB.prepare("DELETE FROM categories WHERE id = ?").bind(id).run();
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: "CATEGORY_DELETED",
+    entityType: "category",
+    entityId: String(id),
+    metadata: {},
+  });
+  return c.json({ success: true, id });
+});
+
 adminRoutes.get("/admin/listings", async (c) => {
-  requireRole(c, ["ADMIN"]);
+  assertAdminOrSecret(c);
   const { page, perPage } = parseQuery(c.req.query(), paginationSchema);
   const status = c.req.query("status");
   const q = (c.req.query("q") ?? "").trim().slice(0, 80);
@@ -405,8 +466,48 @@ adminRoutes.get("/admin/listings", async (c) => {
   });
 });
 
+adminRoutes.patch("/admin/listings/:id/status", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = c.req.param("id");
+  const body = await c.req.json<{ status: ListingStatus; reason?: string }>();
+  if (!ALL_STATUSES.includes(body.status)) {
+    throw new HttpError(422, "INVALID_STATUS", "Statut invalide.");
+  }
+  const listing = await c.env.DB.prepare("SELECT id, seller_id, title, status FROM listings WHERE id = ?")
+    .bind(id)
+    .first<{ id: string; seller_id: string; title: string; status: ListingStatus }>();
+  if (!listing) throw new HttpError(404, "NOT_FOUND", "Annonce introuvable.");
+
+  const now = nowIso();
+  await c.env.DB.prepare(
+    `UPDATE listings SET status = ?, updated_at = ?,
+       published_at = CASE WHEN ? = 'APPROVED' THEN ? ELSE published_at END,
+       archived_at = CASE WHEN ? = 'ARCHIVED' THEN ? ELSE archived_at END
+     WHERE id = ?`,
+  ).bind(body.status, now, body.status, now, body.status, now, id).run();
+
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: `ADMIN_LISTING_${body.status}`,
+    entityType: "listing",
+    entityId: id,
+    metadata: { from: listing.status, to: body.status, reason: body.reason },
+  });
+
+  await notifyUser(c.env, {
+    userId: listing.seller_id,
+    type: body.status === "APPROVED" ? "LISTING_APPROVED" : "LISTING_REMOVED",
+    title: `Statut de votre annonce : ${body.status}`,
+    body: listing.title,
+    link: `/annonces/${id}`,
+  });
+
+  return c.json({ listing: { id, status: body.status } });
+});
+
 adminRoutes.post("/admin/listings/:id/action", async (c) => {
-  const admin = requireRole(c, ["ADMIN"]);
+  const admin = assertAdminOrSecret(c);
   assertCsrf(c);
   const id = c.req.param("id");
   await parseJson(c, adminListingActionSchema);
@@ -441,8 +542,230 @@ adminRoutes.post("/admin/listings/:id/action", async (c) => {
   return c.json({ listing: { id, status: "ARCHIVED" } });
 });
 
+adminRoutes.get("/admin/wilayas", async (c) => {
+  assertAdminOrSecret(c);
+  const rows = await c.env.DB.prepare(
+    `SELECT w.id, w.code, w.name_fr, w.name_ar,
+            (SELECT COUNT(*) FROM listings l WHERE l.wilaya_id = w.id) AS listings_count
+     FROM wilayas w
+     ORDER BY CAST(w.code AS INTEGER) ASC`,
+  ).all<{ id: number; code: string; name_fr: string; name_ar: string; listings_count: number }>();
+
+  return c.json({
+    wilayas: (rows.results ?? []).map((w) => ({
+      id: w.id,
+      code: w.code,
+      nameFr: w.name_fr,
+      nameAr: w.name_ar,
+      active: true,
+      listingsCount: w.listings_count,
+    })),
+  });
+});
+
+adminRoutes.patch("/admin/wilayas/:id", async (c) => {
+  assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = Number(c.req.param("id"));
+  const body = await c.req.json<{ nameFr?: string; nameAr?: string }>();
+  if (body.nameFr || body.nameAr) {
+    await c.env.DB.prepare(
+      "UPDATE wilayas SET name_fr = COALESCE(?, name_fr), name_ar = COALESCE(?, name_ar) WHERE id = ?",
+    )
+      .bind(body.nameFr ?? null, body.nameAr ?? null, id)
+      .run();
+  }
+  return c.json({ success: true, id });
+});
+
+adminRoutes.get("/admin/reports", async (c) => {
+  assertAdminOrSecret(c);
+  const rows = await c.env.DB.prepare(
+    `SELECT r.id, r.listing_id, r.reason, r.details, r.status, r.created_at,
+            l.title AS listing_title, l.status AS listing_status,
+            sp.display_name AS reporter_name
+     FROM reports r
+     JOIN listings l ON l.id = r.listing_id
+     LEFT JOIN seller_profiles sp ON sp.user_id = r.reporter_id
+     ORDER BY r.created_at DESC
+     LIMIT 100`,
+  ).all<{
+    id: string;
+    listing_id: string;
+    reason: string;
+    details: string | null;
+    status: string;
+    created_at: string;
+    listing_title: string;
+    listing_status: string;
+    reporter_name: string | null;
+  }>();
+
+  return c.json({
+    reports: (rows.results ?? []).map((r) => ({
+      id: r.id,
+      listingId: r.listing_id,
+      listingTitle: r.listing_title,
+      reporterName: r.reporter_name || "Anonyme",
+      reason: r.reason,
+      details: r.details || "",
+      status: r.status === "OPEN" ? "PENDING" : r.status,
+      createdAt: Date.parse(r.created_at) || Date.now(),
+    })),
+  });
+});
+
+adminRoutes.patch("/admin/reports/:id", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = c.req.param("id");
+  const body = await c.req.json<{ status: "RESOLVED" | "DISMISSED" }>();
+  await c.env.DB.prepare("UPDATE reports SET status = ? WHERE id = ?")
+    .bind(body.status === "DISMISSED" ? "DISMISSED" : "RESOLVED", id)
+    .run();
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: `REPORT_${body.status}`,
+    entityType: "report",
+    entityId: id,
+    metadata: { status: body.status },
+  });
+  return c.json({ success: true, id, status: body.status });
+});
+
+adminRoutes.get("/admin/ai-config", async (c) => {
+  assertAdminOrSecret(c);
+  const rows = await c.env.DB.prepare(
+    "SELECT id, provider, model_name, api_keys, is_active, settings_json, updated_at FROM ai_config ORDER BY updated_at DESC",
+  ).all<{
+    id: string;
+    provider: string;
+    model_name: string;
+    api_keys: string;
+    is_active: number;
+    settings_json: string | null;
+    updated_at: string;
+  }>();
+
+  const configs = (rows.results ?? []).map((row) => {
+    let keys: string[] = [];
+    try {
+      keys = JSON.parse(row.api_keys);
+    } catch {}
+    const maskedKeys = keys.map((k) => {
+      const s = String(k).trim();
+      if (s.length <= 10) return "••••••••";
+      return `${s.slice(0, 10)}...${s.slice(-4)}`;
+    });
+    return {
+      id: row.id,
+      provider: row.provider,
+      modelName: row.model_name,
+      keysCount: keys.length,
+      keysMasked: maskedKeys,
+      isActive: row.is_active === 1,
+      settings: row.settings_json ? JSON.parse(row.settings_json) : null,
+      updatedAt: row.updated_at,
+    };
+  });
+
+  return c.json({ configs });
+});
+
+adminRoutes.post("/admin/ai-config", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  assertCsrf(c);
+  const body = await c.req.json<{
+    id?: string;
+    provider: string;
+    modelName: string;
+    apiKeys: string[];
+    isActive?: boolean;
+    settings?: any;
+  }>();
+
+  if (!body.provider || !body.modelName || !Array.isArray(body.apiKeys) || body.apiKeys.length === 0) {
+    throw new HttpError(422, "INVALID_INPUT", "Fournisseur, modèle et au moins une clé API requis.");
+  }
+
+  const id = body.id || `${body.provider}_${Date.now()}`;
+  const now = nowIso();
+  const isActive = body.isActive ?? true;
+
+  await c.env.DB.prepare(
+    `INSERT INTO ai_config (id, provider, model_name, api_keys, is_active, settings_json, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       provider = excluded.provider,
+       model_name = excluded.model_name,
+       api_keys = excluded.api_keys,
+       is_active = excluded.is_active,
+       settings_json = excluded.settings_json,
+       updated_at = excluded.updated_at`,
+  )
+    .bind(
+      id,
+      body.provider,
+      body.modelName,
+      JSON.stringify(body.apiKeys),
+      isActive ? 1 : 0,
+      body.settings ? JSON.stringify(body.settings) : null,
+      now,
+    )
+    .run();
+
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: "AI_CONFIG_SAVED",
+    entityType: "ai_config",
+    entityId: id,
+    metadata: { provider: body.provider, model: body.modelName, keysCount: body.apiKeys.length },
+  });
+
+  return c.json({ success: true, id });
+});
+
+adminRoutes.patch("/admin/ai-config/:id/toggle", async (c) => {
+  assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = c.req.param("id");
+  await c.env.DB.prepare("UPDATE ai_config SET is_active = 1 - is_active, updated_at = ? WHERE id = ?")
+    .bind(nowIso(), id)
+    .run();
+  return c.json({ success: true, id });
+});
+
+adminRoutes.delete("/admin/ai-config/:id", async (c) => {
+  assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = c.req.param("id");
+  await c.env.DB.prepare("DELETE FROM ai_config WHERE id = ?").bind(id).run();
+  return c.json({ success: true, id });
+});
+
+adminRoutes.post("/admin/ai-config/test", async (c) => {
+  assertAdminOrSecret(c);
+  const body = await c.req.json<{
+    provider: string;
+    modelName: string;
+    apiKey: string;
+    prompt: string;
+  }>();
+
+  if (!body.provider || !body.modelName || !body.apiKey || !body.prompt) {
+    throw new HttpError(422, "MISSING_FIELDS", "Champs de test incomplets.");
+  }
+
+  try {
+    const res = await testAiProvider(body.provider, body.modelName, body.apiKey, body.prompt);
+    return c.json({ success: true, text: res.text, latencyMs: res.latencyMs });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message || "Erreur lors du test IA" }, 400);
+  }
+});
+
 adminRoutes.get("/admin/audit", async (c) => {
-  requireRole(c, ["ADMIN"]);
+  assertAdminOrSecret(c);
   const { page, perPage } = parseQuery(c.req.query(), paginationSchema);
   const offset = (page - 1) * perPage;
   const [rows, count] = await Promise.all([

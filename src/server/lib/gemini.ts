@@ -53,18 +53,140 @@ export interface GeminiContent {
 /**
  * Executes a Gemini request with model gemini-3.8-flash (and auto-failover to gemini-3.5-flash if 3.8 hits Google Free Tier 429 quota limits).
  */
+export interface DynamicAiConfig {
+  provider: string;
+  model: string;
+  keys: string[];
+}
+
+export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
+  try {
+    const row = await env.DB.prepare(
+      "SELECT provider, model_name, api_keys FROM ai_config WHERE is_active = 1 ORDER BY updated_at DESC LIMIT 1",
+    ).first<{ provider: string; model_name: string; api_keys: string }>();
+
+    if (row) {
+      let keys: string[] = [];
+      try {
+        const parsed = JSON.parse(row.api_keys);
+        if (Array.isArray(parsed)) {
+          keys = parsed.map((k) => String(k).trim()).filter(Boolean);
+        }
+      } catch {}
+      if (keys.length > 0) {
+        return {
+          provider: row.provider || "gemini",
+          model: row.model_name || "gemini-3.8-flash",
+          keys,
+        };
+      }
+    }
+  } catch {
+    // ai_config table query fallback
+  }
+
+  return {
+    provider: "gemini",
+    model: env.GEMINI_MODEL || "gemini-3.8-flash",
+    keys: getGeminiKeys(env),
+  };
+}
+
+/**
+ * Universal AI Caller supporting Gemini, OpenAI, DeepSeek, Groq, and Claude dynamically.
+ */
 async function callGemini(
   env: Env,
   contents: GeminiContent[],
   systemInstruction?: string,
 ): Promise<string | null> {
-  const keys = getGeminiKeys(env);
+  const config = await getActiveAiConfig(env);
+  const keys = config.keys;
   if (keys.length === 0) return null;
 
-  const modelsToTry = [env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.5-flash"];
+  // OpenAI / DeepSeek / Groq (OpenAI-compatible endpoints)
+  if (["openai", "deepseek", "groq"].includes(config.provider)) {
+    const endpointMap: Record<string, string> = {
+      openai: "https://api.openai.com/v1/chat/completions",
+      deepseek: "https://api.deepseek.com/chat/completions",
+      groq: "https://api.groq.com/openai/v1/chat/completions",
+    };
+    const endpoint = endpointMap[config.provider] || "https://api.openai.com/v1/chat/completions";
+    for (const key of keys) {
+      try {
+        const messages: any[] = [];
+        if (systemInstruction) {
+          messages.push({ role: "system", content: systemInstruction });
+        }
+        for (const msg of contents) {
+          const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
+          messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
+        }
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify({
+            model: config.model,
+            messages,
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const reply = data?.choices?.[0]?.message?.content;
+          if (reply && typeof reply === "string") return reply.trim();
+        }
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
 
-  for (const model of modelsToTry) {
-    // Try each key in the pool (5 keys)
+  // Claude / Anthropic
+  if (config.provider === "claude") {
+    for (const key of keys) {
+      try {
+        const messages: any[] = [];
+        for (const msg of contents) {
+          const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
+          messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
+        }
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: config.model || "claude-3-5-sonnet-20241022",
+            system: systemInstruction || undefined,
+            messages,
+            max_tokens: 1000,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const reply = data?.content?.[0]?.text;
+          if (reply && typeof reply === "string") return reply.trim();
+        }
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  // Google Gemini (with round-robin and fallback)
+  const modelsToTry = [config.model, "gemini-3.8-flash", "gemini-3.5-flash"];
+  const uniqueModels = [...new Set(modelsToTry)];
+
+  for (const model of uniqueModels) {
     for (let attempt = 0; attempt < keys.length; attempt++) {
       const key = keys[(currentKeyIndex + attempt) % keys.length];
       try {
@@ -93,7 +215,6 @@ async function callGemini(
         });
 
         if (res.status === 429 || res.status === 403 || res.status === 503) {
-          // Quota or temporary busy for this key, advance index and try next key
           currentKeyIndex = (currentKeyIndex + 1) % keys.length;
           continue;
         }
@@ -115,6 +236,79 @@ async function callGemini(
   }
 
   return null;
+}
+
+export async function testAiProvider(
+  provider: string,
+  model: string,
+  key: string,
+  prompt: string,
+): Promise<{ text: string; latencyMs: number }> {
+  const start = Date.now();
+  if (provider === "gemini") {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 300 },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Google API Error (${res.status}): ${err.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as any;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return { text: text || "Aucune réponse", latencyMs: Date.now() - start };
+  } else if (["openai", "deepseek", "groq"].includes(provider)) {
+    const endpointMap: Record<string, string> = {
+      openai: "https://api.openai.com/v1/chat/completions",
+      deepseek: "https://api.deepseek.com/chat/completions",
+      groq: "https://api.groq.com/openai/v1/chat/completions",
+    };
+    const endpoint = endpointMap[provider] || "https://api.openai.com/v1/chat/completions";
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 300,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`${provider.toUpperCase()} API Error (${res.status}): ${err.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as any;
+    return { text: data?.choices?.[0]?.message?.content || "Aucune réponse", latencyMs: Date.now() - start };
+  } else if (provider === "claude") {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 300,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Claude API Error (${res.status}): ${err.slice(0, 200)}`);
+    }
+    const data = (await res.json()) as any;
+    return { text: data?.content?.[0]?.text || "Aucune réponse", latencyMs: Date.now() - start };
+  }
+  throw new Error(`Fournisseur non supporté: ${provider}`);
 }
 
 export interface ChatImageInput {

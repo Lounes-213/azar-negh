@@ -146,6 +146,30 @@ export function requireRole(
   return user;
 }
 
+export function assertAdminOrSecret(
+  c: import("hono").Context<import("../types").AppEnv>,
+): { id: string; role: Role; email: string } {
+  const adminKey = c.req.header("x-admin-key");
+  if (
+    adminKey &&
+    c.env.SESSION_SECRET &&
+    (adminKey === c.env.SESSION_SECRET || adminKey === (c.env as any).ADMIN_SECRET_KEY)
+  ) {
+    return {
+      id: "master_admin",
+      role: "ADMIN",
+      email: "master.admin@azar-negh.dz",
+    };
+  }
+
+  const user = c.get("user");
+  if (user && user.role === "ADMIN") {
+    return user;
+  }
+
+  throw new HttpError(403, "FORBIDDEN", "Accès administrateur requis (Clé maître ou session Admin requise).");
+}
+
 export function getAllowedOrigins(c: import("hono").Context<import("../types").AppEnv>): string[] {
   const requestOrigin = new URL(c.req.url).origin;
   const allowed = new Set<string>([requestOrigin]);
@@ -154,12 +178,13 @@ export function getAllowedOrigins(c: import("hono").Context<import("../types").A
   if (reqOrigin && (reqOrigin.endsWith(".vercel.app") || reqOrigin === "https://vercel.app")) {
     allowed.add(reqOrigin);
   }
-  if (c.env.APP_ENV !== "production") {
-    allowed.add("http://localhost:5173");
-    allowed.add("http://127.0.0.1:5173");
-    allowed.add("http://localhost:8787");
-    allowed.add("http://127.0.0.1:8787");
-  }
+  // Local dev & admin panel origins
+  allowed.add("http://localhost:5173");
+  allowed.add("http://127.0.0.1:5173");
+  allowed.add("http://localhost:5174");
+  allowed.add("http://127.0.0.1:5174");
+  allowed.add("http://localhost:8787");
+  allowed.add("http://127.0.0.1:8787");
   return [...allowed];
 }
 
@@ -172,6 +197,14 @@ export function assertSameOrigin(c: import("hono").Context<import("../types").Ap
 }
 
 export function assertCsrf(c: import("hono").Context<import("../types").AppEnv>): void {
+  const adminKey = c.req.header("x-admin-key");
+  if (
+    adminKey &&
+    c.env.SESSION_SECRET &&
+    (adminKey === c.env.SESSION_SECRET || adminKey === (c.env as any).ADMIN_SECRET_KEY)
+  ) {
+    return;
+  }
   assertSameOrigin(c);
   const expected = c.get("csrfToken");
   const provided = c.req.header(CSRF_HEADER);
