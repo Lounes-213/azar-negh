@@ -25,6 +25,7 @@ interface Message {
   imagePreview?: string;
   isVoice?: boolean;
   voiceDuration?: number;
+  audioUrl?: string;
   products?: BotProductCard[];
 }
 
@@ -273,6 +274,250 @@ function renderRichContent(content: string, onNavigate?: () => void): React.Reac
   }
 
   return <>{elements}</>;
+}
+
+/**
+ * Real-time soundwave indicator using Web Audio API:
+ * - Silence / quiet: rendered as a sleek flat horizontal line across the center ("chakl khat")
+ * - Speaking: dynamic frequency bars pulsing in emerald gradients matching real voice volume ("amowage")
+ */
+function RealtimeAudioVisualizer({ stream }: { stream: MediaStream | null }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!stream) return;
+    let audioCtx: AudioContext | null = null;
+    let animId: number | null = null;
+
+    try {
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtxClass) return;
+      audioCtx = new AudioCtxClass();
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.8;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const render = () => {
+        if (!canvasRef.current) return;
+        analyser.getByteFrequencyData(dataArray);
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i] ?? 0;
+        }
+        const avg = sum / bufferLength;
+
+        const w = canvas.width;
+        const h = canvas.height;
+        const cy = h / 2;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // When silent or quiet below threshold: flat horizontal line
+        if (avg < 5) {
+          ctx.beginPath();
+          ctx.moveTo(6, cy);
+          ctx.lineTo(w - 6, cy);
+          ctx.strokeStyle = "rgba(52, 211, 153, 0.4)";
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = "round";
+          ctx.stroke();
+        } else {
+          // Speaking: dynamic audio wave bars
+          const numBars = 16;
+          const barWidth = 3.5;
+          const totalBarsW = numBars * barWidth;
+          const gap = (w - 16 - totalBarsW) / (numBars - 1);
+          const startX = 8;
+
+          for (let i = 0; i < numBars; i++) {
+            const bin = Math.min(bufferLength - 1, Math.floor((i / numBars) * 20));
+            const val = dataArray[bin] ?? 0;
+            const factor = Math.min(1, Math.max(0.12, val / 220));
+            const barH = Math.max(3.5, factor * (h - 4));
+            const x = startX + i * (barWidth + gap);
+            const y = cy - barH / 2;
+
+            const grad = ctx.createLinearGradient(0, y, 0, y + barH);
+            grad.addColorStop(0, "#34d399");
+            grad.addColorStop(0.5, "#10b981");
+            grad.addColorStop(1, "#059669");
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            if (typeof (ctx as any).roundRect === "function") {
+              (ctx as any).roundRect(x, y, barWidth, barH, 2);
+            } else {
+              ctx.rect(x, y, barWidth, barH);
+            }
+            ctx.fill();
+          }
+        }
+
+        animId = requestAnimationFrame(render);
+      };
+
+      render();
+    } catch (e) {
+      console.warn("Visualizer init error:", e);
+    }
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+      if (audioCtx && audioCtx.state !== "closed") {
+        try {
+          audioCtx.close();
+        } catch {}
+      }
+    };
+  }, [stream]);
+
+  return (
+    <div className="azarbot-rec-visualizer-wrap">
+      <canvas ref={canvasRef} width={140} height={30} className="azarbot-rec-canvas" />
+    </div>
+  );
+}
+
+/**
+ * Rich WhatsApp/Telegram style interactive voice message card inside chat bubbles.
+ * Allows instant playback with play/pause button, duration tracker, and waveform bars.
+ */
+function VoiceMessageBubble({
+  message,
+  isAr,
+}: {
+  message: Message;
+  isAr: boolean;
+}) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const duration = Math.max(1, message.voiceDuration || 3);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const togglePlay = () => {
+    if (!message.audioUrl) return;
+
+    if (isPlaying) {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    } else {
+      if (!audioRef.current) {
+        const audio = new Audio(message.audioUrl);
+        audioRef.current = audio;
+
+        audio.ontimeupdate = () => {
+          setPlaybackTime(Math.floor(audio.currentTime));
+        };
+        audio.onended = () => {
+          setIsPlaying(false);
+          setPlaybackTime(0);
+        };
+        audio.onerror = () => {
+          setIsPlaying(false);
+        };
+      }
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+        });
+    }
+  };
+
+  const progressPercent = Math.min(100, Math.max(0, (playbackTime / duration) * 100));
+  const waveHeights = [28, 48, 85, 55, 95, 75, 40, 88, 100, 65, 45, 80, 95, 55, 35, 60, 40, 25];
+
+  return (
+    <div className="azarbot-voice-player-card">
+      <div className="azarbot-voice-player-header">
+        <span className="azarbot-voice-header-badge">
+          <Icon name="mic" size={12} />
+          <span>{isAr ? "رسالة صوتية مسجلة" : "Message vocal"}</span>
+        </span>
+        <span className="azarbot-voice-timer">
+          {isPlaying
+            ? `00:${String(playbackTime).padStart(2, "0")} / 00:${String(duration).padStart(2, "0")}`
+            : `00:${String(duration).padStart(2, "0")}`}
+        </span>
+      </div>
+
+      <div className="azarbot-voice-controls-row">
+        {/* Play/Pause Button */}
+        <button
+          type="button"
+          className={`azarbot-voice-play-btn ${isPlaying ? "is-playing" : ""}`}
+          onClick={togglePlay}
+          disabled={!message.audioUrl}
+          title={isPlaying ? (isAr ? "إيقاف مؤقت" : "Pause") : (isAr ? "استماع للتسجيل" : "Écouter")}
+          aria-label="Play/Pause voice note"
+        >
+          {isPlaying ? (
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <rect x="6" y="5" width="4" height="14" rx="1.5" />
+              <rect x="14" y="5" width="4" height="14" rx="1.5" />
+            </svg>
+          ) : (
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="currentColor"
+              style={{ transform: isAr ? "scaleX(-1)" : "none" }}
+            >
+              <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14z" />
+            </svg>
+          )}
+        </button>
+
+        {/* Audio Waveform Track */}
+        <div className="azarbot-voice-track">
+          <div className="azarbot-voice-bars">
+            {waveHeights.map((pct, i) => {
+              const barProgress = (i / waveHeights.length) * 100;
+              const isPast = barProgress <= progressPercent;
+              return (
+                <span
+                  key={i}
+                  className={`voice-bar ${isPast ? "is-past" : ""}`}
+                  style={{ height: `${Math.max(16, pct)}%` }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function AzarBotWidget() {
@@ -543,6 +788,7 @@ export function AzarBotWidget() {
 
       if (shouldSend && audioChunksRef.current.length > 0) {
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        const localAudioUrl = URL.createObjectURL(blob);
         audioChunksRef.current = [];
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -553,6 +799,7 @@ export function AzarBotWidget() {
               base64,
               mimeType,
               duration,
+              audioUrl: localAudioUrl,
             });
           }
         };
@@ -617,7 +864,7 @@ export function AzarBotWidget() {
 
   const sendMessage = async (
     textToSend?: string,
-    audioToSend?: { base64: string; mimeType: string; duration: number },
+    audioToSend?: { base64: string; mimeType: string; duration: number; audioUrl?: string },
   ) => {
     const text = (textToSend || input).trim();
     if ((!text && !selectedImage && !audioToSend) || loading || isCompressing || isRecording) return;
@@ -636,6 +883,7 @@ export function AzarBotWidget() {
       imagePreview: currentImage ? currentImage.previewUrl : undefined,
       isVoice: !!audioToSend,
       voiceDuration: audioToSend?.duration,
+      audioUrl: audioToSend?.audioUrl,
     };
 
     const nextMessages = [...messages, userMsg];
@@ -833,30 +1081,24 @@ export function AzarBotWidget() {
           <div className="azarbot-body" ref={chatBodyRef}>
             {messages.map((msg) => (
               <div key={msg.id} className={`azarbot-message-row ${msg.role === "user" ? "user-row" : "bot-row"}`}>
-                <div className={`azarbot-bubble ${msg.role === "user" ? "user-bubble" : "bot-bubble"}`}>
-                  {/* User uploaded voice note tag */}
+                <div className={`azarbot-bubble ${msg.role === "user" ? "user-bubble" : "bot-bubble"} ${msg.isVoice ? "is-voice-bubble" : ""}`}>
+                  {/* User uploaded voice note card */}
                   {msg.isVoice ? (
-                    <div className="azarbot-voice-tag">
-                      <div className="azarbot-voice-icon-circle">
-                        <Icon name="mic" size={13} />
-                      </div>
-                      <div className="azarbot-voice-bars">
-                        <span /><span /><span /><span />
-                      </div>
-                      <span className="azarbot-voice-len">{msg.voiceDuration || 1}s</span>
-                    </div>
-                  ) : null}
+                    <VoiceMessageBubble message={msg} isAr={isAr} />
+                  ) : (
+                    <>
+                      {/* User uploaded image preview inside chat */}
+                      {msg.imagePreview ? (
+                        <div className="azarbot-msg-image-wrap">
+                          <img src={msg.imagePreview} alt="User upload" className="azarbot-msg-image" />
+                        </div>
+                      ) : null}
 
-                  {/* User uploaded image preview inside chat */}
-                  {msg.imagePreview ? (
-                    <div className="azarbot-msg-image-wrap">
-                      <img src={msg.imagePreview} alt="User upload" className="azarbot-msg-image" />
-                    </div>
-                  ) : null}
-
-                  <div className="azarbot-bubble-content">
-                    {renderRichContent(msg.content, closeChat)}
-                  </div>
+                      <div className="azarbot-bubble-content">
+                        {renderRichContent(msg.content, closeChat)}
+                      </div>
+                    </>
+                  )}
 
                   {/* Attached Rich Product Cards (Max 3) - Click navigates to product and closes bot */}
                   {msg.products && msg.products.length > 0 ? (
@@ -994,16 +1236,8 @@ export function AzarBotWidget() {
                 </span>
               </div>
 
-              {/* Dynamic Soundwave frequency visualizer */}
-              <div className="azarbot-waveform" aria-hidden="true">
-                <span className="wave-bar w-1" />
-                <span className="wave-bar w-2" />
-                <span className="wave-bar w-3" />
-                <span className="wave-bar w-4" />
-                <span className="wave-bar w-5" />
-                <span className="wave-bar w-6" />
-                <span className="wave-bar w-7" />
-              </div>
+              {/* Dynamic Soundwave frequency visualizer (real mic amplitude) */}
+              <RealtimeAudioVisualizer stream={streamRef.current} />
 
               <div className="azarbot-rec-actions">
                 {/* Cancel / Discard */}

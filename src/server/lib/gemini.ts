@@ -85,7 +85,7 @@ export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
 
   return {
     provider: "gemini",
-    model: (env as any).GEMINI_MODEL || "gemini-3.8-flash",
+    model: (env as any).GEMINI_MODEL || "gemini-3.5-flash",
     keys: getGeminiKeys(env),
   };
 }
@@ -181,7 +181,7 @@ async function callGemini(
   }
 
   // Google Gemini (with round-robin and fallback)
-  const modelsToTry = [config.model, "gemini-3.8-flash", "gemini-3.5-flash"];
+  const modelsToTry = [config.model, "gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest", "gemini-3.8-flash"];
   const uniqueModels = [...new Set(modelsToTry)];
 
   for (const model of uniqueModels) {
@@ -414,22 +414,28 @@ ${catalogContext || "لا توجد منتجات مسجلة حالياً."}
         });
       }
       if (audio?.data) {
+        const cleanAudioMime = (audio.mimeType || "audio/webm").split(";")[0]?.trim() || "audio/webm";
         parts.push({
           inlineData: {
-            mimeType: audio.mimeType,
+            mimeType: cleanAudioMime,
             data: audio.data,
           },
         });
       }
 
-      const defaultText = audio?.data
-        ? (isAr ? "استمع إلى هذا التسجيل الصوتي بدقة (قبائلية / دارجة / فرنسية / عربية) وافهم طلب الزبون جيداً، ثم أجب بنص مباشر وموجز ورشح له أفضل السلع المطابقة من الكتالوج." : "Écoute cet enregistrement vocal (kabyle/darija/français), comprends la demande et réponds directement avec les meilleures annonces.")
-        : image?.data
-        ? (isAr ? "حلل هذه الصورة وتعرف على هذا المنتج وابحث عن أفضل المنتجات المشابهة في المنصة." : "Analyse cette image, identifie ce produit et trouve les meilleures annonces similaires sur la plateforme.")
-        : "";
+      let textToSend = m.content || "";
+      if (audio?.data) {
+        textToSend = isAr
+          ? "المستخدم أرسل تسجيلاً صوتياً مرفقاً (Audio). استمع إليه بدقة شديدة وافهم ما يطلبه (سواء تحدث باللغة الأمازيغية القبائلية Taqbaylit أو الدارجة الجزائرية أو العربية أو الفرنسية). أجب عليه مباشرة برسالة نصية واضحة ولطيفة وموجزة بنفس لغته، ورشح له أفضل السلع المطابقة من الكتالوج المرفق إذا كان يبحث عن منتج."
+          : "L'utilisateur a envoyé un enregistrement vocal. Écoute-le très attentivement (en kabyle Taqbaylit, darija algérienne, français ou arabe), réponds directement par un message texte concis et courtois dans sa langue, et propose-lui les meilleures annonces du catalogue.";
+      } else if (image?.data && (!textToSend || textToSend.includes("ابحث لي عن هذا المنتج"))) {
+        textToSend = isAr
+          ? "حلل هذه الصورة وتعرف على هذا المنتج وابحث عن أفضل المنتجات المشابهة في المنصة."
+          : "Analyse cette image, identifie ce produit et trouve les meilleures annonces similaires sur la plateforme.";
+      }
 
       parts.push({
-        text: m.content ? m.content : defaultText,
+        text: textToSend,
       });
     } else {
       parts.push({ text: m.content });
