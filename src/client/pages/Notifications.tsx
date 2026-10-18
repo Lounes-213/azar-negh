@@ -4,6 +4,7 @@ import type { AppNotification, Paginated } from "../../shared/types";
 import { EmptyState, Pagination, Spinner, useToast } from "../components/ui";
 import { Icon, type IconName } from "../components/Icons";
 import { api, errorMessage } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
 import { useRealtime } from "../lib/realtime";
@@ -18,54 +19,10 @@ const TONES: Record<string, { icon: IconName; tone: string }> = {
   ACCOUNT_UPDATED: { icon: "user", tone: "badge-info" },
 };
 
-export function Notifications() {
-  const { t, lang } = useI18n();
+export function PushNotificationCard() {
   const { push } = useToast();
-  const { unread, refreshUnread } = useRealtime();
-  const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  useDocumentTitle(t("notifications.title"));
-
-  const state = useAsync(
-    () =>
-      api<{ notifications: Paginated<AppNotification>; unread: number }>(
-        `/notifications?page=${page}&perPage=20`,
-      ),
-    [page],
-  );
-
-  useEffect(() => {
-    const onChange = () => state.reload();
-    window.addEventListener("azar:notification", onChange);
-    return () => window.removeEventListener("azar:notification", onChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const openNotification = async (notification: AppNotification) => {
-    if (!notification.read) {
-      try {
-        await api(`/notifications/${notification.id}/read`, { method: "POST" });
-        await refreshUnread();
-      } catch (error) {
-        push(errorMessage(error), "error");
-      }
-    }
-    if (notification.link) navigate(notification.link);
-    else state.reload();
-  };
-
-  const readAll = async () => {
-    try {
-      await api("/notifications/read-all", { method: "POST" });
-      await refreshUnread();
-      state.reload();
-    } catch (error) {
-      push(errorMessage(error), "error");
-    }
-  };
-
-function PushNotificationCard() {
-  const { push } = useToast();
+  const { lang } = useI18n();
+  const isAr = lang === "ar";
   const [supported, setSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -91,22 +48,35 @@ function PushNotificationCard() {
       if (isSubscribed) {
         const sub = await reg.pushManager.getSubscription();
         if (sub) {
-          await api("/push/unsubscribe", {
-            method: "POST",
-            body: { endpoint: sub.endpoint },
-          }).catch(() => {});
-          await sub.unsubscribe();
+          try {
+            await api("/push/unsubscribe", {
+              method: "POST",
+              body: { endpoint: sub.endpoint },
+            });
+          } catch {}
+          try {
+            await sub.unsubscribe();
+          } catch {}
         }
         setIsSubscribed(false);
-        push("تم إلغاء تفعيل إشعارات الهاتف.", "default");
+        push(isAr ? "تم إلغاء تفعيل إشعارات الهاتف." : "Notifications désactivées.", "default");
       } else {
         const perm = await Notification.requestPermission();
         if (perm !== "granted") {
-          push("يرجى السماح بالإشعارات من إعدادات المتصفح.", "default");
+          push(
+            isAr
+              ? "يرجى السماح بالإشعارات من إعدادات المتصفح لتفعيل التنبيهات."
+              : "Veuillez autoriser les notifications dans les paramètres de votre navigateur.",
+            "error"
+          );
           return;
         }
 
         const vapidRes = await api<{ publicKey: string }>("/push/vapid-key");
+        if (!vapidRes?.publicKey) {
+          throw new Error("Clé VAPID introuvable.");
+        }
+
         const padding = "=".repeat((4 - (vapidRes.publicKey.length % 4)) % 4);
         const base64 = (vapidRes.publicKey + padding).replace(/-/g, "+").replace(/_/g, "/");
         const rawData = window.atob(base64);
@@ -115,13 +85,20 @@ function PushNotificationCard() {
           applicationServerKey[i] = rawData.charCodeAt(i);
         }
 
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey,
-          });
+        // Clean up any stale subscription first to prevent DOMException: A subscription with a different applicationServerKey already exists
+        const existingSub = await reg.pushManager.getSubscription();
+        if (existingSub) {
+          try {
+            await existingSub.unsubscribe();
+          } catch (e) {
+            console.warn("Could not unsubscribe stale push subscription:", e);
+          }
         }
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
 
         const jsonSub = sub.toJSON();
         if (jsonSub.endpoint && jsonSub.keys) {
@@ -134,11 +111,16 @@ function PushNotificationCard() {
           });
         }
         setIsSubscribed(true);
-        push("تم تفعيل إشعارات الهاتف بنجاح.", "success");
+        push(isAr ? "تم تفعيل إشعارات الهاتف بنجاح." : "Notifications activées avec succès.", "success");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("toggleSubscription error:", err);
-      push("حدث خطأ، يرجى المحاولة لاحقاً.", "error");
+      push(
+        isAr
+          ? "تعذر تفعيل الإشعارات، يرجى التأكد من إعدادات المتصفح."
+          : "Impossible d'activer les notifications.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -150,7 +132,7 @@ function PushNotificationCard() {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (!sub) {
-        push("يرجى تفعيل الإشعارات أولاً.", "default");
+        push(isAr ? "يرجى تفعيل الإشعارات أولاً." : "Veuillez activer les notifications d'abord.", "default");
         return;
       }
 
@@ -158,7 +140,7 @@ function PushNotificationCard() {
         try {
           if (reg?.showNotification) {
             reg.showNotification("Azar Neɣ", {
-              body: "إشعار تجريبي: النظام يعمل بنجاح في الخلفية.",
+              body: isAr ? "إشعار تجريبي: النظام يعمل بنجاح في الخلفية." : "Test de notification : Le système fonctionne en arrière-plan.",
               icon: "/brand/icon-192.png",
               badge: "/brand/icon-192.png",
               data: { url: "/compte/notifications" },
@@ -171,9 +153,9 @@ function PushNotificationCard() {
         method: "POST",
         body: { endpoint: sub.endpoint },
       });
-      push("تم إرسال إشعار تجريبي إلى جهازك.", "success");
+      push(isAr ? "تم إرسال إشعار تجريبي إلى جهازك." : "Notification de test envoyée.", "success");
     } catch {
-      push("تعذر إرسال الإشعار التجريبي.", "error");
+      push(isAr ? "تعذر إرسال الإشعار التجريبي." : "Échec de l'envoi de la notification de test.", "error");
     } finally {
       setLoading(false);
     }
@@ -197,19 +179,23 @@ function PushNotificationCard() {
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontWeight: 600, fontSize: "0.98rem", color: "var(--text)" }}>
-            إشعارات الهاتف والمتصفح (Web Push)
+            {isAr ? "إشعارات الهاتف والمتصفح" : "Notifications de l'appareil"}
           </span>
           <span
             className={`badge ${isSubscribed ? "badge-success" : ""}`}
             style={{ fontSize: "0.75rem", padding: "2px 8px", borderRadius: 6 }}
           >
-            {isSubscribed ? "مفعلة" : "غير مفعلة"}
+            {isSubscribed ? (isAr ? "مفعلة" : "Actives") : (isAr ? "غير مفعلة" : "Inactives")}
           </span>
         </div>
         <div style={{ fontSize: "0.85rem", color: "var(--muted)", marginTop: 4 }}>
           {isSubscribed
-            ? "الإشعارات نشطة وتصلك في الخلفية عند وصول رسائل جديدة أو تحديث حالة إعلاناتك."
-            : "تلقي تنبيهات سريعة على جهازك عند حدوث أي تفاعل جديد في حسابك."}
+            ? (isAr
+                ? "الإشعارات نشطة وتصلك في الخلفية عند وصول رسائل جديدة أو تحديث حالة إعلاناتك."
+                : "Les notifications sont actives en arrière-plan pour vos annonces et messages.")
+            : (isAr
+                ? "تلقي تنبيهات سريعة على جهازك عند حدوث أي تفاعل جديد في حسابك."
+                : "Recevez des alertes instantanées sur votre appareil lors de nouvelles activités.")}
         </div>
       </div>
 
@@ -221,7 +207,7 @@ function PushNotificationCard() {
             disabled={loading}
             className="btn btn-secondary btn-sm"
           >
-            تجربة
+            {isAr ? "تجربة" : "Tester"}
           </button>
         ) : null}
 
@@ -232,21 +218,86 @@ function PushNotificationCard() {
           className={`btn btn-sm ${isSubscribed ? "btn-secondary" : "btn-primary"}`}
           style={{ minWidth: 100 }}
         >
-          {loading ? "..." : isSubscribed ? "تعطيل" : "تفعيل"}
+          {loading ? "..." : isSubscribed ? (isAr ? "تعطيل" : "Désactiver") : (isAr ? "تفعيل" : "Activer")}
         </button>
       </div>
     </div>
   );
 }
 
+export function Notifications() {
+  const { user } = useAuth();
+  const { t, lang } = useI18n();
+  const isAr = lang === "ar";
+  const { push } = useToast();
+  const { unread, refreshUnread } = useRealtime();
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  useDocumentTitle(t("notifications.title"));
+
+  const state = useAsync(
+    () =>
+      user
+        ? api<{ notifications: Paginated<AppNotification>; unread: number }>(
+            `/notifications?page=${page}&perPage=20`,
+          )
+        : Promise.resolve({
+            notifications: { items: [], page: 1, perPage: 20, total: 0, totalPages: 1 },
+            unread: 0,
+          }),
+    [user, page],
+  );
+
+  useEffect(() => {
+    const onChange = () => {
+      if (user) state.reload();
+    };
+    window.addEventListener("azar:notification", onChange);
+    return () => window.removeEventListener("azar:notification", onChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const openNotification = async (notification: AppNotification) => {
+    if (!notification.read) {
+      try {
+        await api(`/notifications/${notification.id}/read`, { method: "POST" });
+        await refreshUnread();
+      } catch (error) {
+        push(errorMessage(error), "error");
+      }
+    }
+    if (notification.link) navigate(notification.link);
+    else state.reload();
+  };
+
+  const readAll = async () => {
+    try {
+      await api("/notifications/read-all", { method: "POST" });
+      await refreshUnread();
+      state.reload();
+    } catch (error) {
+      push(errorMessage(error), "error");
+    }
+  };
+
   return (
     <div className="container page page-narrow">
       <div className="page-head">
         <div>
           <h1>{t("notifications.title")}</h1>
-          <p>{unread > 0 ? `${unread} non lue(s)` : "Tout est à jour."}</p>
+          <p>
+            {user
+              ? unread > 0
+                ? `${unread} non lue(s)`
+                : isAr
+                ? "كل الإشعارات مقروءة."
+                : "Tout est à jour."
+              : isAr
+              ? "إعدادات الإشعارات وتنبيهات الهاتف"
+              : "Paramètres des notifications push"}
+          </p>
         </div>
-        {unread > 0 ? (
+        {user && unread > 0 ? (
           <button type="button" className="btn btn-secondary btn-sm" onClick={readAll}>
             {t("notifications.readAll")}
           </button>
@@ -255,13 +306,68 @@ function PushNotificationCard() {
 
       <PushNotificationCard />
 
-      {state.loading ? (
+      {!user ? (
+        <div
+          className="card stack"
+          style={{
+            padding: "clamp(1.5rem, 3vw, 2rem)",
+            textAlign: "center",
+            alignItems: "center",
+            gap: 12,
+            border: "1px dashed var(--line)",
+            borderRadius: "var(--radius-lg)",
+            marginTop: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              background: "rgba(16, 185, 129, 0.1)",
+              display: "grid",
+              placeItems: "center",
+              color: "var(--brand-600)",
+            }}
+          >
+            <Icon name="bell" size={24} />
+          </div>
+          <h3 style={{ fontSize: "1.05rem", fontWeight: 700, margin: 0 }}>
+            {isAr ? "تسجيل الدخول لعرض سجل إشعارات حسابك" : "Connectez-vous pour voir vos alertes"}
+          </h3>
+          <p className="small muted" style={{ maxWidth: 440, margin: 0 }}>
+            {isAr
+              ? "يمكنك تفعيل تنبيهات الهاتف أعلاه لتلقي إشعارات فورية. لتتبع رسائل المشترين وحالة إعلاناتك، سجّل الدخول إلى حسابك."
+              : "Activez les alertes push ci-dessus. Pour suivre vos annonces et recevoir les messages, connectez-vous à votre compte."}
+          </p>
+          <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate("/connexion")}
+            >
+              {isAr ? "تسجيل الدخول" : "Connexion"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => navigate("/connexion?mode=register")}
+            >
+              {isAr ? "إنشاء حساب جديد" : "Créer un compte"}
+            </button>
+          </div>
+        </div>
+      ) : state.loading ? (
         <Spinner />
       ) : !state.data || state.data.notifications.items.length === 0 ? (
         <EmptyState
           icon="bell"
           title={t("notifications.empty")}
-          text="Les décisions de modération et les mises à jour de vos annonces apparaîtront ici."
+          text={
+            isAr
+              ? "ستظهر قرارات الإشراف وتحديثات إعلاناتك ورسائلك هنا فور وصولها."
+              : "Les décisions de modération et les mises à jour de vos annonces apparaîtront ici."
+          }
         />
       ) : (
         <>

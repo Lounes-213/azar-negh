@@ -10,6 +10,7 @@ import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { formatPhoneForInput } from "../lib/format";
+import { PushNotificationCard } from "./Notifications";
 
 interface AccountStats {
   listingsCount: number;
@@ -28,11 +29,132 @@ interface FollowUser {
   store_slug: string | null;
 }
 
+function LanguageSelectorCard({
+  lang,
+  setLang,
+  isAr,
+}: {
+  lang: "fr" | "ar";
+  setLang: (l: "fr" | "ar") => void;
+  isAr: boolean;
+}) {
+  return (
+    <div
+      className="panel stack"
+      style={{
+        gap: 12,
+        padding: "clamp(1rem, 3vw, 1.5rem)",
+        borderRadius: "var(--radius-lg)",
+        border: "1px solid var(--line)",
+      }}
+    >
+      <div>
+        <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
+          {isAr ? "لغة المنصة والعرض" : "Langue de l'application"}
+        </h3>
+        <p className="small muted" style={{ margin: "2px 0 0 0" }}>
+          {isAr
+            ? "اختر لغتك المفضلة، يتم تحديث واجهة المنصة فوراً."
+            : "Choisissez votre langue. L'affichage s'adapte instantanément."}
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+        {/* Arabic option */}
+        <button
+          type="button"
+          onClick={() => setLang("ar")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 14px",
+            borderRadius: "var(--radius-md)",
+            border: lang === "ar" ? "2px solid var(--brand-600)" : "1px solid var(--line)",
+            background: lang === "ar" ? "var(--brand-50, rgba(16, 185, 129, 0.08))" : "var(--surface)",
+            cursor: "pointer",
+            textAlign: "start",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>🇩🇿</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--ink)" }}>العربية</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>من اليمين لليسار (RTL)</div>
+            </div>
+          </div>
+          {lang === "ar" ? (
+            <span
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "var(--brand-600)",
+                color: "#fff",
+                display: "grid",
+                placeItems: "center",
+                fontSize: "12px",
+                fontWeight: "bold",
+              }}
+            >
+              ✓
+            </span>
+          ) : null}
+        </button>
+
+        {/* French option */}
+        <button
+          type="button"
+          onClick={() => setLang("fr")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 14px",
+            borderRadius: "var(--radius-md)",
+            border: lang === "fr" ? "2px solid var(--brand-600)" : "1px solid var(--line)",
+            background: lang === "fr" ? "var(--brand-50, rgba(16, 185, 129, 0.08))" : "var(--surface)",
+            cursor: "pointer",
+            textAlign: "start",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>🇫🇷</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--ink)" }}>Français</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>De gauche à droite (LTR)</div>
+            </div>
+          </div>
+          {lang === "fr" ? (
+            <span
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "var(--brand-600)",
+                color: "#fff",
+                display: "grid",
+                placeItems: "center",
+                fontSize: "12px",
+                fontWeight: "bold",
+              }}
+            >
+              ✓
+            </span>
+          ) : null}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Account() {
-  const { user, updateUser, logout } = useAuth();
-  const { t, lang } = useI18n();
+  const { user, loading: authLoading, updateUser, logout } = useAuth();
+  const { t, lang, setLang } = useI18n();
   const isAr = lang === "ar";
-  useDocumentTitle(isAr ? "حسابي الشخصي — أزار نغ" : "Mon compte — Azar Neɣ");
+  useDocumentTitle(isAr ? "حسابي والإعدادات — أزار نغ" : "Mon compte & Paramètres — Azar Neɣ");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { push } = useToast();
@@ -117,11 +239,11 @@ export function Account() {
     }
   }, [view, followsData]);
 
-  if (!user) return <Spinner />;
+  if (authLoading) return <Spinner />;
 
   const handleAvatarFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     if (!file.type.startsWith("image/")) {
       push(
@@ -163,6 +285,7 @@ export function Account() {
   };
 
   const handleRemoveAvatar = async () => {
+    if (!user) return;
     setUploadingAvatar(true);
     try {
       await api<{ avatarUrl: null }>("/account/avatar", { method: "DELETE" });
@@ -249,6 +372,190 @@ export function Account() {
       setBusy(false);
     }
   };
+
+  if (!user) {
+    return (
+      <div className="container page" style={{ maxWidth: 760 }}>
+        <div className="stack" style={{ gap: "var(--space-4)" }}>
+          {/* Guest Greeting & Login / Register Callout */}
+          <div
+            className="panel stack"
+            style={{
+              gap: 16,
+              padding: "clamp(1.25rem, 3vw, 2rem)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--line)",
+              background: "linear-gradient(135deg, var(--surface) 0%, var(--surface-muted) 100%)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "rgba(16, 185, 129, 0.12)",
+                  color: "var(--brand-700)",
+                  display: "grid",
+                  placeItems: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name="user" size={28} />
+              </div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
+                  {isAr ? "مرحباً بك في أزار نغ" : "Bienvenue sur Azar Neɣ"}
+                </h2>
+                <p className="small muted" style={{ margin: "4px 0 0 0" }}>
+                  {isAr
+                    ? "سجّل الدخول لنشر إعلاناتك، إنشاء متجرك، ومراسلة البائعين بكل أمان."
+                    : "Connectez-vous pour publier des annonces, créer votre boutique et contacter les vendeurs."}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+              <Link
+                to="/connexion"
+                className="btn btn-primary"
+                style={{ flex: 1, minWidth: 140, justifyContent: "center" }}
+              >
+                <Icon name="logout" size={17} />
+                {isAr ? "تسجيل الدخول" : "Se connecter"}
+              </Link>
+              <Link
+                to="/connexion?mode=register"
+                className="btn btn-secondary"
+                style={{ flex: 1, minWidth: 140, justifyContent: "center" }}
+              >
+                <Icon name="plus" size={17} />
+                {isAr ? "إنشاء حساب جديد" : "Créer un compte"}
+              </Link>
+            </div>
+          </div>
+
+          {/* Language Selector Component */}
+          <LanguageSelectorCard lang={lang} setLang={setLang} isAr={isAr} />
+
+          {/* Push Notification Card */}
+          <PushNotificationCard />
+
+          {/* Legal & App Links */}
+          <div
+            className="panel stack"
+            style={{
+              gap: 8,
+              padding: "clamp(1rem, 3vw, 1.5rem)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: "0 0 4px 0" }}>
+              {isAr ? "الشروط والسياسات العامة" : "Informations & Politiques"}
+            </h3>
+
+            <Link
+              to="/conditions"
+              className="account-menu-item"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "var(--radius-md)",
+                color: "var(--ink)",
+                textDecoration: "none",
+                transition: "background 0.15s ease",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "rgba(100, 116, 139, 0.1)",
+                    color: "var(--ink-muted)",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  <Icon name="file" size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+                    {isAr ? "شروط الاستخدام" : "Conditions d'utilisation"}
+                  </div>
+                  <div className="small muted">
+                    {isAr ? "القواعد والضوابط القانونية للمنصة" : "Règles et conditions d'usage"}
+                  </div>
+                </div>
+              </div>
+              <Icon
+                name="arrow-right"
+                size={16}
+                style={{ color: "var(--ink-muted)", transform: isAr ? "rotate(180deg)" : "none" }}
+              />
+            </Link>
+
+            <Link
+              to="/confidentialite"
+              className="account-menu-item"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 14px",
+                borderRadius: "var(--radius-md)",
+                color: "var(--ink)",
+                textDecoration: "none",
+                transition: "background 0.15s ease",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "rgba(100, 116, 139, 0.1)",
+                    color: "var(--ink-muted)",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  <Icon name="shield" size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+                    {isAr ? "سياسة الخصوصية وحماية البيانات" : "Politique de confidentialité"}
+                  </div>
+                  <div className="small muted">
+                    {isAr ? "حماية بياناتك وحقوقك الشخصية" : "Protection de vos données"}
+                  </div>
+                </div>
+              </div>
+              <Icon
+                name="arrow-right"
+                size={16}
+                style={{ color: "var(--ink-muted)", transform: isAr ? "rotate(180deg)" : "none" }}
+              />
+            </Link>
+          </div>
+
+          {/* PWA Install Card */}
+          <PwaInstallCard lang={lang} />
+
+          <div style={{ textAlign: "center", padding: "16px 0 calc(var(--tabbar-height, 68px) + 24px) 0" }}>
+            <p className="small muted" style={{ margin: 0 }}>
+              Azar Neɣ · {isAr ? "النسخة 2.0 — السوق الجزائري المحلي" : "Version 2.0 — Marketplace Algérie"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderRoleBadge = () => {
     if (user.role === "ADMIN") {
@@ -1676,6 +1983,12 @@ export function Account() {
               </Link>
             </div>
           </div>
+
+          {/* Language Selector in Member Hub */}
+          <LanguageSelectorCard lang={lang} setLang={setLang} isAr={isAr} />
+
+          {/* Device Push Notifications Card */}
+          <PushNotificationCard />
 
           {/* PWA App Installation Card (Android & iOS) */}
           <PwaInstallCard lang={lang} />

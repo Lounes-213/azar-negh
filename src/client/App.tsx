@@ -85,14 +85,7 @@ export function App() {
           <Route path="connexion" element={<Login />} />
           <Route path="conditions" element={<Terms />} />
           <Route path="confidentialite" element={<Privacy />} />
-          <Route
-            path="compte"
-            element={
-              <Protected>
-                <Account />
-              </Protected>
-            }
-          />
+          <Route path="compte" element={<Account />} />
           <Route
             path="compte/annonces"
             element={
@@ -109,14 +102,8 @@ export function App() {
               </Protected>
             }
           />
-          <Route
-            path="compte/notifications"
-            element={
-              <Protected>
-                <Notifications />
-              </Protected>
-            }
-          />
+          <Route path="compte/notifications" element={<Notifications />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route
             path="vendre"
             element={
