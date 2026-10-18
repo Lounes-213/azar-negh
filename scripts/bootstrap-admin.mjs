@@ -45,8 +45,8 @@ function fail(message) {
 
 if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail("--email est requis et doit être valide.");
 if (!phone) fail('--phone est requis (mobile algérien, ex. "0551 23 45 67").');
-if (!Number.isInteger(wilaya) || wilaya < 1 || wilaya > 58)
-  fail("--wilaya doit être un numéro de 1 à 58.");
+if (!Number.isInteger(wilaya) || wilaya < 1 || wilaya > 69)
+  fail("--wilaya doit être un numéro de 1 à 69.");
 
 async function readPassword() {
   const fromEnv = process.env.BOOTSTRAP_ADMIN_PASSWORD;

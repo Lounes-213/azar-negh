@@ -605,10 +605,20 @@ export function AzarBotWidget() {
       setIsCollapsed(true);
     };
 
+    const handleOpenBot = () => {
+      setIsOpen(true);
+      setIsCollapsed(false);
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("azar:open-bot", handleOpenBot);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("azar:open-bot", handleOpenBot);
     };
   }, []);
 

@@ -766,6 +766,30 @@
   display: block;
 }
 
+/* Progress countdown bar */
+.hero-banner-progress {
+  position: absolute;
+  bottom: 0;
+  inset-inline-start: 0;
+  height: 2.5px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+  border-radius: 99px;
+  width: 0%;
+  animation: heroBannerProgress 4s linear forwards;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes heroBannerProgress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
 /* Dots */
 .hero-banner-dots {
   position: absolute;

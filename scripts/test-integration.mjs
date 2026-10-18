@@ -76,7 +76,7 @@ try {
   ]);
   const parsed = JSON.parse(seedOutput.slice(seedOutput.indexOf("[")));
   const row = parsed[0]?.results?.[0];
-  if (row?.wilayas !== 58) throw new Error(`Attendu 58 wilayas, obtenu ${row?.wilayas}`);
+  if (row?.wilayas !== 69) throw new Error(`Attendu 69 wilayas, obtenu ${row?.wilayas}`);
   if (row?.categories !== 24) throw new Error(`Attendu 24 catégories, obtenu ${row?.categories}`);
   console.log(`  ✔ ${row.wilayas} wilayas, ${row.categories} catégories`);
 

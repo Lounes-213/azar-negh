@@ -185,16 +185,17 @@ describe("Azar Neɣ — intégration réelle", () => {
     expect(response.data.status).toBe("ok");
   });
 
-  it("sert les 58 wilayas et la hiérarchie de catégories", async () => {
+  it("sert les 69 wilayas et la hiérarchie de catégories", async () => {
     const response = await anonymous.request<{
       wilayas: { id: number; nameFr: string; nameAr: string }[];
       categories: { slug: string; children: unknown[] }[];
       maxImages: number;
     }>("/api/meta");
     expect(response.status).toBe(200);
-    expect(response.data.wilayas).toHaveLength(58);
+    expect(response.data.wilayas).toHaveLength(69);
     expect(response.data.wilayas[15]?.nameFr).toBe("Alger");
     expect(response.data.wilayas[57]?.nameFr).toBe("El Meniaa");
+    expect(response.data.wilayas[68]?.nameFr).toBe("El Aricha");
     expect(response.data.categories.length).toBeGreaterThanOrEqual(10);
     expect(response.data.maxImages).toBe(6);
   });

@@ -36,7 +36,7 @@ export const registerSchema = z.object({
   password: passwordSchema,
   displayName: z.string().trim().min(2).max(60),
   phone: phoneSchema,
-  wilayaId: z.coerce.number().int().min(1).max(58),
+  wilayaId: z.coerce.number().int().min(1).max(69),
   phonePublic: z.boolean().optional().default(false),
   whatsappPublic: z.boolean().optional().default(false),
 });
@@ -51,7 +51,7 @@ export const profileSchema = z.object({
   phone: phoneSchema,
   phonePublic: z.boolean(),
   whatsappPublic: z.boolean(),
-  wilayaId: z.coerce.number().int().min(1).max(58),
+  wilayaId: z.coerce.number().int().min(1).max(69),
   bio: z.string().trim().max(500).optional().nullable(),
 });
 
@@ -63,7 +63,7 @@ export const listingInputSchema = z.object({
     .min(20, "Description trop courte (20 caractères minimum).")
     .max(4000),
   categoryId: z.coerce.number().int().positive(),
-  wilayaId: z.coerce.number().int().min(1).max(58),
+  wilayaId: z.coerce.number().int().min(1).max(69),
   priceDa: z.coerce.number().int().min(0).max(1_000_000_000),
   negotiable: z.boolean().default(false),
   condition: z.enum(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"]).default("NEW"),
@@ -82,7 +82,7 @@ export type ListingInput = z.infer<typeof listingInputSchema>;
 export const searchQuerySchema = z.object({
   q: z.string().trim().max(80).optional(),
   category: z.coerce.number().int().positive().optional(),
-  wilaya: z.coerce.number().int().min(1).max(58).optional(),
+  wilaya: z.coerce.number().int().min(1).max(69).optional(),
   minPrice: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
   maxPrice: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
   condition: z.enum(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"]).optional(),
@@ -158,7 +158,7 @@ export const storeProfileUpdateSchema = z.object({
   phone: phoneSchema,
   phonePublic: z.boolean(),
   whatsappPublic: z.boolean(),
-  wilayaId: z.coerce.number().int().min(1).max(58),
+  wilayaId: z.coerce.number().int().min(1).max(69),
   bio: z.string().trim().max(500).optional().nullable(),
 });
 
