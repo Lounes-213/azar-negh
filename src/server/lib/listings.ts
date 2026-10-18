@@ -51,6 +51,9 @@ export interface ListingRow {
   sort_order?: number;
   store_name?: string | null;
   store_slug?: string | null;
+  seller_avatar_url?: string | null;
+  store_logo_url?: string | null;
+  seller_remark?: string | null;
 }
 
 const SUMMARY_SELECT = `
@@ -59,12 +62,14 @@ const SUMMARY_SELECT = `
     l.created_at, l.updated_at, l.published_at, l.view_count,
     l.wilaya_id, w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
     l.category_id, c.slug AS category_slug, c.name_fr AS category_name_fr, c.name_ar AS category_name_ar,
-    l.contact_phone, l.contact_phone_public, l.contact_whatsapp, l.last_decision_reason,
+    l.contact_phone, l.contact_phone_public, l.contact_whatsapp, l.last_decision_reason, l.seller_remark,
     l.call_clicks, l.order_clicks, l.original_price_da, l.sort_order,
     p.display_name AS seller_display_name, p.phone AS seller_phone,
     p.phone_public AS seller_phone_public, p.whatsapp_public AS seller_whatsapp_public,
     p.bio AS seller_bio, p.wilaya_id AS seller_wilaya_id, u.created_at AS seller_created_at,
     p.store_name AS store_name, p.store_slug AS store_slug,
+    u.avatar_url AS seller_avatar_url,
+    COALESCE(p.logo_url, u.avatar_url) AS store_logo_url,
     (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id,
     EXISTS (SELECT 1 FROM favorites f WHERE f.listing_id = l.id AND f.user_id = ?) AS is_favorite
   FROM listings l
@@ -101,6 +106,10 @@ export function rowToSummary(row: ListingRow): ListingSummary {
     sellerDisplayName: row.seller_display_name ?? "Vendeur",
     storeName: row.store_name ?? null,
     storeSlug: row.store_slug ?? null,
+    sellerAvatarUrl: row.seller_avatar_url ?? null,
+    storeLogoUrl: row.store_logo_url ?? null,
+    sellerRemark: row.seller_remark ?? null,
+    rejectionReason: row.last_decision_reason ?? null,
     isFavorite: row.is_favorite === 1,
     callClicks: row.call_clicks ?? 0,
     orderClicks: row.order_clicks ?? 0,
@@ -134,6 +143,8 @@ export function rowToDetail(
       displayName: row.seller_display_name ?? "Vendeur",
       storeName: row.store_name ?? null,
       storeSlug: row.store_slug ?? null,
+      avatarUrl: row.store_logo_url || row.seller_avatar_url || null,
+      logoUrl: row.store_logo_url ?? null,
       wilayaId: row.seller_wilaya_id ?? row.wilaya_id,
       bio: row.seller_bio,
       phone: isOwner ? row.seller_phone : profilePhonePublic ? row.seller_phone : null,
@@ -145,6 +156,7 @@ export function rowToDetail(
     contactPhonePublic: listingPhonePublic,
     contactWhatsapp: whatsapp,
     rejectionReason: isOwner || viewer?.role !== "USER" ? row.last_decision_reason : null,
+    sellerRemark: row.seller_remark ?? null,
     viewCount: row.view_count,
     updatedAt: row.updated_at,
     allowedActions: allowedActions(row.status, isOwner, viewer?.role ?? "USER"),

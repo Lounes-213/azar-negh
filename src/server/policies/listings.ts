@@ -42,10 +42,9 @@ export function allowedActions(
   role: Role,
 ): ListingAction[] {
   if (!isOwner) return [];
-  const actions: ListingAction[] = [];
+  const actions: ListingAction[] = ["delete"];
   if (status === "DRAFT" || status === "REJECTED") {
     actions.push("edit", "submit");
-    if (status === "DRAFT") actions.push("delete");
   }
   if (status === "APPROVED") actions.push("edit", "mark_sold", "archive");
   if (status === "SOLD") actions.push("archive", "relist");

@@ -230,13 +230,29 @@ export function Seller() {
     <div className="container page page-enter">
       {/* Store Header Banner */}
       <div className="store-header-card mb-6">
-        <div className="store-banner-bg">
+        <div
+          className="store-banner-bg"
+          style={
+            seller.bannerUrl
+              ? {
+                  backgroundImage: `url(${seller.bannerUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }
+              : undefined
+          }
+        >
           <div className="store-banner-overlay" />
         </div>
 
         <div className="store-profile-bar">
           <div className="store-avatar-wrap">
-            <Avatar name={seller.storeName || seller.displayName} size="xl" />
+            <Avatar
+              name={seller.storeName || seller.displayName}
+              imageUrl={seller.logoUrl || seller.avatarUrl}
+              size="xl"
+              withGreenRing={true}
+            />
           </div>
 
           <div className="store-info-grow">

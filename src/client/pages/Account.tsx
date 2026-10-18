@@ -36,8 +36,8 @@ export function Account() {
   const meta = useAsync(() => api<MetaResponse>("/meta"), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sub-views: "hub" (main menu), "edit" (edit profile & avatar), "follows" (followers & following)
-  const [view, setView] = useState<"hub" | "edit" | "follows">("hub");
+  // Sub-views: "hub" (main menu), "edit" (edit profile & avatar), "follows" (followers & following), "store" (spacious store editor)
+  const [view, setView] = useState<"hub" | "edit" | "follows" | "store">("hub");
   const [followsTab, setFollowsTab] = useState<"followers" | "following">("followers");
 
   const [stats, setStats] = useState<AccountStats | null>(null);
@@ -45,12 +45,19 @@ export function Account() {
 
   const [busy, setBusy] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+
+  const storeLogoInputRef = useRef<HTMLInputElement>(null);
+  const storeBannerInputRef = useRef<HTMLInputElement>(null);
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [storeName, setStoreName] = useState(user?.storeName ?? "");
   const [storeSlug, setStoreSlug] = useState(user?.storeSlug ?? "");
+  const [storeLogoUrl, setStoreLogoUrl] = useState(user?.logoUrl ?? "");
+  const [storeBannerUrl, setStoreBannerUrl] = useState(user?.bannerUrl ?? "");
   const [commune, setCommune] = useState(user?.commune ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
   const [openingHours, setOpeningHours] = useState(user?.openingHours ?? "");
@@ -65,6 +72,8 @@ export function Account() {
     setDisplayName(user.displayName ?? "");
     setStoreName(user.storeName ?? "");
     setStoreSlug(user.storeSlug ?? "");
+    setStoreLogoUrl(user.logoUrl ?? "");
+    setStoreBannerUrl(user.bannerUrl ?? "");
     setCommune(user.commune ?? "");
     setAddress(user.address ?? "");
     setOpeningHours(user.openingHours ?? "");
@@ -164,6 +173,74 @@ export function Account() {
     navigate("/connexion");
   };
 
+  const handleStoreLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setNotice({
+        tone: "danger",
+        text: isAr ? "حجم الشعار يجب ألا يتجاوز 5 ميغابايت." : "Le logo ne doit pas dépasser 5 Mo.",
+      });
+      return;
+    }
+    setUploadingLogo(true);
+    setNotice(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api<{ image: { id: string; url: string } }>("/images", {
+        method: "POST",
+        body: formData,
+      });
+      setStoreLogoUrl(res.image.url);
+      setNotice({
+        tone: "success",
+        text: isAr
+          ? "تم رفع شعار المتجر بنجاح. اضغط 'حفظ' لتثبيت التعديل."
+          : "Logo téléversé. Cliquez sur Enregistrer pour valider.",
+      });
+    } catch (err) {
+      setNotice({ tone: "danger", text: errorMessage(err) });
+    } finally {
+      setUploadingLogo(false);
+      if (storeLogoInputRef.current) storeLogoInputRef.current.value = "";
+    }
+  };
+
+  const handleStoreBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setNotice({
+        tone: "danger",
+        text: isAr ? "حجم الغلاف يجب ألا يتجاوز 5 ميغابايت." : "La bannière ne doit pas dépasser 5 Mo.",
+      });
+      return;
+    }
+    setUploadingBanner(true);
+    setNotice(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api<{ image: { id: string; url: string } }>("/images", {
+        method: "POST",
+        body: formData,
+      });
+      setStoreBannerUrl(res.image.url);
+      setNotice({
+        tone: "success",
+        text: isAr
+          ? "تم رفع غلاف المتجر بنجاح. اضغط 'حفظ' لتثبيت التعديل."
+          : "Bannière téléversée. Cliquez sur Enregistrer pour valider.",
+      });
+    } catch (err) {
+      setNotice({ tone: "danger", text: errorMessage(err) });
+    } finally {
+      setUploadingBanner(false);
+      if (storeBannerInputRef.current) storeBannerInputRef.current.value = "";
+    }
+  };
+
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -179,6 +256,8 @@ export function Account() {
           commune: commune.trim() || null,
           address: address.trim() || null,
           openingHours: openingHours.trim() || null,
+          bannerUrl: storeBannerUrl.trim() || null,
+          logoUrl: storeLogoUrl.trim() || null,
           phone,
           phonePublic,
           whatsappPublic,
@@ -658,6 +737,356 @@ export function Account() {
         </div>
       ) : null}
 
+      {/* ---------------------------------------------------------------- VIEW: STORE MANAGEMENT (MODIFIER LA BOUTIQUE) */}
+      {view === "store" ? (
+        <div className="stack" style={{ gap: "var(--space-4)", paddingBottom: "140px" }}>
+          {/* Header & Back Button */}
+          <div className="row-between" style={{ alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setNotice(null);
+                setView("hub");
+              }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Icon name="arrow-right" size={16} style={{ transform: isAr ? "rotate(0deg)" : "rotate(180deg)" }} />
+              {isAr ? "العودة للحساب" : "Retour"}
+            </button>
+            <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>🏪</span>
+              <span>{isAr ? "تهيئة وإدارة متجري" : "Gestion de ma boutique"}</span>
+            </h2>
+            {storeSlug ? (
+              <Link
+                to={`/vendeurs/${storeSlug}`}
+                className="btn btn-sm btn-outline"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <Icon name="share" size={14} />
+                <span>{isAr ? "معاينة" : "Aperçu"}</span>
+              </Link>
+            ) : (
+              <div style={{ width: 60 }} />
+            )}
+          </div>
+
+          {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
+
+          {/* Form */}
+          <form onSubmit={save} className="stack" style={{ gap: "var(--space-4)" }}>
+            {/* Visual Branding Card (Banner & Logo) */}
+            <div
+              className="panel stack"
+              style={{
+                gap: 16,
+                padding: "clamp(1rem, 3vw, 1.75rem)",
+                borderRadius: "var(--radius-lg)",
+                overflow: "hidden",
+                border: "1px solid var(--line)",
+              }}
+            >
+              <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
+                {isAr ? "الهوية البصرية للمتجر (الغلاف والشعار)" : "Identité visuelle (Bannière & Logo)"}
+              </h3>
+
+              {/* Banner Area */}
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: 160,
+                  borderRadius: "var(--radius-md)",
+                  overflow: "hidden",
+                  background: storeBannerUrl
+                    ? `url(${storeBannerUrl}) center/cover no-repeat`
+                    : "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-900) 100%)",
+                  display: "flex",
+                  alignItems: "flex-end",
+                  padding: 12,
+                  boxShadow: "inset 0 0 40px rgba(0,0,0,0.3)",
+                }}
+              >
+                <input
+                  ref={storeBannerInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: "none" }}
+                  onChange={handleStoreBannerUpload}
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => storeBannerInputRef.current?.click()}
+                    disabled={uploadingBanner}
+                    style={{
+                      background: "rgba(255,255,255,0.9)",
+                      backdropFilter: "blur(4px)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {uploadingBanner ? <Spinner /> : <Icon name="camera" size={14} />}
+                    <span>{isAr ? "تغيير الغلاف" : "Changer la bannière"}</span>
+                  </button>
+                  {storeBannerUrl ? (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setStoreBannerUrl("")}
+                      style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
+                    >
+                      <Icon name="x" size={13} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Logo Area */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <input
+                  ref={storeLogoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: "none" }}
+                  onChange={handleStoreLogoUpload}
+                />
+                <div style={{ position: "relative" }}>
+                  <Avatar
+                    name={storeName || displayName}
+                    imageUrl={storeLogoUrl || user.avatarUrl}
+                    size="xl"
+                    withGreenRing={true}
+                  />
+                </div>
+                <div className="stack" style={{ gap: 6, flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
+                    {isAr ? "شعار المتجر (Logo)" : "Logo officiel de la boutique"}
+                  </div>
+                  <p className="small muted" style={{ margin: 0 }}>
+                    {isAr
+                      ? "يظهر في واجهة متجرك وعلى جميع بطاقات منتجاتك بعلامة التوثيق الخضراء."
+                      : "S'affiche sur votre vitrine et sur toutes vos annonces avec le cercle émeraude."}
+                  </p>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline"
+                      onClick={() => storeLogoInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                    >
+                      {uploadingLogo ? <Spinner /> : <Icon name="camera" size={14} />}
+                      <span>{isAr ? "رفع شعار جديد" : "Téléverser un logo"}</span>
+                    </button>
+                    {storeLogoUrl ? (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => setStoreLogoUrl("")}
+                        style={{ color: "var(--danger)" }}
+                      >
+                        {isAr ? "إزالة" : "Supprimer"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Store Details Panel */}
+            <div
+              className="panel stack"
+              style={{
+                gap: 14,
+                padding: "clamp(1rem, 3vw, 1.75rem)",
+                borderRadius: "var(--radius-lg)",
+                border: "1px solid var(--line)",
+              }}
+            >
+              <h3 style={{ fontSize: "var(--text-base)", fontWeight: 700, margin: 0 }}>
+                {isAr ? "بيانات ومعلومات المتجر" : "Informations & Coordonnées de la boutique"}
+              </h3>
+
+              <div className="form-grid">
+                <Field
+                  label={isAr ? "اسم المتجر" : "Nom commercial de la boutique"}
+                  htmlFor="store-name-input"
+                  error={fields.storeName}
+                  required
+                >
+                  <Input
+                    id="store-name-input"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    placeholder={isAr ? "مثال: متجر الإلكترونيات العصرية" : "Ex. Électro Express Alger"}
+                    maxLength={80}
+                  />
+                </Field>
+
+                <Field
+                  label={isAr ? "رابط المتجر المخصص (Slug)" : "Lien public personnalisé (Slug)"}
+                  htmlFor="store-slug-input"
+                  error={fields.storeSlug}
+                  hint={storeSlug ? `${window.location.origin}/vendeurs/${storeSlug}` : undefined}
+                >
+                  <Input
+                    id="store-slug-input"
+                    value={storeSlug}
+                    onChange={(e) => setStoreSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                    placeholder="ex. electro-express"
+                    maxLength={60}
+                  />
+                </Field>
+
+                <Field
+                  label={t("auth.wilaya")}
+                  htmlFor="store-wilaya-input"
+                  error={fields.wilayaId}
+                  required
+                >
+                  <CustomSelect
+                    id="store-wilaya-input"
+                    value={wilayaId}
+                    onChange={setWilayaId}
+                    options={(meta.data?.wilayas ?? []).map((item) => ({
+                      value: item.id,
+                      label: `${item.id.toString().padStart(2, "0")} — ${isAr ? item.nameAr : item.nameFr}`,
+                      sublabel: isAr ? item.nameFr : item.nameAr,
+                    }))}
+                    searchable
+                    searchPlaceholder={isAr ? "ابحث عن الولاية..." : "Rechercher wilaya..."}
+                  />
+                </Field>
+
+                <Field
+                  label={isAr ? "البلدية أو الحي" : "Commune ou quartier"}
+                  htmlFor="store-commune-input"
+                >
+                  <Input
+                    id="store-commune-input"
+                    value={commune}
+                    onChange={(e) => setCommune(e.target.value)}
+                    placeholder={isAr ? "مثال: سيدي يحيى، حيدرة" : "Ex. Sidi Yahia, Hydra"}
+                    maxLength={80}
+                  />
+                </Field>
+              </div>
+
+              <Field
+                label={isAr ? "العنوان الدقيق للمحل أو المقر" : "Adresse physique précise"}
+                htmlFor="store-address-input"
+              >
+                <Input
+                  id="store-address-input"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder={isAr ? "مثال: 14 شارع ديدوش مراد" : "Ex. 14 Rue Didouche Mourad"}
+                  maxLength={160}
+                />
+              </Field>
+
+              <Field
+                label={isAr ? "أوقات وساعات العمل" : "Horaires d'ouverture"}
+                htmlFor="store-hours-input"
+                hint={isAr ? "مثال: من السبت إلى الخميس: 09:00 - 19:00" : "Ex. Sam - Jeu : 09h00 - 19h00 (Fermé le Vendredi)"}
+              >
+                <Input
+                  id="store-hours-input"
+                  value={openingHours}
+                  onChange={(e) => setOpeningHours(e.target.value)}
+                  placeholder="Ex. 09:00 - 19:00"
+                  maxLength={120}
+                />
+              </Field>
+
+              <Field
+                label={isAr ? "نبذة تعريفية عن المتجر والخدمات" : "À propos / Bio de la boutique"}
+                htmlFor="store-bio-input"
+                hint="500 caractères max."
+              >
+                <Textarea
+                  id="store-bio-input"
+                  rows={4}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  maxLength={500}
+                  placeholder={
+                    isAr
+                      ? "اكتب نبذة مميزة عن متجرك، المنتجات التي توفرها، وضمانات الجودة والتوصيل..."
+                      : "Présentez votre boutique, vos spécialités, garanties et modes de livraison..."
+                  }
+                />
+              </Field>
+
+              <div className="divider" />
+              <h4 style={{ fontSize: "var(--text-sm)", fontWeight: 700, margin: 0 }}>
+                {isAr ? "أرقام التواصل العامة" : "Contact & Messagerie"}
+              </h4>
+
+              <div className="form-grid">
+                <Field
+                  label={t("auth.phone")}
+                  htmlFor="store-phone-input"
+                  error={fields.phone}
+                  required
+                >
+                  <Input
+                    id="store-phone-input"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </Field>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={phonePublic}
+                      onChange={(e) => setPhonePublic(e.target.checked)}
+                    />
+                    <span>{isAr ? "إظهار رقم الهاتف للمشترين" : "Afficher le téléphone publiquement"}</span>
+                  </label>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={whatsappPublic}
+                      onChange={(e) => setWhatsappPublic(e.target.checked)}
+                    />
+                    <span>{isAr ? "تفعيل زر الطلب والتواصل عبر WhatsApp" : "Activer la commande par WhatsApp"}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* SPACIOUS ACTION BUTTONS - High padding prevents collision with mobile bottom nav bar */}
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                marginTop: 8,
+                paddingBottom: 40,
+              }}
+            >
+              <Button type="submit" loading={busy} style={{ flex: 1, padding: "14px 24px", fontSize: "1rem" }}>
+                <Icon name="check" size={18} />
+                {isAr ? "حفظ وتثبيت معلومات المتجر" : "Enregistrer la boutique"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setView("hub")}
+                style={{ padding: "14px 20px" }}
+              >
+                {isAr ? "إلغاء" : "Annuler"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       {/* ---------------------------------------------------------------- VIEW: MAIN ACCOUNT HUB */}
       {view === "hub" ? (
         <div className="stack" style={{ gap: "var(--space-4)" }}>
@@ -894,6 +1323,63 @@ export function Account() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Icon name="arrow-right" size={16} style={{ color: "var(--ink-muted)", transform: isAr ? "rotate(180deg)" : "none" }} />
+                </div>
+              </button>
+
+              {/* Configurer / Gérer ma boutique (Spacious Store Editor) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice(null);
+                  setView("store");
+                }}
+                className="account-menu-item"
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "14px 16px",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--ink)",
+                  background: "rgba(16, 185, 129, 0.05)",
+                  border: "1px solid rgba(16, 185, 129, 0.2)",
+                  cursor: "pointer",
+                  textAlign: "start",
+                  transition: "background 0.15s ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: "10px",
+                      background: "rgba(16, 185, 129, 0.15)",
+                      color: "var(--brand-700)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon name="store" size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--brand-800)" }}>
+                      {isAr ? "تهيئة وتعديل متجري (Boutique Pro)" : "Configurer & modifier ma boutique"}
+                    </div>
+                    <div className="small muted">
+                      {isAr
+                        ? "الشعار، الغلاف، العنوان، أوقات العمل، ونبذة المتجر"
+                        : "Logo officiel, bannière, horaires, coordonnées et bio"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="badge badge-brand" style={{ fontWeight: 600, fontSize: "0.75rem" }}>
+                    PRO
+                  </span>
+                  <Icon name="arrow-right" size={16} style={{ color: "var(--brand-700)", transform: isAr ? "rotate(180deg)" : "none" }} />
                 </div>
               </button>
 

@@ -45,6 +45,9 @@ export function ListingDetail() {
   const [reportBusy, setReportBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const [appealOpen, setAppealOpen] = useState(false);
+  const [appealRemark, setAppealRemark] = useState("");
+  const [appealBusy, setAppealBusy] = useState(false);
 
   const state = useAsync(
     () => api<{ listing: ListingDetailType; related: ListingSummary[] }>(`/listings/${id}`),
@@ -171,12 +174,45 @@ export function ListingDetail() {
     }
     if (listing.status === "REJECTED") {
       return (
-        <div className="reject-reason">
-          <strong>Annonce refusée.</strong>
-          {listing.rejectionReason ? <p className="mt-1">{listing.rejectionReason}</p> : null}
-          <p className="mt-2">
-            Modifiez l'annonce puis soumettez-la à nouveau pour une nouvelle vérification.
-          </p>
+        <div className="reject-reason stack" style={{ gap: 8, padding: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name="alert" size={18} style={{ color: "var(--danger)" }} />
+            <strong>{lang === "ar" ? "تم رفض الإعلان من قبل الإدارة" : "Annonce refusée par la modération."}</strong>
+          </div>
+          {listing.rejectionReason ? (
+            <p className="mt-1" style={{ color: "var(--danger)", fontWeight: 500 }}>
+              <strong>{lang === "ar" ? "سبب الرفض :" : "Motif :"}</strong> {listing.rejectionReason}
+            </p>
+          ) : null}
+          {listing.sellerRemark ? (
+            <div
+              style={{
+                padding: "8px 12px",
+                borderRadius: "var(--radius-sm)",
+                background: "var(--surface)",
+                border: "1px solid var(--line)",
+                fontSize: "0.85rem",
+              }}
+            >
+              💬 <strong>{lang === "ar" ? "توضيحك المرسل للإدارة :" : "Votre remarque envoyée :"}</strong>{" "}
+              {listing.sellerRemark}
+            </div>
+          ) : null}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setAppealRemark(listing.sellerRemark || "");
+                setAppealOpen(true);
+              }}
+            >
+              💬 {lang === "ar" ? "إرسال توضيح / ملاحظة للإدارة" : "Envoyer une remarque à l'admin"}
+            </Button>
+            <Link to={`/vendre/${listing.id}`} className="btn btn-sm btn-outline">
+              <Icon name="edit" size={14} /> {t("common.edit")}
+            </Link>
+          </div>
         </div>
       );
     }
@@ -299,6 +335,7 @@ export function ListingDetail() {
             <div className="seller-card">
               <Avatar
                 name={listing.seller.storeName || listing.seller.displayName}
+                imageUrl={listing.seller.logoUrl || listing.seller.avatarUrl}
                 size="lg"
                 withGreenRing={true}
               />
@@ -595,9 +632,88 @@ export function ListingDetail() {
         }
       >
         <p className="small">
-          Cette action est définitive. Les photos seront également supprimées. Seules les annonces
-          en brouillon, refusées ou archivées peuvent être supprimées.
+          Cette action est définitive. L'annonce ainsi que ses photos associées seront définitivement supprimées.
         </p>
+      </Dialog>
+
+      {/* Appeal / Remark dialog */}
+      <Dialog
+        open={appealOpen}
+        onClose={() => setAppealOpen(false)}
+        title={lang === "ar" ? "إرسال ملاحظة وتوضيح للإدارة" : "Envoyer une remarque à l'administrateur"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAppealOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              loading={appealBusy}
+              disabled={!appealRemark.trim()}
+              onClick={async () => {
+                if (!appealRemark.trim()) return;
+                setAppealBusy(true);
+                try {
+                  await api(`/listings/${listing.id}/appeal`, {
+                    method: "POST",
+                    body: JSON.stringify({ remark: appealRemark.trim() }),
+                  });
+                  push(
+                    lang === "ar"
+                      ? "تم إرسال توضيحك بنجاح، وتمت إعادة توجيه الإعلان للمراجعة !"
+                      : "Remarque transmise à l'administrateur ! L'annonce est de nouveau en cours d'examen.",
+                    "success",
+                  );
+                  setAppealOpen(false);
+                  state.reload();
+                } catch (err) {
+                  push(errorMessage(err), "error");
+                } finally {
+                  setAppealBusy(false);
+                }
+              }}
+            >
+              {lang === "ar" ? "إرسال التوضيح" : "Envoyer la remarque"}
+            </Button>
+          </>
+        }
+      >
+        <div className="stack" style={{ gap: 12 }}>
+          {listing.rejectionReason ? (
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "rgba(239, 68, 68, 0.08)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "0.85rem",
+                color: "var(--danger)",
+              }}
+            >
+              <strong>{lang === "ar" ? "سبب الرفض :" : "Motif de refus :"}</strong> {listing.rejectionReason}
+            </div>
+          ) : null}
+          <Field
+            label={lang === "ar" ? "توضيحك أو ردك على سبب الرفض" : "Votre explication / justificatif"}
+            htmlFor="detail-appeal-text"
+            hint={
+              lang === "ar"
+                ? "اشرح للإدارة لماذا السعر دقيق ومبرر لمراجعة إعلانك مجدداً."
+                : "Expliquez à l'admin les détails nécessaires (prix réel vérifié, conformité...)."
+            }
+            required
+          >
+            <Textarea
+              id="detail-appeal-text"
+              rows={4}
+              value={appealRemark}
+              onChange={(e) => setAppealRemark(e.target.value)}
+              placeholder={
+                lang === "ar"
+                  ? "اكتب توضيحك هنا للإدارة..."
+                  : "Ex. Le prix est justifié car l'appareil est comme neuf avec facture et accessoires..."
+              }
+            />
+          </Field>
+        </div>
       </Dialog>
     </div>
   );

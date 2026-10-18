@@ -551,3 +551,121 @@ export async function translateDescriptionText(
 
   return text;
 }
+
+export interface AutoFillListingInput {
+  itemType: string;
+  draftTitle?: string;
+  image?: {
+    mimeType: string;
+    data: string; // base64
+  };
+  categories: { id: number; nameFr: string; nameAr: string }[];
+  lang?: "fr" | "ar";
+}
+
+export interface AutoFillListingResult {
+  title: string;
+  categoryId: number;
+  condition: string;
+  description: string;
+  suggestedPriceDa?: number | null;
+}
+
+/**
+ * AI Magic Wand (3assa al IA) : analyzes uploaded image and/or draft title
+ * to auto-fill title, category, condition, description, and price recommendation.
+ */
+export async function autoFillListing(
+  env: Env,
+  input: AutoFillListingInput,
+): Promise<AutoFillListingResult> {
+  const isAr = input.lang === "ar";
+  const catList = input.categories
+    .map((c) => `- ID ${c.id}: ${c.nameFr} (${c.nameAr})`)
+    .join("\n");
+
+  const systemInstruction = `
+Tu es l'assistant IA expert de la plateforme e-commerce algérienne "Azar Neɣ".
+Ta mission est d'analyser la photo du produit (ou le titre indicatif s'il s'agit d'un service) et de remplir automatiquement les champs de l'annonce avec une haute précision pour le marché algérien.
+
+Catégories disponibles :
+${catList}
+
+Conditions autorisées (pour les produits) :
+- NEW (Neuf sous emballage)
+- LIKE_NEW (Comme neuf / très peu utilisé)
+- GOOD (Bon état / fonctionne parfaitement)
+- FAIR (État correct)
+- FOR_PARTS (Pour pièces / défectueux)
+
+Consignes strictes :
+1. Titre : concis, professionnel et vendeur (ex: "Apple iPhone 13 128Go Bleu Nuit" ou "Perceuse Bosch Professional 750W").
+2. CategoryId : choisis l'identifiant numérique le plus pertinent parmi la liste fournie ci-dessus.
+3. Condition : détermine la condition basée sur la photo ou par défaut GOOD. (Pour un service, mets "NEW").
+4. Description : description claire, attrayante et structurée avec puces (Caractéristiques, État réel, Accessoires inclus, Modalités de remise). N'invente pas de fausses caractéristiques.
+5. SuggestedPriceDa : estimation réaliste du prix en Dinars Algériens (DA) selon la valeur marchande en Algérie, ou null si impossible à estimer.
+
+FORMAT DE SORTIE : Réponds UNIQUEMENT par un objet JSON valide, sans texte additionnel, sans balises markdown.
+Exemple:
+{"title":"...","categoryId":1,"condition":"GOOD","description":"...","suggestedPriceDa":45000}
+`.trim();
+
+  const userPrompt = `
+Type d'offre : ${input.itemType === "SERVICE" ? "Service / Prestation" : "Produit physique"}
+Titre indicatif : ${input.draftTitle || (isAr ? "حلل الصورة واملأ البيانات" : "Analyse l'image et remplis les données")}
+Langue souhaitée : ${isAr ? "Arabe" : "Français"}
+${input.image ? "Une photo est jointe ci-dessous." : ""}
+`.trim();
+
+  const parts: GeminiPart[] = [];
+  if (input.image?.data) {
+    parts.push({
+      inlineData: {
+        mimeType: input.image.mimeType || "image/jpeg",
+        data: input.image.data,
+      },
+    });
+  }
+  parts.push({ text: userPrompt });
+
+  const response = await callGemini(env, [{ role: "user", parts }], systemInstruction);
+
+  let parsed: any = null;
+  if (response) {
+    try {
+      const cleanJson = response.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      // JSON parse fallback
+    }
+  }
+
+  const defaultCategory = input.categories[0]?.id ?? 1;
+  const validCategoryIds = new Set(input.categories.map((c) => c.id));
+  const finalCatId =
+    parsed?.categoryId && validCategoryIds.has(Number(parsed.categoryId))
+      ? Number(parsed.categoryId)
+      : defaultCategory;
+
+  const validConditions = new Set(["NEW", "LIKE_NEW", "GOOD", "FAIR", "FOR_PARTS"]);
+  const finalCondition =
+    parsed?.condition && validConditions.has(parsed.condition) ? parsed.condition : "GOOD";
+
+  return {
+    title:
+      parsed?.title?.trim() ||
+      input.draftTitle?.trim() ||
+      (isAr ? "منتج معروض للبيع" : "Article à vendre"),
+    categoryId: finalCatId,
+    condition: finalCondition,
+    description:
+      parsed?.description?.trim() ||
+      (isAr
+        ? "منتج بحالة جيدة معروض للبيع على منصة أزار نغ."
+        : "Article en bon état disponible sur Azar Neɣ."),
+    suggestedPriceDa:
+      typeof parsed?.suggestedPriceDa === "number" && parsed.suggestedPriceDa > 0
+        ? Math.round(parsed.suggestedPriceDa)
+        : null,
+  };
+}

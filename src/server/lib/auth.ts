@@ -33,6 +33,7 @@ interface SessionRow {
   longitude: number | null;
   opening_hours: string | null;
   banner_url: string | null;
+  logo_url: string | null;
 }
 
 function rowToUser(row: SessionRow): AuthUser {
@@ -57,6 +58,7 @@ function rowToUser(row: SessionRow): AuthUser {
     longitude: row.longitude,
     openingHours: row.opening_hours,
     bannerUrl: row.banner_url,
+    logoUrl: row.logo_url,
   };
 }
 
@@ -79,7 +81,7 @@ export async function authenticateRequest(
         s.id AS session_id, s.expires_at, s.last_seen_at,
         u.id AS user_id, u.email, u.role, u.status, u.avatar_url,
         p.display_name, p.phone, p.phone_public, p.whatsapp_public, p.wilaya_id, p.bio, p.onboarded_at,
-        p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude, p.opening_hours, p.banner_url
+        p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude, p.opening_hours, p.banner_url, p.logo_url
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      LEFT JOIN seller_profiles p ON p.user_id = u.id

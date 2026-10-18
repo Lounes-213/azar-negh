@@ -54,6 +54,7 @@ function serializeUser(user: AuthUser, csrfToken: string | null) {
     longitude: user.longitude ?? null,
     openingHours: user.openingHours ?? null,
     bannerUrl: user.bannerUrl ?? null,
+    logoUrl: user.logoUrl ?? null,
     csrfToken: csrfToken ?? "",
   };
 }
@@ -487,7 +488,7 @@ authRoutes.patch("/store", async (c) => {
   const now = nowIso();
   await c.env.DB.prepare(
     `UPDATE seller_profiles
-     SET display_name = ?, store_name = ?, store_slug = ?, commune = ?, address = ?,
+     SET display_name = ?, store_name = ?, store_slug = ?, logo_url = ?, commune = ?, address = ?,
          latitude = ?, longitude = ?, opening_hours = ?, banner_url = ?,
          phone = ?, phone_public = ?, whatsapp_public = ?, wilaya_id = ?,
          bio = ?, onboarded_at = COALESCE(onboarded_at, ?), updated_at = ?
@@ -497,6 +498,7 @@ authRoutes.patch("/store", async (c) => {
       input.displayName,
       input.storeName?.trim() || null,
       input.storeSlug?.trim().toLowerCase() || null,
+      input.logoUrl?.trim() || null,
       input.commune?.trim() || null,
       input.address?.trim() || null,
       input.latitude ?? null,
@@ -523,7 +525,7 @@ authRoutes.patch("/store", async (c) => {
 
   const updated = await c.env.DB.prepare(
     `SELECT display_name, phone, phone_public, whatsapp_public, wilaya_id, bio, onboarded_at,
-            store_name, store_slug, commune, address, latitude, longitude, opening_hours, banner_url
+            store_name, store_slug, logo_url, commune, address, latitude, longitude, opening_hours, banner_url
      FROM seller_profiles WHERE user_id = ?`,
   )
     .bind(user.id)
@@ -537,6 +539,7 @@ authRoutes.patch("/store", async (c) => {
       onboarded_at: string | null;
       store_name: string | null;
       store_slug: string | null;
+      logo_url: string | null;
       commune: string | null;
       address: string | null;
       latitude: number | null;
@@ -557,6 +560,7 @@ authRoutes.patch("/store", async (c) => {
     profileComplete: true,
     storeName: updated.store_name,
     storeSlug: updated.store_slug,
+    logoUrl: updated.logo_url,
     commune: updated.commune,
     address: updated.address,
     latitude: updated.latitude,

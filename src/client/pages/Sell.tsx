@@ -72,6 +72,56 @@ export function Sell() {
   }, [existing.data, loaded]);
 
   const [aiBusy, setAiBusy] = useState(false);
+  const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
+
+  const handleAiAutoFill = async () => {
+    if (itemType === "PRODUCT" && images.length === 0) {
+      push(
+        lang === "ar"
+          ? "يرجى تحميل صورة واحدة على الأقل لتفعيل عصا الذكاء الاصطناعي."
+          : "Veuillez téléverser au moins une photo pour activer la baguette magique IA.",
+        "error",
+      );
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const res = await api<{
+        title: string;
+        categoryId: number;
+        condition: string;
+        description: string;
+        suggestedPriceDa?: number | null;
+      }>("/ai/assist", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "auto_fill",
+          imageId: images[0]?.id,
+          title: title.trim() || undefined,
+          itemType,
+          lang: lang === "ar" ? "ar" : "fr",
+        }),
+      });
+
+      if (res.title && !editing) setTitle(res.title);
+      if (res.categoryId) setCategoryId(String(res.categoryId));
+      if (res.condition && itemType !== "SERVICE") setCondition(res.condition);
+      if (res.description) setDescription(res.description);
+      if (res.suggestedPriceDa && !editing) {
+        setSuggestedPrice(res.suggestedPriceDa);
+      }
+      push(
+        lang === "ar"
+          ? "✨ تم استخراج وتعبئة بيانات الإعلان بنجاح بواسطة عصا الذكاء الاصطناعي !"
+          : "✨ Informations remplies avec succès par la baguette magique IA !",
+        "success",
+      );
+    } catch (err) {
+      push(errorMessage(err), "error");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const categoryOptions = useMemo(() => {
     const options: { id: number; label: string; depth: number }[] = [];
@@ -287,8 +337,11 @@ export function Sell() {
     if (description.trim().length < 20)
       next.description = "Description trop courte (20 caractères minimum).";
     if (!priceDa || Number(priceDa) < 0) next.priceDa = "Indiquez un prix valide.";
-    if (images.length === 0) {
-      next.images = lang === "ar" ? "يجب إضافة صورة واحدة على الأقل للإعلان (إلزامية)." : "Au moins une photo est obligatoire pour publier l'annonce.";
+    if (itemType === "PRODUCT" && images.length === 0) {
+      next.images =
+        lang === "ar"
+          ? "يجب إضافة صورة واحدة على الأقل للمنتج (إلزامية)."
+          : "Au moins une photo est obligatoire pour un produit physique.";
     }
     if (images.length > 3) {
       next.images = lang === "ar" ? "3 صور كحد أقصى لكل إعلان." : "3 photos maximum par annonce.";
@@ -304,7 +357,7 @@ export function Sell() {
     wilayaId: Number(wilayaId),
     priceDa: Number(priceDa || 0),
     negotiable,
-    condition,
+    condition: itemType === "SERVICE" ? "NEW" : condition,
     itemType,
     contactPhone: contactPhone.trim() || null,
     contactPhonePublic,
@@ -412,6 +465,16 @@ export function Sell() {
 
           {step === 1 ? (
             <div className="panel stack">
+              {editing ? (
+                <div style={{ marginBottom: 12 }}>
+                  <Alert tone="info">
+                    {lang === "ar"
+                      ? "🔒 لحماية مصداقية الأسعار المعتمدة على منصة أزار نغ، فإن عنوان الإعلان وسعره مقفلان ولا يمكن تعديلهما."
+                      : "🔒 Par souci de crédibilité des prix réels sur Azar Neɣ, le titre et le prix de l'annonce sont verrouillés après publication."}
+                  </Alert>
+                </div>
+              ) : null}
+
               <div>
                 <label className="field-label" style={{ fontWeight: 600, marginBottom: 8, display: "block" }}>
                   {lang === "ar" ? "نوع العرض" : "Type d'offre"} <span style={{ color: "var(--danger)" }}>*</span>
@@ -468,19 +531,226 @@ export function Sell() {
                 </div>
               </div>
 
+              {/* Photo Upload & AI Magic Wand Section (3assa al IA) */}
+              <div
+                style={{
+                  padding: "16px",
+                  background: "var(--surface-muted)",
+                  borderRadius: "var(--radius-lg)",
+                  border: "1px dashed var(--line)",
+                  marginTop: 4,
+                  marginBottom: 6,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "0.95rem",
+                        color: "var(--ink)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Icon name="image" size={17} style={{ color: "var(--brand-600)" }} />
+                      <span>{lang === "ar" ? "صور الإعلان (1 إلى 3 صور)" : "Photos de l'annonce (1 à 3 photos)"}</span>
+                      {itemType === "PRODUCT" ? <span style={{ color: "var(--danger)" }}>*</span> : null}
+                    </div>
+                    <p className="small muted" style={{ margin: "2px 0 0" }}>
+                      {itemType === "PRODUCT"
+                        ? (lang === "ar"
+                            ? "حمّل صور منتجك أولاً لتفعيل عصا الذكاء الاصطناعي وملء الحقول تلقائياً."
+                            : "Téléversez vos photos d'abord pour activer la baguette magique IA.")
+                        : (lang === "ar"
+                            ? "أضف صور توضيحية لخدمتك (اختياري حتى 3 صور)."
+                            : "Ajoutez des photos illustrant votre service (facultatif, max 3).")}
+                    </p>
+                  </div>
+
+                  {/* Baguette Magique IA (3assa al IA) */}
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={handleAiAutoFill}
+                    disabled={aiBusy || (itemType === "PRODUCT" && images.length === 0)}
+                    title={
+                      itemType === "PRODUCT" && images.length === 0
+                        ? (lang === "ar"
+                            ? "حمّل صورة واحدة على الأقل لتفعيل عصا الذكاء الاصطناعي"
+                            : "Ajoutez au moins 1 photo pour activer la baguette magique IA")
+                        : (lang === "ar"
+                            ? "تحليل الصور وتعبئة بيانات الإعلان تلقائياً بالذكاء الاصطناعي"
+                            : "Analyser et pré-remplir automatiquement avec Gemini IA")
+                    }
+                    style={{
+                      background:
+                        images.length > 0 || itemType === "SERVICE"
+                          ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                          : "var(--surface)",
+                      color: images.length > 0 || itemType === "SERVICE" ? "#fff" : "var(--ink-muted)",
+                      border: images.length > 0 || itemType === "SERVICE" ? "none" : "1px solid var(--line)",
+                      borderRadius: "var(--radius-pill)",
+                      padding: "8px 16px",
+                      fontWeight: 700,
+                      fontSize: "0.88rem",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      boxShadow:
+                        images.length > 0 || itemType === "SERVICE"
+                          ? "0 4px 12px rgba(16, 185, 129, 0.3)"
+                          : "none",
+                      cursor:
+                        itemType === "PRODUCT" && images.length === 0 ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {aiBusy ? (
+                      <Spinner />
+                    ) : (
+                      <span style={{ fontSize: "1.15rem" }}>✨</span>
+                    )}
+                    <span>
+                      {aiBusy
+                        ? (lang === "ar" ? "جاري التحليل والتعبئة..." : "Analyse IA en cours...")
+                        : (lang === "ar" ? "عصا الذكاء الاصطناعي" : "Baguette Magique IA")}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Thumbnails + Upload Slot */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  {images.map((image) => (
+                    <div
+                      key={image.id}
+                      style={{
+                        position: "relative",
+                        width: 80,
+                        height: 80,
+                        borderRadius: "var(--radius-md)",
+                        overflow: "hidden",
+                        border: "2px solid var(--brand-500)",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      <img
+                        src={image.url}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(image)}
+                        style={{
+                          position: "absolute",
+                          top: 3,
+                          right: 3,
+                          background: "rgba(0,0,0,0.65)",
+                          color: "#fff",
+                          border: 0,
+                          borderRadius: "50%",
+                          width: 22,
+                          height: 22,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                        }}
+                        title={lang === "ar" ? "حذف الصورة" : "Supprimer"}
+                      >
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {images.length < 3 ? (
+                    <label
+                      style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: "var(--radius-md)",
+                        border: "2px dashed var(--brand-300)",
+                        background: "var(--surface)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                        cursor: uploading ? "wait" : "pointer",
+                        color: "var(--brand-700)",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        disabled={uploading}
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          void uploadFiles(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                      {uploading ? (
+                        <Spinner />
+                      ) : (
+                        <>
+                          <Icon name="plus" size={20} />
+                          <span>{lang === "ar" ? "إضافة صورة" : "Ajouter"}</span>
+                        </>
+                      )}
+                    </label>
+                  ) : null}
+                </div>
+
+                {itemType === "PRODUCT" && images.length === 0 ? (
+                  <div style={{ marginTop: 8, fontSize: "0.82rem", color: "var(--ink-muted)" }}>
+                    {lang === "ar"
+                      ? "💡 حمّل صورة واحدة على الأقل لتفعيل عصا الذكاء الاصطناعي (تتعرف على المنتج وتملأ الاسم، الفئة، الحالة، والوصف تلقائياً)!"
+                      : "💡 Téléversez au moins 1 photo pour activer la baguette IA (analyse le produit et pré-remplit le titre, catégorie, état et description) !"}
+                  </div>
+                ) : null}
+              </div>
+
               <Field
                 label={lang === "ar" ? "عنوان الإعلان" : "Titre de l'annonce"}
                 htmlFor="sell-title"
                 error={fields.title}
                 required
-                hint={lang === "ar" ? "من 8 إلى 100 حرف. كن دقيقاً في الوصف." : "8 à 100 caractères. Soyez précis."}
+                hint={
+                  editing
+                    ? lang === "ar"
+                      ? "🔒 لا يمكن تعديل العنوان بعد النشر لضمان مصداقية الأسعار."
+                      : "🔒 Verrouillé après publication pour garantir l'intégrité de nos prix vérifiés."
+                    : lang === "ar"
+                      ? "من 8 إلى 100 حرف. كن دقيقاً في الوصف أو استعن بعصا الذكاء الاصطناعي."
+                      : "8 à 100 caractères. Soyez précis ou utilisez la baguette magique IA."
+                }
               >
                 <Input
                   id="sell-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   maxLength={100}
-                  placeholder="Ex. iPhone 13 Pro 256 Go — très bon état"
+                  disabled={editing}
+                  placeholder={
+                    itemType === "SERVICE"
+                      ? "Ex. Réparation smartphones et tablettes à domicile"
+                      : "Ex. iPhone 13 Pro 256 Go — très bon état"
+                  }
                 />
               </Field>
 
@@ -516,10 +786,25 @@ export function Sell() {
                   />
                 </Field>
                 <Field
-                  label={`${t("common.price")} (DA)`}
+                  label={
+                    itemType === "SERVICE"
+                      ? lang === "ar"
+                        ? "تعريفة الخدمة (دج) أو ابتداءً من"
+                        : "Tarif indicatif / À partir de (DA)"
+                      : `${t("common.price")} (DA)`
+                  }
                   htmlFor="sell-price"
                   error={fields.priceDa}
                   required
+                  hint={
+                    editing
+                      ? lang === "ar"
+                        ? "🔒 السعر مقفل لحماية مصداقية المنصة. لتعديل السعر يرجى التواصل مع الإدارة."
+                        : "🔒 Prix verrouillé pour protéger la crédibilité de la plateforme."
+                      : lang === "ar"
+                        ? "⚠️ يجب إدخال السعر الحقيقي الفعلي. الأسعار الوهمية أو غير الواقعية تُرفض من طرف الإدارة."
+                        : "⚠️ Prix réel vérifié requis. Tout prix trompeur ou fictif sera rejeté par l'admin."
+                  }
                 >
                   <Input
                     id="sell-price"
@@ -529,18 +814,44 @@ export function Sell() {
                     max={1_000_000_000}
                     value={priceDa}
                     onChange={(event) => setPriceDa(event.target.value)}
+                    disabled={editing}
                     placeholder="0"
                   />
                 </Field>
-                <Field label={t("common.condition")} htmlFor="sell-condition" required>
-                  <CustomSelect
-                    id="sell-condition"
-                    value={condition}
-                    onChange={setCondition}
-                    options={conditionSelectOptions}
-                  />
-                </Field>
+                {itemType !== "SERVICE" ? (
+                  <Field label={t("common.condition")} htmlFor="sell-condition" required>
+                    <CustomSelect
+                      id="sell-condition"
+                      value={condition}
+                      onChange={setCondition}
+                      options={conditionSelectOptions}
+                    />
+                  </Field>
+                ) : null}
               </div>
+
+              {suggestedPrice && !editing ? (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "var(--radius-md)",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    border: "1px solid var(--brand-300)",
+                    fontSize: "0.88rem",
+                    color: "var(--brand-800)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem" }}>💡</span>
+                  <span>
+                    {lang === "ar"
+                      ? `تقدير مقترح من الذكاء الاصطناعي: ~${formatPrice(suggestedPrice)} دج. يرجى إدخال سعرك الحقيقي الفعلي في حقل السعر.`
+                      : `Estimation suggérée par l'IA : ~${formatPrice(suggestedPrice)} DA. Saisissez votre prix de vente réel vérifié.`}
+                  </span>
+                </div>
+              ) : null}
 
               <label className="checkbox">
                 <input

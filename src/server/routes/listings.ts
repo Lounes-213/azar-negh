@@ -263,6 +263,16 @@ listingRoutes.patch("/listings/:id", async (c) => {
   await assertWilaya(c.env.DB, input.wilayaId);
   const maxImages = Number(c.env.MAX_IMAGES_PER_LISTING || "6");
 
+  // Price credibility rule: if listing is not DRAFT, title & price are immutable
+  const isLocked = raw.status !== "DRAFT";
+  const currentRecord = await c.env.DB.prepare(
+    "SELECT title, price_da FROM listings WHERE id = ?",
+  )
+    .bind(id)
+    .first<{ title: string; price_da: number }>();
+  const finalTitle = isLocked && currentRecord ? currentRecord.title : input.title;
+  const finalPrice = isLocked && currentRecord ? currentRecord.price_da : input.priceDa;
+
   await c.env.DB.prepare(
     `UPDATE listings SET
        category_id = ?, wilaya_id = ?, title = ?, description = ?, price_da = ?, negotiable = ?,
@@ -273,9 +283,9 @@ listingRoutes.patch("/listings/:id", async (c) => {
     .bind(
       input.categoryId,
       input.wilayaId,
-      input.title,
+      finalTitle,
       input.description,
-      input.priceDa,
+      finalPrice,
       input.negotiable ? 1 : 0,
       input.condition as ListingCondition,
       input.itemType,
@@ -411,22 +421,18 @@ listingRoutes.delete("/listings/:id", async (c) => {
   const id = c.req.param("id");
   const raw = await loadRawListing(c.env.DB, id);
   if (!raw) throw new HttpError(404, "NOT_FOUND", "Annonce introuvable.");
-  if (raw.seller_id !== user.id) throw new HttpError(403, "FORBIDDEN", "Action non autorisée.");
-  if (!["DRAFT", "REJECTED", "ARCHIVED"].includes(raw.status)) {
-    throw new HttpError(
-      409,
-      "DELETE_NOT_ALLOWED",
-      "Archivez l'annonce avant de la supprimer (les annonces publiées ou en vente ne sont pas supprimables directement).",
-    );
+  if (raw.seller_id !== user.id && user.role !== "ADMIN") {
+    throw new HttpError(403, "FORBIDDEN", "Action non autorisée.");
   }
+
   const images = await c.env.DB.prepare("SELECT r2_key FROM listing_images WHERE listing_id = ?")
     .bind(id)
     .all<{ r2_key: string }>();
   for (const image of images.results ?? []) {
     await deleteR2Object(c.env, image.r2_key);
   }
-  await c.env.DB.prepare("DELETE FROM listings WHERE id = ? AND seller_id = ?")
-    .bind(id, user.id)
+  await c.env.DB.prepare("DELETE FROM listings WHERE id = ?")
+    .bind(id)
     .run();
   await recordAudit(c.env.DB, {
     actorId: user.id,
@@ -436,6 +442,47 @@ listingRoutes.delete("/listings/:id", async (c) => {
     metadata: { title: raw.title, status: raw.status },
   });
   return c.body(null, 204);
+});
+
+listingRoutes.post("/listings/:id/appeal", async (c) => {
+  const user = requireUser(c);
+  assertCsrf(c);
+  const id = c.req.param("id");
+  const raw = await loadRawListing(c.env.DB, id);
+  if (!raw) throw new HttpError(404, "NOT_FOUND", "Annonce introuvable.");
+  if (raw.seller_id !== user.id) {
+    throw new HttpError(403, "FORBIDDEN", "Cette annonce ne vous appartient pas.");
+  }
+
+  const body = await c.req.json<{ remark: string }>();
+  const remark = (body.remark || "").trim();
+  if (!remark || remark.length < 3) {
+    throw new HttpError(422, "REMARK_REQUIRED", "Veuillez saisir votre remarque ou justification.");
+  }
+
+  const now = nowIso();
+  await c.env.DB.prepare(
+    "UPDATE listings SET seller_remark = ?, status = 'PENDING', submitted_at = ?, updated_at = ? WHERE id = ?",
+  )
+    .bind(remark, now, now, id)
+    .run();
+
+  await notifyStaff(c.env, ["MODERATOR", "ADMIN"], {
+    type: "LISTING_SUBMITTED",
+    title: "Remarque d'un vendeur sur annonce refusée",
+    body: `${raw.title} : ${remark.slice(0, 100)}`,
+    link: `/mod/annonces/${id}`,
+  });
+
+  await recordAudit(c.env.DB, {
+    actorId: user.id,
+    action: "LISTING_APPEAL_SUBMITTED",
+    entityType: "listing",
+    entityId: id,
+    metadata: { remark },
+  });
+
+  return respondDetail(c, id);
 });
 
 listingRoutes.get("/account/listings", async (c) => {

@@ -154,6 +154,7 @@ export const storeProfileUpdateSchema = z.object({
   longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
   openingHours: z.string().trim().max(120).optional().nullable(),
   bannerUrl: z.string().trim().max(500).optional().nullable(),
+  logoUrl: z.string().trim().max(500).optional().nullable(),
   phone: phoneSchema,
   phonePublic: z.boolean(),
   whatsappPublic: z.boolean(),

@@ -81,6 +81,7 @@ export interface SessionUser {
   longitude?: number | null;
   openingHours?: string | null;
   bannerUrl?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface StoreProfile {
@@ -88,6 +89,8 @@ export interface StoreProfile {
   displayName: string;
   storeName: string | null;
   storeSlug: string | null;
+  logoUrl?: string | null;
+  avatarUrl?: string | null;
   commune: string | null;
   address: string | null;
   latitude: number | null;
@@ -136,6 +139,9 @@ export interface ListingSummary {
   sellerDisplayName: string;
   storeName?: string | null;
   storeSlug?: string | null;
+  sellerAvatarUrl?: string | null;
+  storeLogoUrl?: string | null;
+  sellerRemark?: string | null;
   itemType?: ItemType;
   isFavorite?: boolean;
   rejectionReason?: string | null;
@@ -149,18 +155,25 @@ export type ListingAction = "edit" | "submit" | "mark_sold" | "archive" | "delet
 export interface ListingDetail extends ListingSummary {
   description: string;
   images: ListingImage[];
-  seller: PublicUser & { id: string; storeName?: string | null; storeSlug?: string | null; followersCount?: number; averageRating?: number };
+  seller: PublicUser & {
+    id: string;
+    storeName?: string | null;
+    storeSlug?: string | null;
+    avatarUrl?: string | null;
+    logoUrl?: string | null;
+    followersCount?: number;
+    averageRating?: number;
+  };
   contactPhone: string | null;
   contactPhonePublic: boolean;
   contactWhatsapp: boolean;
   rejectionReason: string | null;
+  sellerRemark?: string | null;
   viewCount: number;
   updatedAt: string;
   allowedActions: ListingAction[];
   isFavorite: boolean;
-  isOwner: boolean;
-  callClicks?: number;
-  orderClicks?: number;
+  isOwner?: boolean;
 }
 
 export interface Paginated<T> {

@@ -40,6 +40,7 @@ export interface AuthUser {
   longitude?: number | null;
   openingHours?: string | null;
   bannerUrl?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface AuthSession {

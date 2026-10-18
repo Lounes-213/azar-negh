@@ -5,9 +5,11 @@ import {
   Button,
   Dialog,
   EmptyState,
+  Field,
   Pagination,
   SkeletonStack,
   StatusBadge,
+  Textarea,
   useToast,
 } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
@@ -27,6 +29,9 @@ export function MyListings() {
   const page = Math.max(1, Number(params.get("page")) || 1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [appealListing, setAppealListing] = useState<ListingSummary | null>(null);
+  const [appealRemark, setAppealRemark] = useState("");
+  const [appealBusy, setAppealBusy] = useState(false);
   useDocumentTitle(t("account.myListings"));
 
   const state = useAsync(
@@ -162,19 +167,76 @@ export function MyListings() {
                           <Icon name="refresh" size={14} /> Remettre en ligne
                         </Button>
                       )}
-                      {["DRAFT", "REJECTED", "ARCHIVED"].includes(listing.status) && (
-                        <Button size="sm" variant="ghost" onClick={() => setDeleteId(listing.id)}>
-                          <Icon name="trash" size={14} /> {t("common.delete")}
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteId(listing.id)}
+                        title={t("common.delete")}
+                        style={{ color: "var(--danger)" }}
+                      >
+                        <Icon name="trash" size={14} /> {t("common.delete")}
+                      </Button>
                     </>
                   }
                 />
-                {listing.rejectionReason ? (
-                  <p className="reject-reason" style={{ marginTop: 6 }}>
-                    <strong>Motif :</strong> {listing.rejectionReason}
-                  </p>
-                ) : null}
+                {listing.status === "REJECTED" && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "10px 12px",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      borderRadius: "var(--radius-md)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "var(--danger)",
+                        fontWeight: 600,
+                        fontSize: "0.88rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <Icon name="alert" size={15} />
+                      <span>
+                        {lang === "ar" ? "سبب رفض الإعلان :" : "Motif de refus :"} {listing.rejectionReason || (lang === "ar" ? "السعر أو البيانات بحاجة لمراجعة" : "Données ou prix à vérifier")}
+                      </span>
+                    </div>
+
+                    {listing.sellerRemark ? (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          padding: "6px 10px",
+                          background: "var(--surface)",
+                          borderRadius: "var(--radius-sm)",
+                          fontSize: "0.82rem",
+                          color: "var(--ink-muted)",
+                          border: "1px solid var(--line)",
+                        }}
+                      >
+                        💬 <strong>{lang === "ar" ? "توضيحك المرسل للإدارة :" : "Votre remarque envoyée :"}</strong>{" "}
+                        {listing.sellerRemark}
+                      </div>
+                    ) : null}
+
+                    <div style={{ marginTop: 8 }}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setAppealListing(listing);
+                          setAppealRemark(listing.sellerRemark || "");
+                        }}
+                        style={{ fontSize: "0.82rem", padding: "4px 10px" }}
+                      >
+                        💬 {lang === "ar" ? "إرسال توضيح / ملاحظة للإدارة" : "Envoyer une remarque à l'admin"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <p className="small muted" style={{ padding: "6px 4px" }}>
                   <StatusBadge status={listing.status} /> Mis à jour le{" "}
                   {formatDate(listing.publishedAt ?? listing.createdAt, lang)}
@@ -194,6 +256,7 @@ export function MyListings() {
         </>
       )}
 
+      {/* Confirmation modal for delete */}
       <Dialog
         open={Boolean(deleteId)}
         onClose={() => setDeleteId(null)}
@@ -227,6 +290,90 @@ export function MyListings() {
         }
       >
         <p className="small">Cette action est définitive et supprime aussi les photos.</p>
+      </Dialog>
+
+      {/* Appeal / Remark to Admin dialog */}
+      <Dialog
+        open={Boolean(appealListing)}
+        onClose={() => setAppealListing(null)}
+        title={lang === "ar" ? "إرسال ملاحظة وتوضيح للإدارة" : "Envoyer une remarque à l'administrateur"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAppealListing(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              loading={appealBusy}
+              disabled={!appealRemark.trim()}
+              onClick={async () => {
+                if (!appealListing || !appealRemark.trim()) return;
+                setAppealBusy(true);
+                try {
+                  await api(`/listings/${appealListing.id}/appeal`, {
+                    method: "POST",
+                    body: JSON.stringify({ remark: appealRemark.trim() }),
+                  });
+                  push(
+                    lang === "ar"
+                      ? "تم إرسال توضيحك بنجاح، وتمت إعادة توجيه الإعلان للمراجعة !"
+                      : "Remarque transmise à l'administrateur ! L'annonce est de nouveau en révision.",
+                    "success",
+                  );
+                  setAppealListing(null);
+                  setAppealRemark("");
+                  state.reload();
+                } catch (err) {
+                  push(errorMessage(err), "error");
+                } finally {
+                  setAppealBusy(false);
+                }
+              }}
+            >
+              {lang === "ar" ? "إرسال التوضيح" : "Envoyer la remarque"}
+            </Button>
+          </>
+        }
+      >
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="small">
+            <strong>{lang === "ar" ? "الإعلان :" : "Annonce :"}</strong> {appealListing?.title}
+          </div>
+          {appealListing?.rejectionReason ? (
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "rgba(239, 68, 68, 0.08)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "0.85rem",
+                color: "var(--danger)",
+              }}
+            >
+              <strong>{lang === "ar" ? "سبب الرفض :" : "Motif de refus :"}</strong> {appealListing.rejectionReason}
+            </div>
+          ) : null}
+          <Field
+            label={lang === "ar" ? "توضيحك أو ردك على سبب الرفض" : "Votre explication / justificatif"}
+            htmlFor="appeal-text"
+            hint={
+              lang === "ar"
+                ? "اشرح للإدارة لماذا السعر دقيق أو مبرر، وسيتم مراجعة إعلانك مرة أخرى."
+                : "Expliquez à l'admin les détails nécessaires (prix réel vérifié, factures, détails...)."
+            }
+            required
+          >
+            <Textarea
+              id="appeal-text"
+              rows={4}
+              value={appealRemark}
+              onChange={(e) => setAppealRemark(e.target.value)}
+              placeholder={
+                lang === "ar"
+                  ? "اكتب توضيحك هنا للإدارة (مثال: السعر مبرر لأن الهاتف بحالة ممتازة مع العلبة الأصلية والشاحن...)"
+                  : "Ex. Le prix est justifié car l'appareil est comme neuf avec facture d'achat et accessoires d'origine..."
+              }
+            />
+          </Field>
+        </div>
       </Dialog>
     </div>
   );

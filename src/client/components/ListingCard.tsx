@@ -188,13 +188,47 @@ export function ListingCard({
           )}
         </div>
 
-        {/* Shop / Store Row */}
+        {/* Shop / Store Row with Store Logo or Seller Avatar */}
         <div className="ali-store-footer">
           <Link
             to={listing.storeSlug ? `/vendeurs/${listing.storeSlug}` : `/vendeurs/${listing.id}`}
             className="ali-store-link"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            <Icon name="store" size={13} />
+            {listing.storeLogoUrl || listing.sellerAvatarUrl ? (
+              <img
+                src={listing.storeLogoUrl || listing.sellerAvatarUrl!}
+                alt=""
+                className="ali-store-avatar"
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "1.5px solid var(--brand-500)",
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  background: "rgba(16, 185, 129, 0.15)",
+                  color: "var(--brand-700)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  border: "1px solid var(--brand-300)",
+                }}
+              >
+                {(listing.storeName || listing.sellerDisplayName || "V").charAt(0).toUpperCase()}
+              </div>
+            )}
             <span className="ali-store-name truncate">
               {listing.storeName || listing.sellerDisplayName}
             </span>

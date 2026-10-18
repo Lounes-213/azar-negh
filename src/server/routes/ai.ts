@@ -4,6 +4,7 @@ import { HttpError, parseJson } from "../lib/http";
 import { hashIp, requestIp } from "../lib/auth";
 import { consumeRateLimit } from "../lib/rate-limit";
 import {
+  autoFillListing,
   chatWithAzarBot,
   generateListingDescription,
   improveDescriptionText,
@@ -286,7 +287,7 @@ aiRoutes.post("/ai/chat", async (c) => {
 });
 
 const aiAssistSchema = z.object({
-  action: z.enum(["generate", "improve", "translate"]),
+  action: z.enum(["generate", "improve", "translate", "auto_fill"]),
   title: z.string().max(120).optional(),
   categoryName: z.string().max(80).optional(),
   wilayaName: z.string().max(80).optional(),
@@ -296,6 +297,9 @@ const aiAssistSchema = z.object({
   text: z.string().max(4000).optional(),
   lang: z.enum(["fr", "ar"]).optional(),
   targetLang: z.enum(["fr", "ar"]).optional(),
+  imageId: z.string().optional(),
+  imageBase64: z.string().max(7 * 1024 * 1024).optional(),
+  imageMimeType: z.string().max(50).optional(),
 });
 
 aiRoutes.post("/ai/assist", async (c) => {
@@ -310,6 +314,58 @@ aiRoutes.post("/ai/assist", async (c) => {
   }
 
   const input = await parseJson(c, aiAssistSchema);
+
+  if (input.action === "auto_fill") {
+    let imageData = input.imageBase64;
+    let mimeType = input.imageMimeType || "image/jpeg";
+
+    if (!imageData && input.imageId) {
+      try {
+        const imgRow = await c.env.DB.prepare(
+          "SELECT r2_key, content_type FROM listing_images WHERE id = ?",
+        )
+          .bind(input.imageId)
+          .first<{ r2_key: string; content_type: string }>();
+
+        if (imgRow) {
+          mimeType = imgRow.content_type || "image/jpeg";
+          const obj = await c.env.IMAGES.get(imgRow.r2_key);
+          if (obj) {
+            const buf = await obj.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            let binary = "";
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+              binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+            }
+            imageData = btoa(binary);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load image from R2 for auto_fill:", err);
+      }
+    }
+
+    const catRows = await c.env.DB.prepare(
+      "SELECT id, name_fr, name_ar FROM categories WHERE is_active = 1 ORDER BY sort_order ASC",
+    ).all<{ id: number; name_fr: string; name_ar: string }>();
+
+    const categories = (catRows.results ?? []).map((r) => ({
+      id: r.id,
+      nameFr: r.name_fr,
+      nameAr: r.name_ar,
+    }));
+
+    const result = await autoFillListing(c.env, {
+      itemType: input.itemType || "PRODUCT",
+      draftTitle: input.title,
+      image: imageData ? { mimeType, data: imageData } : undefined,
+      categories,
+      lang: input.lang || "ar",
+    });
+
+    return c.json(result);
+  }
 
   if (input.action === "generate") {
     if (!input.title || input.title.trim().length < 2) {

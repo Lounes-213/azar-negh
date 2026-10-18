@@ -14,7 +14,7 @@ sellerRoutes.get("/sellers/:id", async (c) => {
   const viewerId = c.get("user")?.id ?? "";
 
   const seller = await c.env.DB.prepare(
-    `SELECT u.id, u.created_at, u.status, p.display_name, p.phone, p.phone_public,
+    `SELECT u.id, u.created_at, u.status, u.avatar_url, p.display_name, p.logo_url, p.phone, p.phone_public,
             p.whatsapp_public, p.wilaya_id, p.bio, w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
             p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude,
             p.opening_hours, p.banner_url, p.custom_sort_order,
@@ -32,7 +32,9 @@ sellerRoutes.get("/sellers/:id", async (c) => {
       id: string;
       created_at: string;
       status: string;
+      avatar_url: string | null;
       display_name: string;
+      logo_url: string | null;
       phone: string;
       phone_public: number;
       whatsapp_public: number;
@@ -67,10 +69,11 @@ sellerRoutes.get("/sellers/:id", async (c) => {
               w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
               l.category_id, cat.slug AS category_slug, cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
               l.contact_phone, l.contact_phone_public, l.contact_whatsapp, l.last_decision_reason,
-              l.call_clicks, l.order_clicks, l.original_price_da, l.sort_order,
+              l.call_clicks, l.order_clicks, l.original_price_da, l.sort_order, l.seller_remark,
               sp.display_name AS seller_display_name, sp.phone AS seller_phone,
               sp.phone_public AS seller_phone_public, sp.whatsapp_public AS seller_whatsapp_public,
               sp.bio AS seller_bio, sp.wilaya_id AS seller_wilaya_id, u.created_at AS seller_created_at,
+              u.avatar_url AS seller_avatar_url, COALESCE(sp.logo_url, u.avatar_url) AS store_logo_url,
               sp.store_name AS store_name, sp.store_slug AS store_slug,
               (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id,
               EXISTS (SELECT 1 FROM favorites f WHERE f.listing_id = l.id AND f.user_id = ?) AS is_favorite
@@ -108,6 +111,8 @@ sellerRoutes.get("/sellers/:id", async (c) => {
       displayName: seller.display_name,
       storeName: seller.store_name,
       storeSlug: seller.store_slug,
+      logoUrl: seller.logo_url || seller.avatar_url || null,
+      avatarUrl: seller.avatar_url || null,
       commune: seller.commune,
       address: seller.address,
       latitude: seller.latitude,
