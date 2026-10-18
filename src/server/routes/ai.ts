@@ -222,9 +222,11 @@ aiRoutes.post("/ai/chat", async (c) => {
   const input = parsed.data;
 
   const lastUserMsg = [...input.messages].reverse().find((m) => m.role === "user")?.content || "";
+  // When user provides audio, avoid extracting literal keywords from "استفسار صوتي"
+  const searchQuery = input.audio ? undefined : lastUserMsg;
 
   // Extract catalog slice matching user search or recent products
-  const catalogResult = await loadCatalogContext(c.env.DB, lastUserMsg);
+  const catalogResult = await loadCatalogContext(c.env.DB, searchQuery);
 
   try {
     const rawReply = await chatWithAzarBot(

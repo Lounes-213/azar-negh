@@ -284,6 +284,22 @@ function renderRichContent(content: string, onNavigate?: () => void): React.Reac
 function RealtimeAudioVisualizer({ stream }: { stream: MediaStream | null }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Draw flat line immediately on mount
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.moveTo(6, canvas.height / 2);
+    ctx.lineTo(canvas.width - 6, canvas.height / 2);
+    ctx.strokeStyle = "rgba(52, 211, 153, 0.45)";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.stroke();
+  }, []);
+
   useEffect(() => {
     if (!stream) return;
     let audioCtx: AudioContext | null = null;
@@ -546,11 +562,18 @@ export function AzarBotWidget() {
   // Search by Voice state (20s max limit - understands Kabyle / Taqbaylit, Darija, Arabic)
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
+  const isRecordingRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingSecondsRef = useRef(0);
+  const messagesRef = useRef<Message[]>([]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
@@ -756,8 +779,10 @@ export function AzarBotWidget() {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    setRecordingStream(null);
     mediaRecorderRef.current = null;
     audioChunksRef.current = [];
+    isRecordingRef.current = false;
     setIsRecording(false);
     setRecordingSeconds(0);
     recordingSecondsRef.current = 0;
@@ -775,21 +800,31 @@ export function AzarBotWidget() {
     }
 
     const duration = Math.max(1, recordingSecondsRef.current);
-    const mimeType = recorder.mimeType || "audio/webm";
+    const mimeType = (recorder.mimeType || "audio/webm").split(";")[0]?.trim() || "audio/webm";
+
+    if (recorder.state === "recording") {
+      try {
+        recorder.requestData();
+      } catch {}
+    }
 
     recorder.onstop = () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
+      setRecordingStream(null);
+      isRecordingRef.current = false;
       setIsRecording(false);
       setRecordingSeconds(0);
       recordingSecondsRef.current = 0;
 
-      if (shouldSend && audioChunksRef.current.length > 0) {
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      const chunks = [...audioChunksRef.current];
+      audioChunksRef.current = [];
+
+      if (shouldSend && chunks.length > 0) {
+        const blob = new Blob(chunks, { type: mimeType });
         const localAudioUrl = URL.createObjectURL(blob);
-        audioChunksRef.current = [];
         const reader = new FileReader();
         reader.onloadend = () => {
           const raw = reader.result as string;
@@ -804,8 +839,6 @@ export function AzarBotWidget() {
           }
         };
         reader.readAsDataURL(blob);
-      } else {
-        audioChunksRef.current = [];
       }
     };
 
@@ -817,7 +850,7 @@ export function AzarBotWidget() {
   };
 
   const startRecording = async () => {
-    if (loading || isCompressing || isRecording) return;
+    if (loading || isCompressing || isRecordingRef.current) return;
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         alert(isAr ? "الميكروفون غير مدعوم في هذا المتصفح." : "Microphone non supporté sur ce navigateur.");
@@ -825,8 +858,11 @@ export function AzarBotWidget() {
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      setRecordingStream(stream);
+
       const mimeType = getAudioMimeType();
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -836,7 +872,8 @@ export function AzarBotWidget() {
         }
       };
 
-      recorder.start(250);
+      recorder.start(200);
+      isRecordingRef.current = true;
       setIsRecording(true);
       setRecordingSeconds(0);
       recordingSecondsRef.current = 0;
@@ -867,7 +904,9 @@ export function AzarBotWidget() {
     audioToSend?: { base64: string; mimeType: string; duration: number; audioUrl?: string },
   ) => {
     const text = (textToSend || input).trim();
-    if ((!text && !selectedImage && !audioToSend) || loading || isCompressing || isRecording) return;
+    if (!text && !selectedImage && !audioToSend) return;
+    if (loading || isCompressing) return;
+    if (!audioToSend && isRecordingRef.current) return;
 
     const currentImage = selectedImage;
     setSelectedImage(null);
@@ -886,7 +925,8 @@ export function AzarBotWidget() {
       audioUrl: audioToSend?.audioUrl,
     };
 
-    const nextMessages = [...messages, userMsg];
+    const nextMessages = [...messagesRef.current, userMsg];
+    messagesRef.current = nextMessages;
     setMessages(nextMessages);
     setInput("");
     setLoading(true);
@@ -1237,7 +1277,7 @@ export function AzarBotWidget() {
               </div>
 
               {/* Dynamic Soundwave frequency visualizer (real mic amplitude) */}
-              <RealtimeAudioVisualizer stream={streamRef.current} />
+              <RealtimeAudioVisualizer stream={recordingStream} />
 
               <div className="azarbot-rec-actions">
                 {/* Cancel / Discard */}
