@@ -123,10 +123,11 @@ adminRoutes.get("/admin/users", async (c) => {
   const [rows, count] = await Promise.all([
     c.env.DB.prepare(
       `SELECT u.id, u.email, u.role, u.status, u.created_at, u.last_login_at,
-              p.display_name,
+              p.display_name, p.phone, w.name_fr AS wilaya_name,
               (SELECT COUNT(*) FROM listings l WHERE l.seller_id = u.id) AS listings_count
        FROM users u
        LEFT JOIN seller_profiles p ON p.user_id = u.id
+       LEFT JOIN wilayas w ON w.id = p.wilaya_id
        ${whereSql}
        ORDER BY u.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -140,6 +141,8 @@ adminRoutes.get("/admin/users", async (c) => {
         created_at: string;
         last_login_at: string | null;
         display_name: string | null;
+        phone: string | null;
+        wilaya_name: string | null;
         listings_count: number;
       }>(),
     c.env.DB.prepare(
@@ -159,6 +162,8 @@ adminRoutes.get("/admin/users", async (c) => {
           role: row.role,
           status: row.status,
           displayName: row.display_name,
+          phone: row.phone,
+          wilayaName: row.wilaya_name || "Algérie",
           createdAt: row.created_at,
           lastLoginAt: row.last_login_at,
           listingsCount: row.listings_count,
@@ -418,12 +423,16 @@ adminRoutes.get("/admin/listings", async (c) => {
 
   const [rows, count] = await Promise.all([
     c.env.DB.prepare(
-      `SELECT l.id, l.title, l.status, l.price_da, l.created_at, l.published_at,
+      `SELECT l.id, l.title, l.description, l.status, l.price_da, l.created_at, l.published_at,
+              w.name_fr AS wilaya_name, c.name_fr AS category_name,
               u.email AS seller_email, sp.display_name AS seller_name,
-              (SELECT COUNT(*) FROM listing_images i WHERE i.listing_id = l.id) AS images
+              (SELECT COUNT(*) FROM listing_images i WHERE i.listing_id = l.id) AS images,
+              (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
        FROM listings l
        JOIN users u ON u.id = l.seller_id
        LEFT JOIN seller_profiles sp ON sp.user_id = l.seller_id
+       LEFT JOIN wilayas w ON w.id = l.wilaya_id
+       LEFT JOIN categories c ON c.id = l.category_id
        ${whereSql}
        ORDER BY l.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -432,13 +441,17 @@ adminRoutes.get("/admin/listings", async (c) => {
       .all<{
         id: string;
         title: string;
+        description: string | null;
         status: ListingStatus;
         price_da: number;
         created_at: string;
         published_at: string | null;
+        wilaya_name: string | null;
+        category_name: string | null;
         seller_email: string;
         seller_name: string | null;
         images: number;
+        cover_id: string | null;
       }>(),
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM listings l ${whereSql}`)
       .bind(...params)
@@ -450,13 +463,17 @@ adminRoutes.get("/admin/listings", async (c) => {
       items: (rows.results ?? []).map((row) => ({
         id: row.id,
         title: row.title,
+        description: row.description || "",
         status: row.status,
         priceDa: row.price_da,
         createdAt: row.created_at,
         publishedAt: row.published_at,
+        wilayaName: row.wilaya_name || "Algérie",
+        categoryName: row.category_name || "Catégorie",
         sellerEmail: row.seller_email,
-        sellerName: row.seller_name,
+        sellerName: row.seller_name || row.seller_email,
         images: row.images,
+        coverImage: row.cover_id ? `/api/images/${row.cover_id}` : null,
       })),
       page,
       perPage,

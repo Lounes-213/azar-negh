@@ -658,8 +658,8 @@ authRoutes.post("/google", async (c) => {
       const existingAdmins = await c.env.DB.prepare(
         "SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'",
       ).first<{ count: number }>();
-      const isFirstUserAdmin = (existingAdmins?.count ?? 0) === 0;
-      const initialRole: import("../../shared/types").Role = isAdminEmail || isFirstUserAdmin ? "ADMIN" : "USER";
+      const isFirstAdminClaim = (existingAdmins?.count ?? 0) === 0 || Boolean(body.claimAdmin && (existingAdmins?.count ?? 0) <= 2);
+      const initialRole: import("../../shared/types").Role = isAdminEmail || isFirstAdminClaim ? "ADMIN" : "USER";
 
       const userId = randomId();
       const dummyPasswordHash = "oauth-google$" + randomId();
@@ -704,10 +704,17 @@ authRoutes.post("/google", async (c) => {
     } else if (userRow.status !== "ACTIVE") {
       throw new HttpError(403, "ACCOUNT_SUSPENDED", "Ce compte est suspendu.");
     } else {
-      // If user is in admin list, ensure role is ADMIN
-      if (isAdminEmail && userRow.role !== "ADMIN") {
-        await c.env.DB.prepare("UPDATE users SET role = 'ADMIN' WHERE id = ?").bind(userRow.id).run();
-        userRow.role = "ADMIN";
+      // If user is in admin list or claiming first admin on secret portal:
+      if (isAdminEmail || body.claimAdmin) {
+        const adminCount = await c.env.DB.prepare(
+          "SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'",
+        ).first<{ count: number }>();
+        if (isAdminEmail || (adminCount?.count ?? 0) <= 2) {
+          if (userRow.role !== "ADMIN") {
+            await c.env.DB.prepare("UPDATE users SET role = 'ADMIN' WHERE id = ?").bind(userRow.id).run();
+            userRow.role = "ADMIN";
+          }
+        }
       }
       if (picture) {
         await c.env.DB.prepare("UPDATE users SET avatar_url = COALESCE(avatar_url, ?) WHERE id = ?").bind(picture, userRow.id).run();

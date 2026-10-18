@@ -235,7 +235,7 @@ aiRoutes.post("/ai/chat", async (c) => {
     const matchedTagRegex = /\[MATCHED_PRODUCTS:\s*([a-zA-Z0-9_,\s-]+)\]/i;
     const match = matchedTagRegex.exec(rawReply);
 
-    if (match) {
+    if (match && match[1]) {
       reply = rawReply.replace(matchedTagRegex, "").trim();
       const ids = match[1]
         .split(",")

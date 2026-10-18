@@ -227,6 +227,9 @@ export interface AdminUser {
   role: Role;
   status: UserStatus;
   displayName: string | null;
+  phone?: string | null;
+  wilayaName?: string | null;
+  avatarUrl?: string | null;
   createdAt: string;
   lastLoginAt: string | null;
   listingsCount: number;

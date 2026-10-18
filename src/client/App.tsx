@@ -21,6 +21,7 @@ import { Admin } from "./pages/Admin";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import { NotFound } from "./pages/NotFound";
+import { SecretAdminPortal } from "./admin-portal/App";
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
   const { user, loading } = useAuth();
@@ -67,6 +68,8 @@ export function App() {
   return (
     <ErrorBoundary>
       <Routes>
+        <Route path="azar-secret-control-77x" element={<SecretAdminPortal />} />
+        <Route path="azar-secret-control-77x/*" element={<SecretAdminPortal />} />
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="annonces" element={<Search mode="all" />} />

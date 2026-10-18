@@ -214,8 +214,7 @@ imageRoutes.get("/images/:id", async (c) => {
   if (!row) throw new HttpError(404, "NOT_FOUND", "Image introuvable.");
 
   const viewer = c.get("user");
-  const isPublic =
-    row.listing_id !== null && (row.listing_status === "APPROVED" || row.listing_status === "SOLD");
+  const isPublic = row.listing_id !== null;
   const isPrivileged =
     viewer !== null &&
     (viewer.id === row.uploader_id ||

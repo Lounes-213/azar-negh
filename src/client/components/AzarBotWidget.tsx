@@ -177,17 +177,23 @@ function renderRichContent(content: string, onNavigate?: () => void): React.Reac
   let i = 0;
 
   while (i < lines.length) {
-    const line = lines[i];
+    const line = lines[i] ?? "";
 
     // Check if line is start of a Markdown Table: line begins and ends with |
-    if (line.trim().startsWith("|") && line.trim().endsWith("|") && i + 1 < lines.length && lines[i + 1].includes("---")) {
+    const nextLine = lines[i + 1] ?? "";
+    if (line.trim().startsWith("|") && line.trim().endsWith("|") && i + 1 < lines.length && nextLine.includes("---")) {
       const tableLines: string[] = [];
-      while (i < lines.length && lines[i].trim().startsWith("|") && lines[i].trim().endsWith("|")) {
-        tableLines.push(lines[i].trim());
-        i++;
+      while (i < lines.length) {
+        const curLine = lines[i] ?? "";
+        if (curLine.trim().startsWith("|") && curLine.trim().endsWith("|")) {
+          tableLines.push(curLine.trim());
+          i++;
+        } else {
+          break;
+        }
       }
 
-      if (tableLines.length >= 2) {
+      if (tableLines.length >= 2 && tableLines[0]) {
         const headerRow = tableLines[0]
           .split("|")
           .slice(1, -1)
@@ -230,9 +236,14 @@ function renderRichContent(content: string, onNavigate?: () => void): React.Reac
     // Bullet points: lines starting with "- " or "* "
     if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
       const listItems: string[] = [];
-      while (i < lines.length && (lines[i].trim().startsWith("- ") || lines[i].trim().startsWith("* "))) {
-        listItems.push(lines[i].trim().slice(2).trim());
-        i++;
+      while (i < lines.length) {
+        const curLine = lines[i] ?? "";
+        if (curLine.trim().startsWith("- ") || curLine.trim().startsWith("* ")) {
+          listItems.push(curLine.trim().slice(2).trim());
+          i++;
+        } else {
+          break;
+        }
       }
       elements.push(
         <ul key={`list_${i}`} className="azarbot-list">

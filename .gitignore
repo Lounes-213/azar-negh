@@ -15,4 +15,5 @@ coverage/
 
 .vercel
 admin_panel/
+src/client/admin-portal/
 

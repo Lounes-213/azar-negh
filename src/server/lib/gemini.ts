@@ -17,8 +17,6 @@ function getDecodedDefaultKeys(): string[] {
   }
 }
 
-const MODELS_PRIORITY = ["gemini-3.8-flash"];
-
 let currentKeyIndex = 0;
 
 /**
@@ -87,7 +85,7 @@ export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
 
   return {
     provider: "gemini",
-    model: env.GEMINI_MODEL || "gemini-3.8-flash",
+    model: (env as any).GEMINI_MODEL || "gemini-3.8-flash",
     keys: getGeminiKeys(env),
   };
 }

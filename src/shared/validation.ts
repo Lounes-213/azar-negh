@@ -135,7 +135,7 @@ export const categoryInputSchema = z.object({
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).max(1000).default(1),
-  perPage: z.coerce.number().int().min(1).max(50).default(20),
+  perPage: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 export const storeProfileUpdateSchema = z.object({
@@ -178,5 +178,6 @@ export const googleAuthSchema = z.object({
   credential: z.string().optional(),
   email: emailSchema.optional(),
   name: z.string().trim().max(100).optional(),
+  claimAdmin: z.boolean().optional(),
 });
 
