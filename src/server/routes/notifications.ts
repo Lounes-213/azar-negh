@@ -91,3 +91,76 @@ notificationRoutes.post("/notifications/read-all", async (c) => {
     .run();
   return c.json({ unread: 0 });
 });
+
+import { VAPID_PUBLIC_KEY, sendWebPush } from "../lib/webpush";
+import { randomId } from "../lib/crypto";
+
+notificationRoutes.get("/push/vapid-key", (c) => {
+  return c.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+notificationRoutes.post("/push/subscribe", async (c) => {
+  const user = c.get("user");
+  const body = (await c.req.json().catch(() => null)) as {
+    endpoint?: string;
+    keys?: { p256dh?: string; auth?: string };
+  } | null;
+
+  if (!body || !body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+    throw new HttpError(400, "INVALID_SUBSCRIPTION", "Données d'abonnement invalides.");
+  }
+
+  const id = randomId();
+  await c.env.DB.prepare(
+    `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET
+       user_id = excluded.user_id,
+       p256dh = excluded.p256dh,
+       auth = excluded.auth,
+       created_at = excluded.created_at`,
+  )
+    .bind(
+      id,
+      user?.id ?? null,
+      body.endpoint,
+      body.keys.p256dh,
+      body.keys.auth,
+      nowIso(),
+    )
+    .run();
+
+  return c.json({ ok: true });
+});
+
+notificationRoutes.post("/push/test", async (c) => {
+  const user = c.get("user");
+  const body = (await c.req.json().catch(() => ({}))) as { endpoint?: string };
+
+  const targetSubs: { id?: string; endpoint: string }[] = [];
+  if (body.endpoint) {
+    targetSubs.push({ endpoint: body.endpoint });
+  } else if (user) {
+    const rows = await c.env.DB.prepare("SELECT id, endpoint FROM push_subscriptions WHERE user_id = ?")
+      .bind(user.id)
+      .all<{ id: string; endpoint: string }>();
+    targetSubs.push(...(rows.results || []));
+  }
+
+  if (targetSubs.length === 0) {
+    return c.json({ ok: false, message: "Aucun appareil enregistré." });
+  }
+
+  let sent = 0;
+  for (const sub of targetSubs) {
+    const ok = await sendWebPush(c.env.DB, sub, {
+      title: "Azar Neɣ — تجربة إشعار الهاتف 🔔",
+      body: "مرحباً بك! إشعارات الهاتف تعمل بنجاح حتى والشاشة مغلقة 🚀",
+      url: "/compte/notifications",
+    });
+    if (ok) sent++;
+  }
+
+  return c.json({ ok: true, sent });
+});
+

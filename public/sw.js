@@ -72,3 +72,74 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// Background Push Notifications (receives alerts even when phone screen is locked or browser is closed)
+self.addEventListener("push", (event) => {
+  let promise;
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      promise = self.registration.showNotification(data.title || "Azar Neɣ — آزار نغ", {
+        body: data.body || "لديك إشعار جديد في منصة آزار نغ",
+        icon: "/brand/icon-192.png",
+        badge: "/brand/icon-192.png",
+        data: { url: data.url || "/compte/notifications" },
+        vibrate: [200, 100, 200],
+      });
+    } catch {
+      promise = self.registration.showNotification("Azar Neɣ — آزار نغ", {
+        body: event.data.text() || "لديك إشعار جديد في منصة آزار نغ",
+        icon: "/brand/icon-192.png",
+        badge: "/brand/icon-192.png",
+        data: { url: "/compte/notifications" },
+        vibrate: [200, 100, 200],
+      });
+    }
+  } else {
+    // If push ping, fetch the latest user notification from the server
+    promise = fetch("/api/notifications?perPage=1")
+      .then((res) => res.json())
+      .then((data) => {
+        const latest = data?.notifications?.items?.[0];
+        const title = latest?.title || "Azar Neɣ — آزار نغ";
+        const body = latest?.body || "لديك إشعار وتحديث جديد على المنصة";
+        const url = latest?.link || "/compte/notifications";
+        return self.registration.showNotification(title, {
+          body,
+          icon: "/brand/icon-192.png",
+          badge: "/brand/icon-192.png",
+          data: { url },
+          vibrate: [200, 100, 200],
+        });
+      })
+      .catch(() => {
+        return self.registration.showNotification("Azar Neɣ — آزار نغ", {
+          body: "لديك إشعار وتحديث جديد على المنصة",
+          icon: "/brand/icon-192.png",
+          badge: "/brand/icon-192.png",
+          data: { url: "/compte/notifications" },
+          vibrate: [200, 100, 200],
+        });
+      });
+  }
+  event.waitUntil(promise);
+});
+
+// Click handler: opens or focuses the app when the user taps on the phone notification
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data?.url || "/compte/notifications";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(urlToOpen) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
+

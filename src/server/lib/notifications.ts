@@ -83,10 +83,20 @@ export async function unreadCount(db: D1Database, userId: string): Promise<numbe
   return row?.count ?? 0;
 }
 
+import { sendPushToUser } from "./webpush";
+
 export async function notifyUser(env: Env, input: NewNotification): Promise<StoredNotification> {
   const stored = await persistNotification(env.DB, input);
   const unread = await unreadCount(env.DB, input.userId);
   await pushNotification(env, stored, input, unread);
+
+  // Dispatch background Web Push (pops up on phone lock screen / desktop even when app is closed)
+  sendPushToUser(env.DB, input.userId, {
+    title: input.title,
+    body: input.body || undefined,
+    url: input.link || "/compte/notifications",
+  }).catch(() => {});
+
   return stored;
 }
 

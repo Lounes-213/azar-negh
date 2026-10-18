@@ -64,6 +64,182 @@ export function Notifications() {
     }
   };
 
+function PushNotificationCard() {
+  const { push } = useToast();
+  const [supported, setSupported] = useState(false);
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator && "Notification" in window) {
+      setSupported(true);
+      setPermission(Notification.permission);
+    }
+  }, []);
+
+  if (!supported) return null;
+
+  const enablePush = async () => {
+    try {
+      setLoading(true);
+      const perm = await Notification.requestPermission();
+      setPermission(perm);
+      if (perm !== "granted") {
+        push("يرجى السماح بالإشعارات في إعدادات المتصفح.", "default");
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+      const vapidRes = await api<{ publicKey: string }>("/push/vapid-key");
+
+      const padding = "=".repeat((4 - (vapidRes.publicKey.length % 4)) % 4);
+      const base64 = (vapidRes.publicKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const applicationServerKey = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        applicationServerKey[i] = rawData.charCodeAt(i);
+      }
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+      }
+
+      const jsonSub = sub.toJSON();
+      await api("/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({
+          endpoint: jsonSub.endpoint,
+          keys: jsonSub.keys,
+        }),
+      });
+
+      push("تم تفعيل إشعارات الهاتف بنجاح! ستصلك التنبيهات حتى والشاشة مغلقة 🔔", "success");
+    } catch (err) {
+      console.error("enablePush error:", err);
+      push("حدث خطأ أثناء تفعيل الإشعارات.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testPush = async () => {
+    try {
+      setTesting(true);
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        await enablePush();
+        return;
+      }
+      await api("/push/test", {
+        method: "POST",
+        body: JSON.stringify({ endpoint: sub.endpoint }),
+      });
+      push("تم إرسال إشعار تجريبي! اقفل شاشة الهاتف أو بدّل التطبيق لتشاهد الإشعار المنبثق 📲", "success");
+    } catch (err) {
+      console.error("testPush error:", err);
+      push("فشل إرسال الإشعار التجريبي.", "error");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (permission === "granted") {
+    return (
+      <div
+        className="card"
+        style={{
+          padding: "14px 18px",
+          marginBottom: 20,
+          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.03))",
+          border: "1px solid rgba(16, 185, 129, 0.25)",
+          borderRadius: 14,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ color: "#10b981", fontSize: 20 }}>🔔</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>إشعارات الهاتف مفعّلة ونشطة</div>
+            <div style={{ fontSize: "0.82rem", color: "var(--muted)" }}>
+              تصلك التنبيهات في أي وقت حتى لو كان هاتفك مقفولاً أو المتصفح مغلقاً.
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={testPush}
+          className="btn btn-secondary btn-sm"
+          disabled={testing}
+          style={{ borderRadius: 8 }}
+        >
+          {testing ? "جاري الإرسال..." : "📲 جرّب إشعار الهاتف الآن"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="card"
+      style={{
+        padding: "16px 20px",
+        marginBottom: 20,
+        background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.04))",
+        border: "1px solid rgba(16, 185, 129, 0.3)",
+        borderRadius: 16,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: 14,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: "var(--brand)",
+            color: "white",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 22,
+            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+          }}
+        >
+          🔔
+        </div>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>تفعيل إشعارات الهاتف (حتى والشاشة مغلقة)</div>
+          <div style={{ fontSize: "0.86rem", color: "var(--muted)", marginTop: 2 }}>
+            لا تفوت أي رسالة من زبون أو تحديث لإعلاناتك عندما تكون خارج التطبيق.
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={enablePush}
+        className="btn btn-primary"
+        disabled={loading}
+        style={{ minWidth: 170, borderRadius: 10, fontWeight: 700 }}
+      >
+        {loading ? "جاري التفعيل..." : "🔔 تفعيل الإشعارات الآن"}
+      </button>
+    </div>
+  );
+}
+
   return (
     <div className="container page page-narrow">
       <div className="page-head">
@@ -77,6 +253,8 @@ export function Notifications() {
           </button>
         ) : null}
       </div>
+
+      <PushNotificationCard />
 
       {state.loading ? (
         <Spinner />
