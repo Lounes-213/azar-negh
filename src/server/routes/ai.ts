@@ -16,20 +16,65 @@ export const aiRoutes = new Hono<AppEnv>();
 /**
  * Loads a compact, token-efficient serialization of approved listings for AI reasoning.
  */
-async function loadCatalogContext(db: D1Database, query?: string): Promise<string> {
-  try {
-    const cleanQuery = (query || "").replace(/[%_]/g, " ").trim();
-    const where =
-      cleanQuery.length >= 2
-        ? "l.status = 'APPROVED' AND (l.title LIKE ? OR l.description LIKE ?)"
-        : "l.status = 'APPROVED'";
-    const params = cleanQuery.length >= 2 ? [`%${cleanQuery}%`, `%${cleanQuery}%`] : [];
+export interface BotProductCard {
+  id: string;
+  title: string;
+  priceDa: number;
+  originalPriceDa?: number | null;
+  wilayaName: string;
+  condition: string;
+  itemType: string;
+  imageUrl: string | null;
+}
 
-    const rows = await db
+interface CatalogContextResult {
+  contextText: string;
+  candidates: BotProductCard[];
+}
+
+const STOPWORDS = new Set([
+  "salam", "bonjour", "salut", "svp", "merci", "wach", "kayen", "3ndkum", "andi", "hab", "bghit",
+  "les", "des", "une", "pour", "dans", "avec", "sur", "par", "est", "sont", "quel", "quelle",
+  "من", "في", "على", "إلى", "هل", "عندكم", "كاين", "سلام", "عليكم", "حاب", "نحوس", "اريد", "بدي", "عطيني", "واش", "عندك"
+]);
+
+/**
+ * Extracts searchable keywords from a query string.
+ */
+function extractKeywords(query?: string): string[] {
+  if (!query) return [];
+  const words = query
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
+  return Array.from(new Set(words)).slice(0, 5);
+}
+
+/**
+ * Loads a compact, token-efficient serialization of approved listings for AI reasoning
+ * and collects candidate product cards with images.
+ */
+async function loadCatalogContext(db: D1Database, query?: string): Promise<CatalogContextResult> {
+  try {
+    const keywords = extractKeywords(query);
+    let where = "l.status = 'APPROVED'";
+    const params: string[] = [];
+
+    if (keywords.length > 0) {
+      const conditions = keywords.map(() => "(l.title LIKE ? OR l.description LIKE ?)");
+      where += ` AND (${conditions.join(" OR ")})`;
+      for (const kw of keywords) {
+        params.push(`%${kw}%`, `%${kw}%`);
+      }
+    }
+
+    let rows = await db
       .prepare(
-        `SELECT l.id, l.title, l.price_da, l.condition, l.item_type,
+        `SELECT l.id, l.title, l.price_da, l.original_price_da, l.condition, l.item_type,
                 w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
-                cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar
+                cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
+                (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
          FROM listings l
          LEFT JOIN wilayas w ON w.id = l.wilaya_id
          LEFT JOIN categories cat ON cat.id = l.category_id
@@ -42,27 +87,61 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<strin
         id: string;
         title: string;
         price_da: number;
+        original_price_da: number | null;
         condition: string;
         item_type: string;
         wilaya_name_fr: string;
         wilaya_name_ar: string;
         category_name_fr: string;
         category_name_ar: string;
+        cover_id: string | null;
       }>();
 
-    if (!rows.results || rows.results.length === 0) {
-      return "لا توجد منتجات مسجلة حالياً تطابق هذا الطلب.";
+    // If keyword query yielded 0 results, fall back to top general catalog
+    if ((!rows.results || rows.results.length === 0) && keywords.length > 0) {
+      rows = await db
+        .prepare(
+          `SELECT l.id, l.title, l.price_da, l.original_price_da, l.condition, l.item_type,
+                  w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+                  cat.name_fr AS category_name_fr, cat.name_ar AS category_name_ar,
+                  (SELECT li.id FROM listing_images li WHERE li.listing_id = l.id ORDER BY li.position ASC LIMIT 1) AS cover_id
+           FROM listings l
+           LEFT JOIN wilayas w ON w.id = l.wilaya_id
+           LEFT JOIN categories cat ON cat.id = l.category_id
+           WHERE l.status = 'APPROVED'
+           ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
+           LIMIT 20`,
+        )
+        .all();
     }
 
-    return rows.results
+    const results = rows.results || [];
+    if (results.length === 0) {
+      return { contextText: "لا توجد منتجات مسجلة حالياً.", candidates: [] };
+    }
+
+    const candidates: BotProductCard[] = results.map((r) => ({
+      id: r.id,
+      title: r.title,
+      priceDa: r.price_da,
+      originalPriceDa: r.original_price_da,
+      wilayaName: r.wilaya_name_ar || r.wilaya_name_fr || "الجزائر",
+      condition: r.condition,
+      itemType: r.item_type || "PRODUCT",
+      imageUrl: r.cover_id ? `/api/images/${r.cover_id}` : null,
+    }));
+
+    const contextText = results
       .map(
         (r) =>
-          `- [${r.title}](/annonces/${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} | الحالة: ${r.condition || ""}`,
+          `- [${r.title}](/annonces/${r.id}) (ID: ${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} | الحالة: ${r.condition || ""}`,
       )
       .join("\n");
+
+    return { contextText, candidates };
   } catch (err) {
     console.error("loadCatalogContext error:", err);
-    return "لا توجد منتجات مسجلة حالياً.";
+    return { contextText: "لا توجد منتجات مسجلة حالياً.", candidates: [] };
   }
 }
 
@@ -76,6 +155,12 @@ const chatSchema = z.object({
     )
     .min(1)
     .max(50),
+  image: z
+    .object({
+      mimeType: z.string().max(50),
+      data: z.string().max(7 * 1024 * 1024), // Max ~5MB binary base64
+    })
+    .optional(),
   userPersona: z
     .object({
       preferredWilaya: z.string().max(100).optional(),
@@ -131,19 +216,63 @@ aiRoutes.post("/ai/chat", async (c) => {
 
   const lastUserMsg = [...input.messages].reverse().find((m) => m.role === "user")?.content || "";
 
-  // Extract keywords to retrieve matching catalog slice
-  const catalogContext = await loadCatalogContext(c.env.DB, lastUserMsg.slice(0, 40));
+  // Extract catalog slice matching user search or recent products
+  const catalogResult = await loadCatalogContext(c.env.DB, lastUserMsg);
 
   try {
-    const reply = await chatWithAzarBot(
+    const rawReply = await chatWithAzarBot(
       c.env,
       input.messages,
-      catalogContext,
+      catalogResult.contextText,
       input.userPersona,
       input.lang || "ar",
+      input.image,
     );
 
-    return c.json({ reply });
+    // Extract product IDs if suggested by AI: [MATCHED_PRODUCTS: id1, id2, id3]
+    let reply = rawReply;
+    const matchedProducts: BotProductCard[] = [];
+    const matchedTagRegex = /\[MATCHED_PRODUCTS:\s*([a-zA-Z0-9_,\s-]+)\]/i;
+    const match = matchedTagRegex.exec(rawReply);
+
+    if (match) {
+      reply = rawReply.replace(matchedTagRegex, "").trim();
+      const ids = match[1]
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+
+      for (const id of ids) {
+        const found = catalogResult.candidates.find((p) => p.id === id);
+        if (found && !matchedProducts.some((p) => p.id === found.id)) {
+          matchedProducts.push(found);
+          if (matchedProducts.length >= 3) break;
+        }
+      }
+    }
+
+    // Also detect markdown links [Name](/annonces/id) if less than 3 matched products
+    if (matchedProducts.length < 3) {
+      const linkRegex = /\/annonces\/([a-zA-Z0-9_-]+)/g;
+      let linkMatch: RegExpExecArray | null;
+      while ((linkMatch = linkRegex.exec(reply)) !== null && matchedProducts.length < 3) {
+        const id = linkMatch[1];
+        const found = catalogResult.candidates.find((p) => p.id === id);
+        if (found && !matchedProducts.some((p) => p.id === found.id)) {
+          matchedProducts.push(found);
+        }
+      }
+    }
+
+    // If user provided an image and matched products are still empty, attach top relevant candidates (max 3)
+    if (input.image && matchedProducts.length === 0 && catalogResult.candidates.length > 0) {
+      matchedProducts.push(...catalogResult.candidates.slice(0, 3));
+    }
+
+    return c.json({
+      reply,
+      products: matchedProducts.slice(0, 3), // Strictly max 3 products
+    });
   } catch (err) {
     console.error("chatWithAzarBot error:", err);
     return c.json({
@@ -151,6 +280,7 @@ aiRoutes.post("/ai/chat", async (c) => {
         input.lang === "ar"
           ? "مرحباً بك! أنا مساعد آزار الذكي. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟"
           : "Bonjour ! Je suis l'assistant Azar Bot. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?",
+      products: [],
     });
   }
 });

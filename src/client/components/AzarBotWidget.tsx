@@ -6,42 +6,178 @@ import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { getLocalUserPersona } from "../lib/persona";
 
+export interface BotProductCard {
+  id: string;
+  title: string;
+  priceDa: number;
+  originalPriceDa?: number | null;
+  wilayaName: string;
+  condition: string;
+  itemType: string;
+  imageUrl: string | null;
+}
+
 interface Message {
   id: string;
   role: "user" | "model";
   content: string;
   createdAt: number;
+  imagePreview?: string;
+  products?: BotProductCard[];
 }
 
-const CHAT_STORAGE_KEY = "azar_bot_chat_history_v1";
+const CHAT_STORAGE_KEY = "azar_bot_chat_history_v2";
 
-function renderMarkdownWithLinks(text: string) {
-  // Matches markdown links like [Titre de l'annonce](/annonces/123)
-  const regex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  const parts: React.ReactNode[] = [];
+/**
+ * Parses inline markdown:
+ * - **bold text** -> green highlight (<strong className="azarbot-highlight">)
+ * - [Link Label](/url) -> clickable product chip
+ * - `code` -> inline code
+ */
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  // Regex matches **bold**, [link](url), and `code`
+  const tokenRegex = /(\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`)/g;
+  const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = tokenRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
+      nodes.push(text.slice(lastIndex, match.index));
     }
-    const label = match[1] || "";
-    const url = match[2] || "/";
-    parts.push(
-      <Link key={match.index} to={url} className="azarbot-product-chip">
-        <Icon name="tag" size={13} />
-        <span>{label}</span>
-      </Link>,
-    );
-    lastIndex = regex.lastIndex;
+
+    if (match[2]) {
+      // **bold text** -> styled in green brand color
+      nodes.push(
+        <strong key={`b_${match.index}`} className="azarbot-highlight">
+          {match[2]}
+        </strong>,
+      );
+    } else if (match[3] && match[4]) {
+      // [Link Label](/url) -> product chip
+      const label = match[3];
+      const url = match[4];
+      nodes.push(
+        <Link key={`l_${match.index}`} to={url} className="azarbot-product-chip">
+          <Icon name="tag" size={12} />
+          <span>{label}</span>
+        </Link>,
+      );
+    } else if (match[5]) {
+      // `code`
+      nodes.push(
+        <code key={`c_${match.index}`} className="azarbot-inline-code">
+          {match[5]}
+        </code>,
+      );
+    }
+
+    lastIndex = tokenRegex.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    nodes.push(text.slice(lastIndex));
   }
 
-  return parts;
+  return nodes;
+}
+
+/**
+ * Renders full markdown with support for:
+ * - Comparison Tables (| col1 | col2 |)
+ * - Bullet lists (- item or * item)
+ * - Green bold highlights (**text**)
+ * - Product link chips
+ */
+function renderRichContent(content: string): React.ReactNode {
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Check if line is start of a Markdown Table: line begins and ends with |
+    if (line.trim().startsWith("|") && line.trim().endsWith("|") && i + 1 < lines.length && lines[i + 1].includes("---")) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|") && lines[i].trim().endsWith("|")) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+
+      if (tableLines.length >= 2) {
+        const headerRow = tableLines[0]
+          .split("|")
+          .slice(1, -1)
+          .map((c) => c.trim());
+
+        // Skip separator row (tableLines[1])
+        const dataRows = tableLines.slice(2).map((r) =>
+          r
+            .split("|")
+            .slice(1, -1)
+            .map((c) => c.trim()),
+        );
+
+        elements.push(
+          <div key={`table_${i}`} className="azarbot-table-wrap">
+            <table className="azarbot-table">
+              <thead>
+                <tr>
+                  {headerRow.map((h, hIdx) => (
+                    <th key={hIdx}>{renderInlineMarkdown(h)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataRows.map((row, rIdx) => (
+                  <tr key={rIdx}>
+                    {row.map((cell, cIdx) => (
+                      <td key={cIdx}>{renderInlineMarkdown(cell)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>,
+        );
+        continue;
+      }
+    }
+
+    // Bullet points: lines starting with "- " or "* "
+    if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
+      const listItems: string[] = [];
+      while (i < lines.length && (lines[i].trim().startsWith("- ") || lines[i].trim().startsWith("* "))) {
+        listItems.push(lines[i].trim().slice(2).trim());
+        i++;
+      }
+      elements.push(
+        <ul key={`list_${i}`} className="azarbot-list">
+          {listItems.map((item, idx) => (
+            <li key={idx}>{renderInlineMarkdown(item)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    // Normal text line
+    if (line.trim().length > 0) {
+      elements.push(
+        <p key={`p_${i}`} className="azarbot-paragraph">
+          {renderInlineMarkdown(line)}
+        </p>,
+      );
+    } else {
+      // Empty line spacer
+      elements.push(<div key={`sp_${i}`} className="azarbot-spacer" />);
+    }
+
+    i++;
+  }
+
+  return <>{elements}</>;
 }
 
 export function AzarBotWidget() {
@@ -55,9 +191,19 @@ export function AzarBotWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasPromptedGreeting, setHasPromptedGreeting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Search by image state
+  const [selectedImage, setSelectedImage] = useState<{
+    file: File;
+    base64: string;
+    mimeType: string;
+    previewUrl: string;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Smooth automatic collapse after 3.8s and on scroll
   useEffect(() => {
@@ -83,13 +229,13 @@ export function AzarBotWidget() {
       if (raw) {
         setMessages(JSON.parse(raw));
       } else {
-        // Clean default welcoming message without emojis
+        // Clean default welcoming message with bold green hints
         const initial: Message = {
           id: "welcome",
           role: "model",
           content: isAr
-            ? `مرحباً بك${user ? ` ${user.displayName || ""}` : ""}! أنا آزار بوت، مساعدك الذكي للتسوق في الجزائر.\nاسألني عن أي منتج، قارن الأسعار، أو اطلب توصية ذكية تناسب ميزانيتك وولايتك.`
-            : `Bonjour${user ? ` ${user.displayName || ""}` : ""} ! Je suis Azar Bot, votre assistant shopping intelligent.\nPosez-moi vos questions, trouvez les meilleurs prix ou demandez une recommandation personnalisée !`,
+            ? `مرحباً بك${user ? ` **${user.displayName || ""}**` : ""}! أنا **آزار بوت**، مساعدك الذكي للتسوق في الجزائر.\nاسألني عن أي منتج، قارن بين **الأسعار والمواصفات**، أو ارفع **صورة لأي سلعة** للبحث عنها فوراً!`
+            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Azar Bot**, votre assistant shopping intelligent.\nPosez-moi vos questions, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
           createdAt: Date.now(),
         };
         setMessages([initial]);
@@ -115,13 +261,15 @@ export function AzarBotWidget() {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, loading]);
 
   const clearChat = () => {
     const resetMsg: Message = {
       id: "reset",
       role: "model",
-      content: isAr ? "تم مسح المحادثة. كيف يمكنني مساعدتك الآن؟" : "Discussion effacée. Que puis-je chercher pour vous ?",
+      content: isAr
+        ? "تم مسح المحادثة. يمكنك سؤالي أو إرسال **صورة لأي منتج** للبحث عنه."
+        : "Discussion effacée. Posez une question ou envoyez une **photo d'un produit** pour le chercher.",
       createdAt: Date.now(),
     };
     setMessages([resetMsg]);
@@ -132,15 +280,64 @@ export function AzarBotWidget() {
     }
   };
 
+  const copyToClipboard = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1800);
+    } catch {
+      // Clipboard fallback
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Strict 5MB limit check
+    if (file.size > 5 * 1024 * 1024) {
+      alert(
+        isAr
+          ? "حجم الصورة كبير جداً! الحد الأقصى المسموح به هو 5 ميغابايت."
+          : "L'image est trop volumineuse ! La taille maximale est de 5 Mo.",
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64Data = result.split(",")[1] || "";
+      setSelectedImage({
+        file,
+        base64: base64Data,
+        mimeType: file.type || "image/jpeg",
+        previewUrl: result,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeSelectedImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const sendMessage = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
-    if (!text || loading) return;
+    if ((!text && !selectedImage) || loading) return;
+
+    const currentImage = selectedImage;
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     const userMsg: Message = {
       id: `u_${Date.now()}`,
       role: "user",
-      content: text,
+      content: text || (isAr ? "ابحث لي عن هذا المنتج في المنصة" : "Trouvez-moi ce produit sur la plateforme"),
       createdAt: Date.now(),
+      imagePreview: currentImage ? currentImage.previewUrl : undefined,
     };
 
     const nextMessages = [...messages, userMsg];
@@ -150,7 +347,7 @@ export function AzarBotWidget() {
 
     try {
       const persona = getLocalUserPersona();
-      const payload = {
+      const payload: any = {
         messages: nextMessages.map((m) => ({
           role: m.role,
           content: m.content,
@@ -159,8 +356,14 @@ export function AzarBotWidget() {
         lang: isAr ? "ar" : "fr",
       };
 
-      // Direct object payload (api helper handles JSON.stringify without double-encoding)
-      const res = await api<{ reply: string }>("/ai/chat", {
+      if (currentImage) {
+        payload.image = {
+          mimeType: currentImage.mimeType,
+          data: currentImage.base64,
+        };
+      }
+
+      const res = await api<{ reply: string; products?: BotProductCard[] }>("/ai/chat", {
         method: "POST",
         body: payload,
       });
@@ -170,6 +373,7 @@ export function AzarBotWidget() {
         role: "model",
         content: res.reply || (isAr ? "عذراً، لم أستطع العثور على نتيجة." : "Désolé, aucune réponse trouvée."),
         createdAt: Date.now(),
+        products: res.products && res.products.length > 0 ? res.products.slice(0, 3) : undefined,
       };
 
       setMessages((prev) => [...prev, botMsg]);
@@ -187,8 +391,8 @@ export function AzarBotWidget() {
   };
 
   const quickPrompts = isAr
-    ? ["أفضل الهواتف", "سيارات بأفضل سعر", "نصائح الشراء الآمن"]
-    : ["Meilleurs smartphones", "Voitures bon prix", "Conseils d'achat"];
+    ? ["أفضل الهواتف اليوم", "قارن بين العروض", "نصائح فحص السلعة", "سيارات بأفضل سعر"]
+    : ["Meilleurs smartphones", "Comparer les offres", "Conseils d'achat", "Voitures bon prix"];
 
   return (
     <div className={`azarbot-widget-container ${isAr ? "is-rtl" : ""}`}>
@@ -204,23 +408,17 @@ export function AzarBotWidget() {
           onMouseEnter={() => setIsCollapsed(false)}
           onMouseLeave={() => setIsCollapsed(true)}
           aria-label="Ouvrir l'assistant Azar Bot"
-          title="Azar Bot — Assistant Shopping"
+          title="Azar Bot — Assistant Shopping IA"
         >
           <div className="azarbot-robot-avatar">
             <svg viewBox="0 0 48 48" width="34" height="34" fill="none">
-              {/* Antenna */}
               <circle cx="24" cy="6" r="3.5" fill="#10b981" />
               <line x1="24" y1="9" x2="24" y2="15" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-              {/* Head */}
               <rect x="8" y="15" width="32" height="25" rx="8" fill="#10b981" />
-              {/* Screen Face */}
               <rect x="12" y="19" width="24" height="15" rx="4" fill="#064e3b" />
-              {/* Glowing Eyes */}
               <circle cx="18" cy="26" r="3" fill="#6ee7b7" className="robot-eye" />
               <circle cx="30" cy="26" r="3" fill="#6ee7b7" className="robot-eye" />
-              {/* Smile */}
               <path d="M21 31c1 1 5 1 6 0" stroke="#a7f3d0" strokeWidth="1.8" strokeLinecap="round" />
-              {/* Ears */}
               <rect x="4" y="23" width="4" height="7" rx="2" fill="#059669" />
               <rect x="40" y="23" width="4" height="7" rx="2" fill="#059669" />
             </svg>
@@ -261,7 +459,7 @@ export function AzarBotWidget() {
                   Azar Bot
                 </h3>
                 <small className="azarbot-header-desc">
-                  {isAr ? "مساعد التسوق الذكي" : "Assistant shopping intelligent"}
+                  {isAr ? "مساعد التسوق والبحث بالصور" : "Assistant shopping & recherche par image"}
                 </small>
               </div>
             </div>
@@ -288,14 +486,85 @@ export function AzarBotWidget() {
             </div>
           </div>
 
-          {/* Messages Feed (No repeating robot icons on bubbles) */}
+          {/* Messages Feed */}
           <div className="azarbot-body">
             {messages.map((msg) => (
               <div key={msg.id} className={`azarbot-message-row ${msg.role === "user" ? "user-row" : "bot-row"}`}>
                 <div className={`azarbot-bubble ${msg.role === "user" ? "user-bubble" : "bot-bubble"}`}>
+                  {/* User uploaded image preview inside chat */}
+                  {msg.imagePreview ? (
+                    <div className="azarbot-msg-image-wrap">
+                      <img src={msg.imagePreview} alt="User upload" className="azarbot-msg-image" />
+                    </div>
+                  ) : null}
+
                   <div className="azarbot-bubble-content">
-                    {renderMarkdownWithLinks(msg.content)}
+                    {renderRichContent(msg.content)}
                   </div>
+
+                  {/* Attached Rich Product Cards (Max 3) */}
+                  {msg.products && msg.products.length > 0 ? (
+                    <div className="azarbot-products-grid">
+                      <div className="azarbot-products-label">
+                        <Icon name="tag" size={12} />
+                        <span>{isAr ? "عروض مطابقة في المنصة:" : "Offres correspondantes :"}</span>
+                      </div>
+                      {msg.products.slice(0, 3).map((prod) => (
+                        <Link
+                          key={prod.id}
+                          to={`/annonces/${prod.id}`}
+                          className="azarbot-product-card"
+                          title={prod.title}
+                        >
+                          {prod.imageUrl ? (
+                            <img src={prod.imageUrl} alt={prod.title} className="azarbot-card-thumb" />
+                          ) : (
+                            <div className="azarbot-card-thumb-placeholder">
+                              <Icon name="tag" size={20} />
+                            </div>
+                          )}
+
+                          <div className="azarbot-card-body">
+                            <h4 className="azarbot-card-title">{prod.title}</h4>
+                            <div className="azarbot-card-price-row">
+                              <span className="azarbot-card-price">{prod.priceDa.toLocaleString()} DA</span>
+                              {prod.originalPriceDa && prod.originalPriceDa > prod.priceDa ? (
+                                <span className="azarbot-card-old-price">
+                                  {prod.originalPriceDa.toLocaleString()} DA
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="azarbot-card-meta">
+                              <span className="azarbot-card-badge">{prod.wilayaName}</span>
+                              <span className="azarbot-card-badge">{prod.condition}</span>
+                            </div>
+                          </div>
+
+                          <span className="azarbot-card-action">
+                            <Icon name="chevron-left" size={16} />
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Bot utilities: Copy advice text */}
+                  {msg.role === "model" && msg.content ? (
+                    <div className="azarbot-msg-actions">
+                      <button
+                        type="button"
+                        className="azarbot-msg-copy-btn"
+                        onClick={() => copyToClipboard(msg.id, msg.content)}
+                        title={isAr ? "نسخ النص" : "Copier le texte"}
+                      >
+                        {copiedId === msg.id ? (
+                          <span className="copied-text">{isAr ? "تم النسخ ✓" : "Copié ✓"}</span>
+                        ) : (
+                          <Icon name="edit" size={12} />
+                        )}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -306,6 +575,15 @@ export function AzarBotWidget() {
                   <span className="dot" />
                   <span className="dot" />
                   <span className="dot" />
+                  <span className="loading-hint">
+                    {selectedImage
+                      ? isAr
+                        ? "جاري تحليل الصورة والبحث عن المنتجات..."
+                        : "Analyse de l'image en cours..."
+                      : isAr
+                      ? "جاري التفكير والبحث..."
+                      : "Recherche en cours..."}
+                  </span>
                 </div>
               </div>
             ) : null}
@@ -327,7 +605,29 @@ export function AzarBotWidget() {
             ))}
           </div>
 
-          {/* Input Box (NO autoFocus so mobile keyboard doesn't pop up immediately) */}
+          {/* Image Upload Preview Bar before sending */}
+          {selectedImage ? (
+            <div className="azarbot-image-preview-bar">
+              <img src={selectedImage.previewUrl} alt="Preview" className="azarbot-image-preview-thumb" />
+              <div className="azarbot-image-preview-info">
+                <span className="azarbot-image-preview-name">{selectedImage.file.name}</span>
+                <span className="azarbot-image-preview-hint">
+                  {isAr ? "صورة جاهزة للبحث (Vision AI)" : "Prête pour la recherche"}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="azarbot-remove-image-btn"
+                onClick={removeSelectedImage}
+                title={isAr ? "إلغاء الصورة" : "Supprimer"}
+                aria-label="Supprimer l'image"
+              >
+                <Icon name="x" size={14} />
+              </button>
+            </div>
+          ) : null}
+
+          {/* Input Box */}
           <form
             className="azarbot-footer"
             onSubmit={(e) => {
@@ -335,20 +635,50 @@ export function AzarBotWidget() {
               sendMessage();
             }}
           >
+            {/* Hidden native file input for camera/image upload (max 5MB) */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: "none" }}
+              onChange={handleImageSelect}
+            />
+
+            {/* Photo / Camera search button */}
+            <button
+              type="button"
+              className={`azarbot-image-btn ${selectedImage ? "has-image" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              title={isAr ? "ابحث بصورة من هاتفك (حد أقصى 5 ميغابايت)" : "Chercher par image (max 5 Mo)"}
+              aria-label="Téléverser une image"
+              disabled={loading}
+            >
+              <Icon name="camera" size={18} />
+            </button>
+
             <input
               ref={inputRef}
               type="text"
               className="azarbot-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isAr ? "اسأل آزار عن سلعة، سعر، أو ولاية..." : "Posez une question sur un produit..."}
+              placeholder={
+                selectedImage
+                  ? isAr
+                    ? "أضف ملاحظة أو اضغط إرسال للبحث..."
+                    : "Ajoutez un mot ou envoyez..."
+                  : isAr
+                  ? "اسأل عن منتج أو ارفع صورة..."
+                  : "Posez une question ou envoyez une photo..."
+              }
               maxLength={400}
               autoFocus={false}
             />
+
             <button
               type="submit"
               className="azarbot-send-btn"
-              disabled={!input.trim() || loading}
+              disabled={(!input.trim() && !selectedImage) || loading}
               aria-label="Envoyer"
             >
               <Icon name="arrow-right" size={16} />

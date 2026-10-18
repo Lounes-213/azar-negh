@@ -3424,13 +3424,13 @@ ol {
 }
 
 .azarbot-bubble {
-  max-width: 86%;
+  max-width: 88%;
   padding: 12px 16px;
   border-radius: 18px;
   font-size: 0.93rem;
   line-height: 1.55;
-  white-space: pre-line;
   word-break: break-word;
+  position: relative;
 }
 
 .user-bubble {
@@ -3440,10 +3440,237 @@ ol {
 }
 
 .bot-bubble {
-  background: var(--surface-muted);
+  background: var(--surface);
   color: var(--ink);
   border-bottom-inline-start-radius: 4px;
   border: 1px solid var(--line);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.04);
+}
+
+/* Green bold highlights for words between ** ** matching app colors */
+.azarbot-highlight {
+  color: #047857;
+  font-weight: 700;
+}
+
+.bot-bubble strong,
+.bot-bubble b {
+  color: #047857;
+  font-weight: 700;
+}
+
+.user-bubble .azarbot-highlight,
+.user-bubble strong,
+.user-bubble b {
+  color: #d1fae5;
+  font-weight: 700;
+}
+
+.azarbot-paragraph {
+  margin: 0 0 6px 0;
+}
+
+.azarbot-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.azarbot-spacer {
+  height: 6px;
+}
+
+.azarbot-list {
+  margin: 6px 0;
+  padding-inline-start: 18px;
+  list-style-type: disc;
+}
+
+.azarbot-list li {
+  margin-bottom: 4px;
+}
+
+.azarbot-inline-code {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--brand-800);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: monospace;
+}
+
+/* Comparison Tables */
+.azarbot-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 10px 0;
+  border-radius: 12px;
+  border: 1px solid var(--brand-200);
+  background: var(--surface);
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.azarbot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: start;
+}
+
+.azarbot-table th {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.08));
+  color: var(--brand-800);
+  font-weight: 700;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--brand-300);
+  white-space: nowrap;
+}
+
+.azarbot-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.azarbot-table tr:last-child td {
+  border-bottom: none;
+}
+
+.azarbot-table tr:hover td {
+  background: rgba(16, 185, 129, 0.04);
+}
+
+/* User Uploaded Image Inside Chat */
+.azarbot-msg-image-wrap {
+  margin-bottom: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 240px;
+}
+
+.azarbot-msg-image {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+}
+
+/* Rich Matched Product Cards (Max 3) */
+.azarbot-products-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.azarbot-products-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--brand-700);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.azarbot-product-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--brand-200);
+  border-radius: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.04);
+}
+
+.azarbot-product-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-500);
+  box-shadow: 0 6px 16px -4px rgba(16, 185, 129, 0.22);
+  text-decoration: none;
+}
+
+.azarbot-card-thumb {
+  width: 54px;
+  height: 54px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--surface-muted);
+  flex-shrink: 0;
+}
+
+.azarbot-card-thumb-placeholder {
+  width: 54px;
+  height: 54px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+  display: grid;
+  place-items: center;
+  color: var(--brand-600);
+  flex-shrink: 0;
+}
+
+.azarbot-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.azarbot-card-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 3px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.azarbot-card-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.azarbot-card-price {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--brand-700);
+}
+
+.azarbot-card-old-price {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.azarbot-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.azarbot-card-badge {
+  background: var(--surface-muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.azarbot-card-action {
+  color: var(--brand-600);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
 }
 
 .azarbot-product-chip {
@@ -3454,11 +3681,11 @@ ol {
   border: 1.5px solid var(--brand-300);
   color: var(--brand-800);
   font-weight: 600;
-  padding: 4px 10px;
-  margin: 4px 2px;
+  padding: 3px 8px;
+  margin: 3px 2px;
   border-radius: var(--radius-sm);
   text-decoration: none;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
@@ -3468,10 +3695,41 @@ ol {
   text-decoration: none;
 }
 
+/* Copy text action button */
+.azarbot-msg-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.azarbot-msg-copy-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.azarbot-msg-copy-btn:hover {
+  color: var(--brand-700);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.copied-text {
+  color: var(--brand-700);
+  font-weight: 600;
+}
+
 .loading-bubble {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   padding: 14px 18px;
 }
 
@@ -3489,6 +3747,12 @@ ol {
 
 .loading-bubble .dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+.loading-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-inline-start: 6px;
 }
 
 @keyframes botDotPulse {
@@ -3531,8 +3795,66 @@ ol {
   color: var(--brand-700);
 }
 
+/* Image Upload Preview Bar before sending */
+.azarbot-image-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02));
+  border-top: 1px solid var(--brand-200);
+  animation: fadeInPill 0.2s ease-out;
+}
+
+.azarbot-image-preview-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1.5px solid var(--brand-400);
+}
+
+.azarbot-image-preview-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.azarbot-image-preview-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.azarbot-image-preview-hint {
+  font-size: 0.72rem;
+  color: var(--brand-700);
+  font-weight: 600;
+}
+
+.azarbot-remove-image-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.azarbot-remove-image-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
 .azarbot-footer {
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-top: 1px solid var(--line);
   background: var(--surface);
   display: flex;
@@ -3540,11 +3862,31 @@ ol {
   gap: 8px;
 }
 
+.azarbot-image-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.azarbot-image-btn:hover,
+.azarbot-image-btn.has-image {
+  color: var(--brand-700);
+  background: rgba(16, 185, 129, 0.12);
+}
+
 .azarbot-input {
   flex: 1;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
-  padding: 10px 16px;
+  padding: 9px 16px;
   font-size: var(--text-sm);
   background: var(--surface-muted);
   outline: none;
