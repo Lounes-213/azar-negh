@@ -793,6 +793,115 @@ adminRoutes.patch("/admin/ai-config/:id/toggle", async (c) => {
   return c.json({ success: true, id });
 });
 
+adminRoutes.post("/admin/ai-config/keys", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  assertCsrf(c);
+  const body = await c.req.json<{
+    configId?: string;
+    provider?: string;
+    modelName?: string;
+    key: string;
+  }>();
+
+  const rawKey = (body.key || "").trim();
+  if (!rawKey) {
+    throw new HttpError(422, "KEY_REQUIRED", "Clé API obligatoire.");
+  }
+
+  const provider = body.provider || "gemini";
+  const modelName = body.modelName || (provider === "gemini" ? "gemini-3.8-flash" : "gpt-4o-mini");
+
+  const newKeys = rawKey
+    .split(/[\n,;]+/)
+    .map((k) => k.trim())
+    .filter(Boolean);
+
+  if (newKeys.length === 0) {
+    throw new HttpError(422, "KEY_REQUIRED", "Au moins une clé valide requise.");
+  }
+
+  const existing = body.configId
+    ? await c.env.DB.prepare("SELECT id, provider, model_name, api_keys FROM ai_config WHERE id = ?").bind(body.configId).first<{ id: string; provider: string; model_name: string; api_keys: string }>()
+    : await c.env.DB.prepare("SELECT id, provider, model_name, api_keys FROM ai_config WHERE provider = ? ORDER BY updated_at DESC").bind(provider).first<{ id: string; provider: string; model_name: string; api_keys: string }>();
+
+  let keys: string[] = [];
+  const id = existing ? existing.id : `${provider}_${Date.now()}`;
+
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing.api_keys);
+      if (Array.isArray(parsed)) keys = parsed;
+    } catch {}
+  }
+
+  for (const nk of newKeys) {
+    if (!keys.includes(nk)) {
+      keys.push(nk);
+    }
+  }
+
+  const now = nowIso();
+  await c.env.DB.prepare(
+    `INSERT INTO ai_config (id, provider, model_name, api_keys, is_active, updated_at)
+     VALUES (?, ?, ?, ?, 1, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       model_name = excluded.model_name,
+       api_keys = excluded.api_keys,
+       updated_at = excluded.updated_at`,
+  )
+    .bind(id, provider, modelName, JSON.stringify(keys), now)
+    .run();
+
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: "AI_KEYS_ADDED",
+    entityType: "ai_config",
+    entityId: id,
+    metadata: { provider, addedCount: newKeys.length, totalCount: keys.length },
+  });
+
+  return c.json({ success: true, id, keysCount: keys.length });
+});
+
+adminRoutes.delete("/admin/ai-config/:id/keys/:keyIndex", async (c) => {
+  const admin = assertAdminOrSecret(c);
+  assertCsrf(c);
+  const id = c.req.param("id");
+  const keyIndex = parseInt(c.req.param("keyIndex"), 10);
+
+  const existing = await c.env.DB.prepare("SELECT id, provider, api_keys FROM ai_config WHERE id = ?").bind(id).first<{ id: string; provider: string; api_keys: string }>();
+  if (!existing) {
+    throw new HttpError(404, "NOT_FOUND", "Configuration IA introuvable.");
+  }
+
+  let keys: string[] = [];
+  try {
+    const parsed = JSON.parse(existing.api_keys);
+    if (Array.isArray(parsed)) keys = parsed;
+  } catch {}
+
+  if (isNaN(keyIndex) || keyIndex < 0 || keyIndex >= keys.length) {
+    throw new HttpError(422, "INVALID_INDEX", "Index de clé invalide.");
+  }
+
+  keys.splice(keyIndex, 1);
+  const now = nowIso();
+
+  await c.env.DB.prepare("UPDATE ai_config SET api_keys = ?, updated_at = ? WHERE id = ?")
+    .bind(JSON.stringify(keys), now, id)
+    .run();
+
+  await recordAudit(c.env.DB, {
+    actorId: admin.id,
+    action: "AI_KEY_DELETED",
+    entityType: "ai_config",
+    entityId: id,
+    metadata: { removedIndex: keyIndex, remainingCount: keys.length },
+  });
+
+  return c.json({ success: true, remainingCount: keys.length });
+});
+
 adminRoutes.delete("/admin/ai-config/:id", async (c) => {
   assertAdminOrSecret(c);
   assertCsrf(c);

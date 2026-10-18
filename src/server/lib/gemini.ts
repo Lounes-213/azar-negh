@@ -84,11 +84,19 @@ export async function getAllActiveAiConfigs(env: Env): Promise<DynamicAiConfig[]
     // ai_config table query fallback
   }
 
+  // Always ensure default/fallback keys are merged into Gemini pool for high availability
   const defaultKeys = getGeminiKeys(env);
-  if (!configs.some((c) => c.provider === "gemini") && defaultKeys.length > 0) {
+  const geminiConfig = configs.find((c) => c.provider === "gemini");
+  if (geminiConfig) {
+    for (const dk of defaultKeys) {
+      if (!geminiConfig.keys.includes(dk)) {
+        geminiConfig.keys.push(dk);
+      }
+    }
+  } else if (defaultKeys.length > 0) {
     configs.push({
       provider: "gemini",
-      model: (env as any).GEMINI_MODEL || "gemini-3.5-flash-lite",
+      model: (env as any).GEMINI_MODEL || "gemini-3.8-flash",
       keys: defaultKeys,
     });
   }
@@ -131,7 +139,10 @@ async function callGemini(
         groq: "https://api.groq.com/openai/v1/chat/completions",
       };
       const endpoint = endpointMap[config.provider] || "https://api.openai.com/v1/chat/completions";
-      for (const key of keys) {
+      const startKeyOffset = Math.floor(Math.random() * keys.length);
+      for (let attempt = 0; attempt < keys.length; attempt++) {
+        const key = keys[(startKeyOffset + attempt) % keys.length];
+        if (!key) continue;
         try {
           const messages: any[] = [];
           if (systemInstruction) {
@@ -168,7 +179,10 @@ async function callGemini(
 
     // Claude / Anthropic
     if (config.provider === "claude") {
-      for (const key of keys) {
+      const startKeyOffset = Math.floor(Math.random() * keys.length);
+      for (let attempt = 0; attempt < keys.length; attempt++) {
+        const key = keys[(startKeyOffset + attempt) % keys.length];
+        if (!key) continue;
         try {
           const messages: any[] = [];
           for (const msg of contents) {
@@ -201,22 +215,27 @@ async function callGemini(
       continue;
     }
 
-    // Google Gemini (with round-robin, multi-model and multi-key quota failover)
+    // Google Gemini (with random uniform load balancing across keys and multi-model quota failover)
     const modelsToTry = [
       config.model,
+      "gemini-3.8-flash",
       "gemini-3.5-flash-lite",
       "gemini-flash-lite-latest",
       "gemini-3.1-flash-lite",
       "gemini-3.5-flash",
       "gemini-3.6-flash",
       "gemini-flash-latest",
-      "gemini-3.8-flash",
     ];
     const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
 
+    // Uniformly distribute request load across all keys for all users
+    const startKeyIdx = Math.floor(Math.random() * keys.length);
+
     for (const model of uniqueModels) {
       for (let attempt = 0; attempt < keys.length; attempt++) {
-        const key = keys[(currentKeyIndex + attempt) % keys.length];
+        const keyIndex = (startKeyIdx + attempt) % keys.length;
+        const key = keys[keyIndex];
+        if (!key) continue;
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
           const payload: any = {
@@ -544,64 +563,48 @@ export async function generateListingDescription(
   const isAr = input.lang === "ar";
 
   const systemInstruction = isAr
-    ? "أنت خبير محترف في كتابة إعلانات البيع والتسويق في الجزائر على منصة Azar Neɣ. اكتب نص إعلان جذاب، منظم وواضح بدون مقدمات أو خاتمات زائفة، جاهز للنشر مباشرة مع نقاط محددة (الحالة، المميزات، التوصيل/الاستلام، السعر)."
-    : "Tu es un expert en e-commerce et petites annonces en Algérie pour la plateforme Azar Neɣ. Rédige une description de vente vendeuse, structurée, claire et directe, sans blabla ni formule de politesse introductive. Format prêt à être publié avec puces claires (État, Caractéristiques, Remise en main propre / Livraison, Prix).";
+    ? "أنت خبير تسويق إعلانات في الجزائر على منصة Azar Neɣ. اكتب وصفاً تسويقياً جذاباً ومختصراً جداً لا يتجاوز 120 حرفاً إطلاقاً. ركز على المنتج وحالته وسعره في جملة واحدة فقط بدون أي مقدمات."
+    : "Expert e-commerce en Algérie sur Azar Neɣ. Rédige une description vendeuse et ultra-concise de 120 caractères MAXIMUM. Directe au but, une seule phrase vendeuse.";
 
   const prompt = isAr
-    ? `اكتب وصف إعلان بيع للمنتج التالي:
+    ? `اكتب وصف إعلان بيع ممتاز في أقل من 120 حرفاً فقط:
 - العنوان: ${input.title}
-- نوع العرض: ${input.itemType === "SERVICE" ? "خدمة" : input.itemType === "DIGITAL" ? "منتج رقمي" : "منتج"}
-- الفئة: ${input.categoryName ?? "عام"}
-- الولاية: ${input.wilayaName ?? "الجزائر"}
-- الحالة: ${input.condition ?? "جيدة"}
+- الحالة: ${input.condition ?? "ممتازة"}
 - السعر: ${input.priceDa ? `${input.priceDa} دج` : "حسب الاتفاق"}
-
-اكتب نصا مقنعا وواضحا باللهجة واللغة المناسبة للمشترين في الجزائر.`
-    : `Rédige une description pour cette annonce :
+- الولاية: ${input.wilayaName ?? "الجزائر"}
+المطلوب: جملة تسويقية واحدة فقط أقل من 120 حرفاً تجذب المشتري.`
+    : `Rédige une description d'annonce vendeuse de moins de 120 caractères MAXIMUM :
 - Titre : ${input.title}
-- Type d'offre : ${input.itemType === "SERVICE" ? "Service" : input.itemType === "DIGITAL" ? "Produit numérique" : "Produit"}
-- Catégorie : ${input.categoryName ?? "Général"}
-- Wilaya : ${input.wilayaName ?? "Algérie"}
 - État : ${input.condition ?? "Bon état"}
 - Prix : ${input.priceDa ? `${input.priceDa} DA` : "À discuter"}
-
-Fournis un texte vendeur, propre et bien aéré avec des puces.`;
+- Wilaya : ${input.wilayaName ?? "Algérie"}
+Une seule phrase concise sous 120 caractères.`;
 
   const aiResult = await callGemini(
     env,
     [{ role: "user", parts: [{ text: prompt }] }],
     systemInstruction,
   );
-  if (aiResult) return aiResult;
 
-  // High quality structured fallback
-  if (isAr) {
-    return `📌 ${input.title}
+  let text = aiResult ? aiResult.trim() : "";
+  // Strip enclosing quotes or prefixes if any
+  text = text.replace(/^["'«](.*)["'»]$/s, "$1").trim();
 
-✨ تفاصيل العرض :
-• الحالة : ${input.condition === "NEW" ? "جديد تماما" : "حالة ممتازة وجاهز للاستعمال"}
-• الفئة : ${input.categoryName ?? "متوفر حاليا"}
-• السعر : ${input.priceDa ? `${input.priceDa} دج` : "قابل للتفاوض"}
-
-📍 الموقع والتسليم :
-• متوفر في ولاية ${input.wilayaName ?? "الجزائر"}
-• إمكانية المعاينة والتسليم يدا بيد أو التوصيل حسب الاتفاق.
-
-📞 للمزيد من المعلومات أو الطلب، يرجى التواصل عبر الهاتف أو الواتساب.`;
+  // High quality structured fallback under 120 characters if AI didn't respond
+  if (!text) {
+    if (isAr) {
+      text = `${input.title} بحالة ${input.condition ?? "ممتازة"}${input.priceDa ? ` بسعر ${input.priceDa} دج` : ""}، متوفر في ${input.wilayaName ?? "الجزائر"}. سارع بالطلب!`;
+    } else {
+      text = `${input.title} en état ${input.condition ?? "impeccable"}${input.priceDa ? ` à ${input.priceDa} DA` : ""}, dispo sur ${input.wilayaName ?? "Algérie"}. Contactez vite !`;
+    }
   }
 
-  return `📌 ${input.title}
+  // Strict enforcement: Maximum 120 characters
+  if (text.length > 120) {
+    text = text.slice(0, 117).trim() + "...";
+  }
 
-✨ Détails & Caractéristiques :
-• État : ${input.condition === "NEW" ? "Neuf sous emballage" : "Très bon état, fonctionne parfaitement"}
-• Catégorie : ${input.categoryName ?? "Disponible immédiatement"}
-• Prix : ${input.priceDa ? `${input.priceDa} DA` : "Prix négociable dans la limite du raisonnable"}
-
-📍 Localisation & Disponibilité :
-• Disponible sur ${input.wilayaName ?? "votre région"}
-• Remise en main propre privilégiée ou livraison selon accord.
-
-📞 Pour toute question ou pour commander, contactez-moi par appel ou WhatsApp.`;
+  return text;
 }
 
 /**

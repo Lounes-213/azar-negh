@@ -78,11 +78,8 @@ export function CustomSelect({
   useEffect(() => {
     if (open) {
       updateScrollIndicators();
-      if (shouldSearch && searchInputRef.current) {
-        setTimeout(() => searchInputRef.current?.focus(), 50);
-      }
     }
-  }, [open, filteredOptions, shouldSearch]);
+  }, [open, filteredOptions]);
 
   // Click outside listener
   useEffect(() => {

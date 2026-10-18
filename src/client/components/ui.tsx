@@ -246,8 +246,14 @@ export function Dialog({
     document.addEventListener("keydown", onKey);
     const previous = document.activeElement as HTMLElement | null;
     const timer = window.setTimeout(() => {
+      // Prioritize focusing non-input interactive elements (close button, actions) to avoid triggering the mobile virtual keyboard
+      const closeOrBtn = panelRef.current?.querySelector<HTMLElement>(".dialog-close, button, [href]");
+      if (closeOrBtn) {
+        closeOrBtn.focus();
+        return;
+      }
       const focusable = panelRef.current?.querySelector<HTMLElement>(
-        "input, select, textarea, button, [href]",
+        "select, button, [href]",
       );
       focusable?.focus();
     }, 20);

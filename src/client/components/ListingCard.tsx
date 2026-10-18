@@ -199,7 +199,7 @@ function ListingCardInner({
           {listing.title}
         </Link>
 
-        {/* Social Proof (Stars & Sales & Likes) */}
+        {/* Social Proof (Stars & Sales) */}
         <div className="ali-social-proof">
           <div className="ali-rating-stars">
             <Icon name="star" size={13} filled className="ali-star-icon" />
@@ -210,23 +210,6 @@ function ListingCardInner({
           ) : (
             <span className="ali-free-tag">{lang === "ar" ? "توصيل مباشر" : "Vendeur direct"}</span>
           )}
-          {likesCount > 0 ? (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 2,
-                fontSize: "0.74rem",
-                fontWeight: 700,
-                color: favorite ? "#ef4444" : "var(--ink-muted)",
-                marginInlineStart: "auto",
-              }}
-              title={`${likesCount} likes`}
-            >
-              <Icon name="heart" size={10} filled={favorite} />
-              <span>{likesCount}</span>
-            </span>
-          ) : null}
         </div>
 
         {/* Shop / Store Row with Store Logo or Seller Avatar */}

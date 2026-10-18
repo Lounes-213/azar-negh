@@ -189,15 +189,11 @@ export function Sell() {
 
   const handleAiGenerate = async () => {
     if (!title.trim()) {
-      if (images.length > 0) {
-        await handleAiAutoFill();
-        return;
-      }
       push(
         lang === "ar"
-          ? "يرجى كتابة عنوان الإعلان أولاً أو إضافة صورة لتوليد الوصف."
-          : "Veuillez d'abord saisir un titre ou ajouter une photo pour générer la description.",
-        "error",
+          ? "💡 يرجى كتابة عنوان الإعلان أولاً لتتمكن عصا الذكاء الاصطناعي من صياغة الوصف."
+          : "💡 Veuillez d'abord renseigner le titre pour que la baguette IA puisse rédiger la description.",
+        "default",
       );
       document.getElementById("sell-title")?.focus();
       return;
@@ -220,11 +216,12 @@ export function Sell() {
         }),
       });
       if (res.text) {
-        setDescription(res.text);
+        const trimmed = res.text.length > 120 ? res.text.slice(0, 117).trim() + "..." : res.text.trim();
+        setDescription(trimmed);
         push(
           lang === "ar"
-            ? "تم توليد الوصف بنجاح بواسطة الذكاء الاصطناعي !"
-            : "Description rédigée avec succès par l'IA !",
+            ? "✨ تم صياغة الوصف بنجاح بواسطة عصا الذكاء الاصطناعي (أقل من 120 حرف) !"
+            : "✨ Description rédigée avec succès par la baguette IA (max 120 car.) !",
           "success",
         );
       }
@@ -719,52 +716,13 @@ export function Sell() {
                     <p className="small muted" style={{ margin: "2px 0 0" }}>
                       {itemType === "PRODUCT"
                         ? (lang === "ar"
-                            ? "حمّل صور منتجك أولاً لتفعيل عصا الذكاء الاصطناعي وملء الحقول تلقائياً."
-                            : "Téléversez vos photos d'abord pour activer la baguette magique IA.")
+                            ? "أول صورة ستكون الغلاف الرئيسي للإعلان (حتى 3 صور)."
+                            : "La 1ère photo sera la couverture principale de votre annonce (jusqu'à 3 photos).")
                         : (lang === "ar"
-                            ? "أضف صور توضيحية لخدمتك (اختياري حتى 3 صور)."
-                            : "Ajoutez des photos illustrant votre service (facultatif, max 3).")}
+                            ? "أضف صوراً توضيحية لخدمتك (اختياري، حتى 3 صور)."
+                            : "Ajoutez des photos illustrant votre service (facultatif, max 3 photos).")}
                     </p>
                   </div>
-
-                  {/* Baguette Magique IA (3assa al IA) */}
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={handleAiAutoFill}
-                    disabled={aiBusy}
-                    title={
-                      lang === "ar"
-                        ? "تحليل الصور وتعبئة بيانات الإعلان تلقائياً بالذكاء الاصطناعي"
-                        : "Analyser et pré-remplir automatiquement avec Gemini IA"
-                    }
-                    style={{
-                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "var(--radius-pill)",
-                      padding: "8px 16px",
-                      fontWeight: 700,
-                      fontSize: "0.88rem",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
-                      cursor: aiBusy ? "wait" : "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    {aiBusy ? (
-                      <Spinner />
-                    ) : (
-                      <span style={{ fontSize: "1.15rem" }}>✨</span>
-                    )}
-                    <span>
-                      {aiBusy
-                        ? (lang === "ar" ? "جاري التحليل والتعبئة..." : "Analyse IA en cours...")
-                        : (lang === "ar" ? "عصا الذكاء الاصطناعي" : "Baguette Magique IA")}
-                    </span>
-                  </button>
                 </div>
 
                 {/* Thumbnails + Upload Slot */}
@@ -1056,40 +1014,38 @@ export function Sell() {
                       disabled={aiBusy}
                       title={
                         lang === "ar"
-                          ? "توليد وصف متكامل بالذكاء الاصطناعي"
-                          : "Rédiger automatiquement avec Gemini IA"
+                          ? "توليد وصف تلقائي جذاب ومختصر بحد أقصى 120 حرف"
+                          : "Rédiger automatiquement une description concise (120 caractères max)"
                       }
                       style={{
-                        background: "rgba(16, 185, 129, 0.12)",
-                        color: "var(--brand-700)",
-                        borderColor: "var(--brand-300)",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        color: "#fff",
+                        border: "none",
                         borderRadius: "var(--radius-pill)",
-                        padding: "4px 10px",
-                        fontSize: "0.82rem",
+                        padding: "6px 14px",
+                        fontSize: "0.84rem",
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 6,
-                        height: 30,
-                        fontWeight: 600,
+                        height: 32,
+                        fontWeight: 700,
+                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
+                        cursor: aiBusy ? "wait" : "pointer",
                       }}
                     >
                       {aiBusy ? (
                         <Spinner />
                       ) : (
-                        <Icon name="sparkles" size={14} style={{ color: "var(--brand-600)" }} />
+                        <span style={{ fontSize: "1rem" }}>✨</span>
                       )}
                       <span>
                         {aiBusy
-                          ? lang === "ar"
-                            ? "جاري المعالجة..."
-                            : "IA en cours..."
-                          : lang === "ar"
-                            ? "مساعد الذكاء الاصطناعي"
-                            : "Rédiger avec l'IA"}
+                          ? (lang === "ar" ? "جاري الصياغة..." : "Rédaction...")
+                          : (lang === "ar" ? "عصا الذكاء الاصطناعي (120 حرف)" : "Baguette IA (120 car.)")}
                       </span>
                     </button>
 
-                    {description.trim().length > 8 ? (
+                    {description.trim().length > 6 ? (
                       <>
                         <button
                           type="button"
@@ -1143,17 +1099,34 @@ export function Sell() {
                 <Textarea
                   id="sell-description"
                   value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  maxLength={4000}
-                  placeholder="Décrivez votre article avec honnêteté : âge, état, accessoires, raison de la vente…"
+                  onChange={(event) => setDescription(event.target.value.slice(0, 120))}
+                  maxLength={120}
+                  placeholder={
+                    lang === "ar"
+                      ? "اكتب وصفاً مختصراً وجذاباً (120 حرف كحد أقصى) أو استخدم عصا الذكاء الاصطناعي..."
+                      : "Description claire et concise (120 caractères max) ou utilisez la baguette IA..."
+                  }
                   aria-invalid={Boolean(fields.description)}
+                  style={{ minHeight: 90 }}
                 />
                 <div
                   className="hint mt-1"
-                  style={{ display: "flex", justifyContent: "space-between" }}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
-                  <span>Précisez l'état, les défauts et les accessoires inclus.</span>
-                  <span>{description.length}/4000</span>
+                  <span className="small muted">
+                    {lang === "ar"
+                      ? "الوصف مختصر ومباشر (120 حرف كحد أقصى)."
+                      : "Description concise (120 caractères max)."}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "0.82rem",
+                      fontWeight: description.length >= 115 ? 700 : 500,
+                      color: description.length >= 120 ? "var(--brand-700)" : "inherit",
+                    }}
+                  >
+                    {description.length}/120
+                  </span>
                 </div>
                 {fields.description ? (
                   <div className="error-text mt-1">{fields.description}</div>

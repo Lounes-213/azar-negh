@@ -60,7 +60,7 @@ export const listingInputSchema = z.object({
   description: z
     .string()
     .trim()
-    .min(20, "Description trop courte (20 caractères minimum).")
+    .min(10, "Description trop courte (10 caractères minimum).")
     .max(4000),
   categoryId: z.coerce.number().int().positive(),
   wilayaId: z.coerce.number().int().min(1).max(69),
