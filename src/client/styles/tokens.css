@@ -91,11 +91,17 @@
   --brand-negh-color: #10b981;
 }
 
-/* Styled text for the "Neɣ" part of "Aẓar Neɣ" */
+/* Styled text for the "Negh" part of "Azar Negh" - on one line, green, not bold */
 .brand-negh {
-  color: var(--brand-negh-color, #10b981);
-  font-weight: 800;
+  color: #10b981 !important;
+  font-weight: 400 !important;
   display: inline;
+}
+.brand-title {
+  white-space: nowrap !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Arabic locale switches to the Arabic-first stack (Cairo pairs with Poppins). */
@@ -162,7 +168,7 @@ html[lang="ar"] {
 }
 
 [data-theme="dark"] .tabbar .tab-sell .tab-icon {
-  border-color: var(--surface) !important;
+  border: none !important;
 }
 
 [data-theme="dark"] .sidebar {

@@ -5,7 +5,7 @@ import { Avatar } from "./ui";
 import { Logo } from "./Logo";
 import { SearchSuggestions } from "./SearchSuggestions";
 import { AzarBotWidget } from "./AzarBotWidget";
-import { NearbyStoresModal } from "./NearbyStoresModal";
+import { LocationModal } from "./LocationModal";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
 import { useRealtime } from "../lib/realtime";
@@ -205,42 +205,30 @@ export function Layout() {
             <Logo variant="mark" height={34} />
           </Link>
 
-          <button
-            type="button"
+          <div
             className="mobile-greeting"
-            onClick={() => setLocationOpen(true)}
             style={{
-              background: "none",
-              border: 0,
-              padding: 0,
-              cursor: "pointer",
-              textAlign: "start",
+              display: "flex",
+              alignItems: "center",
+              minWidth: 0,
             }}
-            title={lang === "ar" ? "تحديد موقعي والمتاجر القريبة" : "Ma position et magasins proches"}
           >
-            <div
+            <span
+              className="brand-title"
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: "rgba(16, 185, 129, 0.12)",
-                color: "var(--brand-700)",
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
+                fontSize: "1.2rem",
+                fontWeight: 700,
+                color: "var(--ink)",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                letterSpacing: "-0.01em",
               }}
             >
-              <Icon name="map-pin" size={18} />
-            </div>
-            <span>
-              <strong>
-                {user ? `Salam, ${(user.displayName ?? "").split(" ")[0] || "vous"}` : "Salam 👋"}
-              </strong>
-              <small>
-                Aẓar <span className="brand-negh">Neɣ</span> · 📍
-              </small>
+              Azar <span className="brand-negh" style={{ color: "#10b981", fontWeight: 400 }}>Negh</span>
             </span>
-          </button>
+          </div>
 
           <div className="topbar-search-wrap">
             <form className="topbar-search" onSubmit={submitSearch} role="search">
@@ -336,7 +324,7 @@ export function Layout() {
             </div>
             <div className="footer-bottom">
               <span>
-                © {new Date().getFullYear()} Aẓar <span className="brand-negh">Neɣ</span>. {t("footer.rights")}
+                © {new Date().getFullYear()} Azar <span className="brand-negh">Negh</span>. {t("footer.rights")}
               </span>
               <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
                 <Link to="/conditions" className="muted" style={{ fontSize: "12px" }}>
@@ -345,7 +333,7 @@ export function Layout() {
                 <Link to="/confidentialite" className="muted" style={{ fontSize: "12px" }}>
                   {lang === "ar" ? "سياسة الخصوصية" : "Confidentialité"}
                 </Link>
-                <span>DZD · Aẓar <span className="brand-negh">Neɣ</span></span>
+                <span>DZD · Azar <span className="brand-negh">Negh</span></span>
               </div>
             </div>
           </div>
@@ -377,7 +365,7 @@ export function Layout() {
         </NavLink>
       </nav>
 
-      <NearbyStoresModal open={locationOpen} onClose={() => setLocationOpen(false)} />
+      <LocationModal open={locationOpen} onClose={() => setLocationOpen(false)} />
     </div>
   );
 }

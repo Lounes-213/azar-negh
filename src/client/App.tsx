@@ -9,6 +9,7 @@ import { Home } from "./pages/Home";
 import { Search } from "./pages/Search";
 import { ListingDetail } from "./pages/ListingDetail";
 import { Seller } from "./pages/Seller";
+import { Categories } from "./pages/Categories";
 import { Login } from "./pages/Login";
 import { Account } from "./pages/Account";
 import { MyListings } from "./pages/MyListings";
@@ -77,6 +78,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="annonces" element={<Search mode="all" />} />
+          <Route path="categories" element={<Categories />} />
           <Route path="categories/:slug" element={<Search mode="category" />} />
           <Route path="wilayas/:slug" element={<Search mode="wilaya" />} />
           <Route path="annonces/:id" element={<ListingDetail />} />

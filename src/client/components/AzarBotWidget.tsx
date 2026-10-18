@@ -625,7 +625,7 @@ export function AzarBotWidget() {
           role: "model",
           content: isAr
             ? `مرحباً بك${user ? ` **${user.displayName || ""}**` : ""}! أنا **آزار شات**، مساعدك الذكي للتسوق في الجزائر.\nاسألني كتابة أو تحدث بالمايك 🎙️ بالقبائلية (**Taqbaylit**)، الدارجة أو العربية، قارن بين **الأسعار والمواصفات**، أو ارفع **صورة لأي سلعة** للبحث عنها فوراً!`
-            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Aẓar Chat**, votre assistant shopping intelligent.\nÉcrivez ou parlez au micro 🎙️ en **Kabyle (Taqbaylit)**, Darija ou Français, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
+            : `Bonjour${user ? ` **${user.displayName || ""}**` : ""} ! Je suis **Azar Chat**, votre assistant shopping intelligent.\nÉcrivez ou parlez au micro 🎙️ en **Kabyle (Taqbaylit)**, Darija ou Français, comparez les **prix et caractéristiques**, ou téléversez la **photo d'un produit** pour le retrouver immédiatement !`,
           createdAt: Date.now(),
         };
         setMessages([initial]);
@@ -1034,7 +1034,7 @@ export function AzarBotWidget() {
               </span>
             ) : (
               <span>
-                Aẓar <span style={{ color: "#34d399", fontWeight: 800 }}>Chat</span>
+                Azar <span style={{ color: "#34d399", fontWeight: 800 }}>Chat</span>
               </span>
             )}
           </span>
@@ -1076,7 +1076,7 @@ export function AzarBotWidget() {
                     </span>
                   ) : (
                     <span>
-                      Aẓar <span style={{ color: "#10b981", fontWeight: 800 }}>Chat</span>
+                      Azar <span style={{ color: "#10b981", fontWeight: 800 }}>Chat</span>
                     </span>
                   )}
                 </h3>

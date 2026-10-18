@@ -187,10 +187,16 @@ ol {
   white-space: nowrap;
 }
 
-.btn:hover {
+.btn {
   text-decoration: none;
-  background: var(--brand-800);
-  --btn-border: var(--brand-800);
+}
+
+@media (hover: hover) {
+  .btn:not(.btn-secondary):not(.btn-ghost):not(.btn-danger):hover {
+    text-decoration: none;
+    background: var(--brand-800);
+    border-color: var(--brand-800);
+  }
 }
 
 .btn:active {
@@ -207,22 +213,33 @@ ol {
   --btn-bg: var(--surface);
   --btn-fg: var(--ink);
   --btn-border: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
 }
 
-.btn-secondary:hover {
-  --btn-bg: var(--surface-muted);
-  --btn-border: var(--line-strong);
+@media (hover: hover) {
+  .btn-secondary:hover {
+    background: var(--surface-muted) !important;
+    color: var(--ink) !important;
+    border-color: var(--line-strong) !important;
+  }
 }
 
 .btn-ghost {
   --btn-bg: transparent;
   --btn-fg: var(--ink-soft);
   --btn-border: transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  border: 1px solid transparent;
 }
 
-.btn-ghost:hover {
-  --btn-bg: var(--surface-muted);
-  --btn-border: transparent;
+@media (hover: hover) {
+  .btn-ghost:hover {
+    background: var(--surface-muted) !important;
+    border-color: transparent !important;
+  }
 }
 
 .btn-danger {
@@ -2441,20 +2458,14 @@ ol {
     display: grid;
     place-items: center;
     margin-top: -22px;
-    border: 3.5px solid var(--surface);
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+    border: none;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
     animation: sellPulseGlow 3s infinite ease-in-out;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
     position: relative;
   }
   .tabbar .tab-sell .tab-icon::after {
-    content: "";
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    border: 2px solid rgba(16, 185, 129, 0.4);
-    animation: sellRippleRing 3s infinite ease-out;
-    pointer-events: none;
+    display: none;
   }
   .tabbar .tab-sell:hover .tab-icon {
     transform: translateY(-2px) scale(1.08);

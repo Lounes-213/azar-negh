@@ -1095,21 +1095,15 @@
     display: grid;
     place-items: center;
     margin-top: -22px;
-    border: 3.5px solid var(--surface);
-    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+    border: none;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
     animation: sellPulseGlow 3s infinite ease-in-out;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
     position: relative;
   }
 
   .tabbar .tab-sell .tab-icon::after {
-    content: "";
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    border: 2px solid rgba(16, 185, 129, 0.4);
-    animation: sellRippleRing 3s infinite ease-out;
-    pointer-events: none;
+    display: none;
   }
 
   .tabbar .tab-sell:hover .tab-icon {

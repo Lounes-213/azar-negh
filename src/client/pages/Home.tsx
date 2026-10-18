@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Icon, type IconName } from "../components/Icons";
 import { EmptyState, SkeletonStack, Spinner } from "../components/ui";
@@ -28,6 +28,25 @@ export function Home() {
     () => api<{ listings: Paginated<ListingSummary> }>("/listings?sort=newest&perPage=8"),
     [],
   );
+
+  const [detectedPlace, setDetectedPlace] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem("azar:detected_location");
+      if (saved) return JSON.parse(saved).name;
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const onLocUpdated = (e: Event) => {
+      const custom = e as CustomEvent<{ name: string }>;
+      if (custom.detail?.name) setDetectedPlace(custom.detail.name);
+    };
+    window.addEventListener("azar:location-updated", onLocUpdated);
+    return () => window.removeEventListener("azar:location-updated", onLocUpdated);
+  }, []);
 
   const popular = useMemo(() => {
     if (!meta.data) return [];
@@ -110,11 +129,10 @@ export function Home() {
                 fontSize: "inherit",
                 transition: "background 0.15s ease",
               }}
-              title={lang === "ar" ? "عرض المتاجر القريبة على الخريطة" : "Voir les magasins proches sur la carte"}
+              title={lang === "ar" ? "تحديد موقعي" : "Ma localisation"}
             >
               <Icon name="map-pin" size={15} />
-              <span>{t("home.trust3")}</span>
-              <span style={{ fontSize: "0.75rem", opacity: 0.85 }}>📍 {lang === "ar" ? "المتاجر القريبة" : "Magasins proches"}</span>
+              <span>{detectedPlace ? `📍 ${detectedPlace}` : (lang === "ar" ? "تحديد موقعي" : "Ma position")}</span>
             </button>
           </div>
         </div>
@@ -130,7 +148,7 @@ export function Home() {
                 : "Tout ce dont vous avez besoin, près de chez vous."}
             </p>
           </div>
-          <Link to="/annonces" className="btn btn-ghost btn-sm">
+          <Link to="/categories" className="btn btn-ghost btn-sm">
             {t("common.more")} <Icon name="arrow-right" size={16} />
           </Link>
         </div>

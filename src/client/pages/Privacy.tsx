@@ -6,7 +6,7 @@ import { Link } from "react-router";
 export function Privacy() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  useDocumentTitle(isAr ? "سياسة الخصوصية — أزار نغ" : "Politique de confidentialité — Aẓar Neɣ");
+  useDocumentTitle(isAr ? "سياسة الخصوصية — أزار نغ" : "Politique de confidentialité — Azar Negh");
 
   return (
     <div className="container page" style={{ maxWidth: 880 }}>
@@ -31,7 +31,7 @@ export function Privacy() {
               {isAr ? "سياسة الخصوصية وحماية البيانات" : "Politique de Confidentialité"}
             </h1>
             <p className="small muted" style={{ margin: "4px 0 0" }}>
-              {isAr ? "احترام خصوصيتكم هو أولويتنا • منصة أزار نغ (Aẓar Neɣ)" : <>Protection de vos données personnelles • Plateforme Aẓar <span className="brand-negh">Neɣ</span></>}
+              {isAr ? "احترام خصوصيتكم هو أولويتنا • منصة أزار نغ (Azar Negh)" : <>Protection de vos données personnelles • Plateforme Azar <span className="brand-negh">Negh</span></>}
             </p>
           </div>
         </div>

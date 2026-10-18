@@ -121,7 +121,7 @@ export function PwaInstallCard({ lang }: PwaInstallCardProps) {
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
               <h3 style={{ fontSize: "var(--text-base)", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
-                {isAr ? "ثبّت تطبيق أزار نغ على هاتفك" : <>Installer l'application Aẓar <span className="brand-negh">Neɣ</span></>}
+                {isAr ? "ثبّت تطبيق أزار نغ على هاتفك" : <>Installer l'application Azar <span className="brand-negh">Negh</span></>}
               </h3>
               <span
                 style={{
@@ -176,7 +176,7 @@ export function PwaInstallCard({ lang }: PwaInstallCardProps) {
           <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10, borderBottom: "1px solid var(--line)" }}>
             <img src="/brand/icon.svg" alt="" style={{ width: 44, height: 44, borderRadius: 12 }} />
             <div>
-              <div style={{ fontWeight: 800, fontSize: "1rem" }}>Aẓar <span className="brand-negh">Neɣ</span></div>
+              <div style={{ fontWeight: 800, fontSize: "1rem" }}>Azar <span className="brand-negh">Negh</span></div>
               <div className="small muted">
                 {isIos ? (isAr ? "لأجهزة iPhone و iPad (متصفح Safari)" : "Pour iPhone & iPad (Safari)") : (isAr ? "للهواتف الذكية" : "Sur votre smartphone")}
               </div>

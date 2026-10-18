@@ -72,6 +72,22 @@ export function Search({ mode }: { mode: Mode }) {
     mode === "wilaya" ? wilayaFromSlug?.id : Number(params.get("wilaya")) || undefined;
 
   const currentItemType = params.get("itemType") ?? "";
+  const currentCategory = params.get("category") ?? "";
+  const currentWilaya = params.get("wilaya") ?? "";
+  const currentMinPrice = params.get("minPrice") ?? "";
+  const currentMaxPrice = params.get("maxPrice") ?? "";
+  const currentCondition = params.get("condition") ?? "";
+  const currentQ = params.get("q") ?? "";
+
+  const activeFiltersCount = [
+    currentCategory,
+    currentWilaya,
+    currentMinPrice,
+    currentMaxPrice,
+    currentCondition,
+    currentItemType,
+    currentQ,
+  ].filter(Boolean).length;
 
   const [draft, setDraft] = useState({
     q: params.get("q") ?? "",
@@ -271,11 +287,27 @@ export function Search({ mode }: { mode: Mode }) {
           />
           <button
             type="button"
-            className="btn btn-secondary filter-toggle"
+            className={`btn filter-toggle ${activeFiltersCount > 0 ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setShowFilters((value) => !value)}
             aria-expanded={showFilters}
           >
-            <Icon name="filter" size={16} /> {t("common.filters")}
+            <Icon name="filter" size={16} />
+            <span>{t("common.filters")}</span>
+            {activeFiltersCount > 0 ? (
+              <span
+                style={{
+                  background: "rgba(255, 255, 255, 0.3)",
+                  color: "#ffffff",
+                  padding: "1px 6px",
+                  borderRadius: "99px",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  marginLeft: 4,
+                }}
+              >
+                {activeFiltersCount}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>
@@ -429,6 +461,126 @@ export function Search({ mode }: { mode: Mode }) {
         </form>
 
         <div>
+          {activeFiltersCount > 0 ? (
+            <div className="active-filters" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16, alignItems: "center" }}>
+              <span className="small muted" style={{ fontWeight: 600 }}>
+                {lang === "ar" ? "التصفيات النشطة:" : "Filtres actifs :"}
+              </span>
+              {currentCategory ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("category");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>{meta.data?.categories.find((c) => String(c.id) === currentCategory)?.[lang === "ar" ? "nameAr" : "nameFr"] || currentCategory}</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              {currentWilaya ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("wilaya");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>{meta.data?.wilayas.find((w) => String(w.id) === currentWilaya)?.[lang === "ar" ? "nameAr" : "nameFr"] || `Wilaya ${currentWilaya}`}</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              {currentMinPrice ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("minPrice");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>≥ {currentMinPrice} DA</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              {currentMaxPrice ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("maxPrice");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>≤ {currentMaxPrice} DA</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              {currentCondition ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("condition");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>{currentCondition === "NEW" ? (lang === "ar" ? "جديد" : "Neuf") : (lang === "ar" ? "مستعمل" : "Occasion")}</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              {currentItemType ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("itemType");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>{currentItemType}</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              {currentQ ? (
+                <button
+                  type="button"
+                  style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "var(--brand-800)", borderRadius: 99, padding: "3px 10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("q");
+                    next.delete("page");
+                    setParams(next);
+                  }}
+                >
+                  <span>"{currentQ}"</span>
+                  <Icon name="x" size={13} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn-link small"
+                style={{ color: "var(--danger)", fontWeight: 600, paddingInline: 6 }}
+                onClick={clearFilters}
+              >
+                {t("search.clear")}
+              </button>
+            </div>
+          ) : null}
           {results.loading ? (
             <SkeletonStack count={6} />
           ) : results.error ? (

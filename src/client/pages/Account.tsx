@@ -178,7 +178,7 @@ export function Account() {
   const { t, lang, setLang } = useI18n();
   const { theme, setTheme } = useTheme();
   const isAr = lang === "ar";
-  useDocumentTitle(isAr ? "حسابي والإعدادات — أزار نغ" : "Mon compte & Paramètres — Aẓar Neɣ");
+  useDocumentTitle(isAr ? "حسابي والإعدادات — أزار نغ" : "Mon compte & Paramètres — Azar Negh");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { push } = useToast();
@@ -537,7 +537,7 @@ export function Account() {
               </div>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <h2 style={{ fontSize: "var(--text-lg)", fontWeight: 800, margin: 0, color: "var(--ink)" }}>
-                  {isAr ? "مرحباً بك في أزار نغ" : <>Bienvenue sur Aẓar <span className="brand-negh">Neɣ</span></>}
+                  {isAr ? "مرحباً بك في أزار نغ" : <>Bienvenue sur Azar <span className="brand-negh">Negh</span></>}
                 </h2>
                 <p className="small muted" style={{ margin: "4px 0 0 0" }}>
                   {isAr
@@ -681,7 +681,7 @@ export function Account() {
 
           <div style={{ textAlign: "center", padding: "16px 0 calc(var(--tabbar-height, 68px) + 24px) 0" }}>
             <p className="small muted" style={{ margin: 0 }}>
-              Aẓar <span className="brand-negh">Neɣ</span> · {isAr ? "النسخة 2.0 — السوق الجزائري المحلي" : "Version 2.0 — Marketplace Algérie"}
+              Azar <span className="brand-negh">Negh</span> · {isAr ? "النسخة 2.0 — السوق الجزائري المحلي" : "Version 2.0 — Marketplace Algérie"}
             </p>
           </div>
         </div>
