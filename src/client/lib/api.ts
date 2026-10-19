@@ -77,6 +77,9 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
   if (options.body instanceof FormData) {
     body = options.body;
+  } else if (typeof options.body === "string") {
+    headers["content-type"] = "application/json";
+    body = options.body;
   } else if (options.body !== undefined) {
     headers["content-type"] = "application/json";
     body = JSON.stringify(options.body);

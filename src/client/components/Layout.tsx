@@ -32,7 +32,33 @@ function getGreeting(user: { displayName?: string | null } | null, lang: string)
   return firstName ? `${timeGreeting}, ${firstName}` : `${timeGreeting} 👋`;
 }
 
+if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+  window.history.scrollRestoration = "manual";
+}
+
 const scrollPositions = new Map<string, number>();
+
+function saveScroll(key: string, pathname: string, y: number) {
+  scrollPositions.set(key, y);
+  scrollPositions.set(pathname, y);
+  try {
+    sessionStorage.setItem(`azar:scroll:${pathname}`, String(y));
+  } catch {
+    // ignore
+  }
+}
+
+function getSavedScroll(key: string, pathname: string): number {
+  if (scrollPositions.has(key)) return scrollPositions.get(key)!;
+  if (scrollPositions.has(pathname)) return scrollPositions.get(pathname)!;
+  try {
+    const val = sessionStorage.getItem(`azar:scroll:${pathname}`);
+    if (val !== null) return parseInt(val, 10);
+  } catch {
+    // ignore
+  }
+  return 0;
+}
 
 function SmartScrollRestoration() {
   const location = useLocation();
@@ -40,24 +66,25 @@ function SmartScrollRestoration() {
 
   useEffect(() => {
     const handleScroll = () => {
-      scrollPositions.set(location.key, window.scrollY);
+      saveScroll(location.key, location.pathname, window.scrollY);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      scrollPositions.set(location.key, window.scrollY);
+      saveScroll(location.key, location.pathname, window.scrollY);
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [location.key]);
+  }, [location.key, location.pathname]);
 
   useEffect(() => {
     if (navType === "POP") {
-      const savedY = scrollPositions.get(location.key) ?? 0;
+      const savedY = getSavedScroll(location.key, location.pathname);
       window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
+      });
       const timer = setTimeout(() => {
-        if (Math.abs(window.scrollY - savedY) > 50) {
-          window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
-        }
-      }, 60);
+        window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
+      }, 50);
       return () => clearTimeout(timer);
     } else {
       window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });

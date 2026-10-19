@@ -65,6 +65,16 @@ function flattenCategories(
   return result;
 }
 
+interface SearchCacheEntry {
+  items: ListingSummary[];
+  currentPage: number;
+  totalCount: number;
+  totalPages: number;
+  timestamp: number;
+}
+
+const searchCache = new Map<string, SearchCacheEntry>();
+
 export function Search({ mode }: { mode: Mode }) {
   const { t, lang } = useI18n();
   const { slug } = useParams();
@@ -139,11 +149,12 @@ export function Search({ mode }: { mode: Mode }) {
     return query.toString();
   }, [effectiveCategory, effectiveWilaya, params, sort]);
 
-  const [items, setItems] = useState<ListingSummary[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const initialCache = searchCache.get(baseFilterQuery);
+  const [items, setItems] = useState<ListingSummary[]>(() => initialCache?.items ?? []);
+  const [currentPage, setCurrentPage] = useState(() => initialCache?.currentPage ?? 1);
+  const [totalCount, setTotalCount] = useState(() => initialCache?.totalCount ?? 0);
+  const [totalPages, setTotalPages] = useState(() => initialCache?.totalPages ?? 1);
+  const [initialLoading, setInitialLoading] = useState(() => !initialCache);
   const [loadingMore, setLoadingMore] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [matchingStores, setMatchingStores] = useState<MatchingStore[]>([]);
@@ -168,7 +179,17 @@ export function Search({ mode }: { mode: Mode }) {
   }, [params.get("q")]);
 
   const loadInitial = () => {
-    setInitialLoading(true);
+    const cached = searchCache.get(baseFilterQuery);
+    if (cached && Date.now() - cached.timestamp < 120_000) {
+      setItems(cached.items);
+      setCurrentPage(cached.currentPage);
+      setTotalCount(cached.totalCount);
+      setTotalPages(cached.totalPages);
+      setInitialLoading(false);
+      return;
+    }
+
+    setInitialLoading(!cached);
     setFetchError(null);
     setCurrentPage(1);
 
@@ -182,6 +203,13 @@ export function Search({ mode }: { mode: Mode }) {
         setTotalCount(data.listings.total);
         setTotalPages(data.listings.totalPages);
         setInitialLoading(false);
+        searchCache.set(baseFilterQuery, {
+          items: data.listings.items,
+          currentPage: 1,
+          totalCount: data.listings.total,
+          totalPages: data.listings.totalPages,
+          timestamp: Date.now(),
+        });
       })
       .catch((err) => {
         setFetchError(errorMessage(err));
@@ -208,7 +236,15 @@ export function Search({ mode }: { mode: Mode }) {
       setItems((prev) => {
         const seen = new Set(prev.map((it) => it.id));
         const fresh = data.listings.items.filter((it) => !seen.has(it.id));
-        return [...prev, ...fresh];
+        const combined = [...prev, ...fresh];
+        searchCache.set(baseFilterQuery, {
+          items: combined,
+          currentPage: nextPage,
+          totalCount: data.listings.total,
+          totalPages: data.listings.totalPages,
+          timestamp: Date.now(),
+        });
+        return combined;
       });
       setCurrentPage(nextPage);
       setTotalCount(data.listings.total);

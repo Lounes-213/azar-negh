@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -268,7 +269,7 @@ export function Dialog({
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
+  const content = (
     <div
       className="dialog-backdrop"
       onMouseDown={(event) => {
@@ -293,6 +294,11 @@ export function Dialog({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined") {
+    return createPortal(content, document.body);
+  }
+  return content;
 }
 
 /* ------------------------------------------------------------------ toasts */

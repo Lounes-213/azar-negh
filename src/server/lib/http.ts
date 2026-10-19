@@ -31,6 +31,13 @@ export async function parseJson<T>(c: Context<AppEnv>, schema: ZodType<T>): Prom
   let raw: unknown;
   try {
     raw = await c.req.json();
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        // keep raw
+      }
+    }
   } catch {
     throw new HttpError(400, "INVALID_JSON", "Le corps de la requête doit être un JSON valide.");
   }

@@ -148,16 +148,16 @@ export function Sell() {
       const activeWil = meta.data?.wilayas.find((w) => String(w.id) === wilayaId);
       const res = await api<{ text: string }>("/ai/assist", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           action: "generate",
           title: title.trim(),
           categoryName: activeCat ? (lang === "ar" ? activeCat.nameAr : activeCat.nameFr) : undefined,
           wilayaName: activeWil ? (lang === "ar" ? activeWil.nameAr : activeWil.nameFr) : undefined,
-          priceDa: Number(priceDa) || undefined,
+          priceDa: Number(priceDa) > 0 ? Number(priceDa) : undefined,
           condition: t(`cond.${condition}`),
           itemType,
           lang: lang === "ar" ? "ar" : "fr",
-        }),
+        },
       });
       if (res.text) {
         const trimmed = res.text.length > 120 ? res.text.slice(0, 117).trim() + "..." : res.text.trim();
@@ -188,11 +188,11 @@ export function Sell() {
     try {
       const res = await api<{ text: string }>("/ai/assist", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           action: "improve",
           text: description.trim(),
           lang: lang === "ar" ? "ar" : "fr",
-        }),
+        },
       });
       if (res.text) {
         setDescription(res.text);
@@ -216,11 +216,11 @@ export function Sell() {
       const targetLang = isArabic ? "fr" : "ar";
       const res = await api<{ text: string }>("/ai/assist", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           action: "translate",
           text: description.trim(),
           targetLang,
-        }),
+        },
       });
       if (res.text) {
         setDescription(res.text);

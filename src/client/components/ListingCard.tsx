@@ -176,7 +176,7 @@ function ListingCardInner({
         {/* Bottom Wilaya Pill */}
         <div className="ali-wilaya-pill">
           <Icon name="map-pin" size={11} />
-          <span>{lang === "ar" ? listing.wilaya.nameAr : listing.wilaya.nameFr}</span>
+          <span>{lang === "ar" ? (listing.wilaya?.nameAr || "الجزائر") : (listing.wilaya?.nameFr || "Algérie")}</span>
         </div>
       </div>
 

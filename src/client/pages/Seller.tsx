@@ -25,7 +25,7 @@ export function Seller() {
 
   const [page, setPage] = useState(1);
   const state = useAsync(
-    () => api<SellerResponse>(`/sellers/${id}?page=${page}&perPage=24`),
+    () => api<SellerResponse>(`/sellers/${encodeURIComponent(id ?? "")}?page=${page}&perPage=24`),
     [id, page],
   );
 
@@ -41,10 +41,7 @@ export function Seller() {
   const [avgRating, setAvgRating] = useState<number | null>(null);
   const [reviewsCount, setReviewsCount] = useState<number | null>(null);
 
-  // PWA & App Launch / Share Dialogs
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [appModalOpen, setAppModalOpen] = useState(false);
+  // Share Dialog
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Reordering mode for store owner
@@ -52,26 +49,48 @@ export function Seller() {
   const [orderedItems, setOrderedItems] = useState<ListingSummary[] | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
 
+  const seller = state.data?.seller;
+  const listings = state.data?.listings;
+  const isOwner = Boolean(user && seller && user.id === seller.id);
+
+  const proLink = seller?.storeSlug
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/@${seller.storeSlug}`
+    : `${typeof window !== "undefined" ? window.location.origin : ""}/boutique/${seller?.id ?? id ?? ""}`;
+
+  const storeTitle = seller?.storeName || seller?.displayName || (lang === "ar" ? "متجر" : "Boutique");
+  useDocumentTitle(`${storeTitle} | Azar Negh`);
+
+  // Update dynamic meta tags for clean social sharing (always called in the same hook order)
   useEffect(() => {
-    const standaloneMode =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      Boolean((window.navigator as unknown as { standalone?: boolean }).standalone) ||
-      document.referrer.includes("android-app://");
-    setIsStandalone(standaloneMode);
+    if (!seller) return;
+    const titleText = `${seller.storeName || seller.displayName} | Azar Negh`;
+    const wilayaLabel = lang === "ar"
+      ? (seller.wilaya?.nameAr || "الجزائر")
+      : (seller.wilaya?.nameFr || "Algérie");
+    const descText = `${seller.storeName || seller.displayName} (${wilayaLabel}) - Azar Negh`;
+    const imgUrl = seller.logoUrl || seller.bannerUrl || `${window.location.origin}/brand/icon-512.png`;
 
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
+    const setMeta = (attr: string, key: string, content: string) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, key);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
     };
-    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
-  }, []);
 
-  const storeTitle = state.data?.seller.storeName || state.data?.seller.displayName || "Boutique";
-  useDocumentTitle(`${storeTitle} — Boutique Officielle`);
+    setMeta("property", "og:title", titleText);
+    setMeta("property", "og:description", descText);
+    setMeta("property", "og:image", imgUrl);
+    setMeta("property", "og:url", proLink);
+    setMeta("name", "twitter:title", titleText);
+    setMeta("name", "twitter:description", descText);
+    setMeta("name", "twitter:image", imgUrl);
+  }, [seller, proLink, lang]);
 
   if (state.loading) return <Spinner />;
-  if (state.error || !state.data) {
+  if (state.error || !state.data || !seller || !listings) {
     return (
       <div className="container page page-enter">
         <EmptyState
@@ -82,9 +101,6 @@ export function Seller() {
       </div>
     );
   }
-
-  const { seller, listings } = state.data;
-  const isOwner = user?.id === seller.id;
 
   const currentIsFollowing = isFollowing !== null ? isFollowing : seller.isFollowing;
   const currentFollowersCount = followersCount !== null ? followersCount : seller.followersCount;
@@ -117,79 +133,6 @@ export function Seller() {
     }
   };
 
-  const proLink = seller.storeSlug
-    ? `${window.location.origin}/@${seller.storeSlug}`
-    : `${window.location.origin}/boutique/${seller.id}`;
-
-  // Update dynamic meta tags for clean social sharing
-  useEffect(() => {
-    const titleText = `${seller.storeName || seller.displayName} — Boutique Officielle | Azar Negh`;
-    const wilayaLabel = lang === "ar"
-      ? (seller.wilaya?.nameAr || "الجزائر")
-      : (seller.wilaya?.nameFr || "Algérie");
-    const descText = `${seller.storeName || seller.displayName} (${wilayaLabel}) sur l'application Azar Negh. Catalogue officiel des produits.`;
-    const imgUrl = seller.logoUrl || seller.bannerUrl || `${window.location.origin}/brand/icon-512.png`;
-
-    const setMeta = (attr: string, key: string, content: string) => {
-      let el = document.querySelector(`meta[${attr}="${key}"]`);
-      if (!el) {
-        el = document.createElement("meta");
-        el.setAttribute(attr, key);
-        document.head.appendChild(el);
-      }
-      el.setAttribute("content", content);
-    };
-
-    setMeta("property", "og:title", titleText);
-    setMeta("property", "og:description", descText);
-    setMeta("property", "og:image", imgUrl);
-    setMeta("property", "og:url", proLink);
-    setMeta("name", "twitter:title", titleText);
-    setMeta("name", "twitter:description", descText);
-    setMeta("name", "twitter:image", imgUrl);
-  }, [seller, proLink, lang]);
-
-  const handleOpenInApp = async () => {
-    if (isStandalone) {
-      push(
-        lang === "ar"
-          ? "أنت تتصفح بالفعل داخل تطبيق أزار نغ الرسمي !"
-          : "Vous êtes déjà dans l'application officielle Azar Negh !",
-        "success",
-      );
-      return;
-    }
-
-    if (deferredPrompt) {
-      try {
-        deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
-        if (choice.outcome === "accepted") {
-          push(lang === "ar" ? "جاري فتح التطبيق..." : "Ouverture de l'application...", "success");
-          return;
-        }
-      } catch {
-        // fallback
-      }
-    }
-
-    const isAndroid = /android/i.test(navigator.userAgent);
-    if (isAndroid) {
-      const intentTarget = seller.storeSlug ? `@${seller.storeSlug}` : seller.id;
-      const intentUrl = `intent://${window.location.host}/boutique/${intentTarget}#Intent;scheme=https;package=com.azarnegh.app;action=android.intent.action.VIEW;end;`;
-      try {
-        window.location.href = intentUrl;
-        setTimeout(() => {
-          setAppModalOpen(true);
-        }, 1200);
-        return;
-      } catch {
-        // fallback
-      }
-    }
-
-    setAppModalOpen(true);
-  };
 
   const handleShareStore = () => {
     setShareModalOpen(true);
@@ -258,74 +201,6 @@ export function Seller() {
 
   return (
     <div className="container page page-enter">
-      {/* Smart App Bar for Browser Users */}
-      {!isStandalone && (
-        <div
-          className="store-smart-app-banner mb-4"
-          style={{
-            background: "linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(21, 128, 61, 0.16) 100%)",
-            border: "1.5px solid rgba(22, 163, 74, 0.3)",
-            borderRadius: "var(--radius-lg)",
-            padding: "12px 18px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 14,
-            flexWrap: "wrap",
-            boxShadow: "0 4px 14px rgba(22, 163, 74, 0.08)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "12px",
-                background: "linear-gradient(135deg, #22c55e, #15803d)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 6,
-                boxShadow: "0 4px 10px rgba(22, 163, 74, 0.25)",
-                flexShrink: 0,
-              }}
-            >
-              <img src="/brand/icon.svg" alt="Azar Neɣ" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <strong style={{ fontSize: "0.95rem" }}>Azar Neɣ</strong>
-                <span
-                  style={{
-                    fontSize: "0.7rem",
-                    fontWeight: 700,
-                    background: "var(--brand-700)",
-                    color: "#fff",
-                    padding: "1px 7px",
-                    borderRadius: 10,
-                  }}
-                >
-                  {lang === "ar" ? "تطبيق رسمي" : "App officielle"}
-                </span>
-              </div>
-              <div className="small muted">
-                {lang === "ar"
-                  ? `تصفح متجر « ${seller.storeName || seller.displayName} » في التطبيق مباشرة`
-                  : `Consultez la boutique « ${seller.storeName || seller.displayName} » directement sur l'application`}
-              </div>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            onClick={handleOpenInApp}
-            style={{ fontWeight: 700, padding: "9px 18px", boxShadow: "0 4px 10px rgba(22, 163, 74, 0.25)", whiteSpace: "nowrap" }}
-          >
-            <Icon name="arrow-right" size={14} style={{ transform: "rotate(90deg)" }} />
-            <span>{lang === "ar" ? "فتح في التطبيق" : "Voir sur l'app"}</span>
-          </Button>
-        </div>
-      )}
-
       {/* Store Header Card */}
       <div className="store-header-card mb-6">
         {/* Sleek, customizable slim banner for all stores (default brand green, color-customizable) */}
@@ -457,21 +332,6 @@ export function Seller() {
             <Button variant="ghost" size="sm" onClick={handleShareStore} title="Partager la boutique">
               <Icon name="share" size={16} />
               <span>{lang === "ar" ? "مشاركة" : "Partager"}</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleOpenInApp}
-              title={lang === "ar" ? "فتح في تطبيق أزار نغ" : "Voir sur l'application"}
-              style={{
-                borderColor: "var(--brand-600)",
-                color: "var(--brand-700)",
-                fontWeight: 700,
-              }}
-            >
-              <Icon name="arrow-right" size={14} style={{ transform: "rotate(90deg)" }} />
-              <span>{lang === "ar" ? "فتح في التطبيق" : "Voir sur l'app"}</span>
             </Button>
 
             {seller.phone ? (
@@ -657,11 +517,11 @@ export function Seller() {
         </form>
       </Dialog>
 
-      {/* Professional Store Share Dialog */}
+      {/* Store Share Dialog */}
       <Dialog
         open={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
-        title={lang === "ar" ? "مشاركة رابط المتجر الاحترافي" : "Partager le lien Pro de la boutique"}
+        title={lang === "ar" ? "مشاركة رابط المتجر" : "Partager le lien de la boutique"}
       >
         <div className="stack" style={{ gap: 16, padding: "8px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 12, borderBottom: "1px solid var(--line)" }}>
@@ -677,8 +537,8 @@ export function Seller() {
 
           <p className="small muted" style={{ margin: 0 }}>
             {lang === "ar"
-              ? "هذا الرابط مخصص لمتجرك ومعروضاتك فقط، لا يحتوي على إعلانات منافسة أو منتجات خارجية :"
-              : "Lien officiel et sécurisé dédié exclusivement à votre boutique sans aucune annonce externe ni concurrente :"}
+              ? "رابط مخصص لمتجرك ومعروضاتك، شاركه مع زبائنك لتصفح منتجاتك مباشرة :"
+              : "Lien dédié à votre boutique pour permettre à vos clients de consulter directement tous vos produits :"}
           </p>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -702,7 +562,7 @@ export function Seller() {
               size="sm"
               onClick={async () => {
                 await navigator.clipboard.writeText(proLink);
-                push(lang === "ar" ? "تم نسخ الرابط الاحترافي بنجاح !" : "Lien Pro copié avec succès !", "success");
+                push(lang === "ar" ? "تم نسخ الرابط بنجاح !" : "Lien copié !", "success");
               }}
             >
               <Icon name="copy" size={14} />
@@ -710,13 +570,33 @@ export function Seller() {
             </Button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
+          {/* Prominent Full-Width Copy Button */}
+          <Button
+            variant="primary"
+            style={{
+              width: "100%",
+              justifyContent: "center",
+              gap: 8,
+              padding: "12px 16px",
+              fontWeight: 700,
+              fontSize: "0.98rem",
+            }}
+            onClick={async () => {
+              await navigator.clipboard.writeText(proLink);
+              push(lang === "ar" ? "تم نسخ رابط المتجر بنجاح !" : "Lien de la boutique copié !", "success");
+            }}
+          >
+            <Icon name="copy" size={18} />
+            <span>{lang === "ar" ? "نسخ رابط المتجر" : "Copier le lien de la boutique"}</span>
+          </Button>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <a
-              href={`https://wa.me/?text=${encodeURIComponent(`${seller.storeName || seller.displayName} sur Azar Neɣ :\n${proLink}`)}`}
+              href={`https://wa.me/?text=${encodeURIComponent(`${seller.storeName || seller.displayName} :\n${proLink}`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-secondary btn-sm"
-              style={{ justifyContent: "center", gap: 6, fontWeight: 700 }}
+              style={{ justifyContent: "center", gap: 6, fontWeight: 700, padding: "10px" }}
             >
               <Icon name="whatsapp" size={16} />
               <span>WhatsApp</span>
@@ -728,8 +608,8 @@ export function Seller() {
                 if (navigator.share) {
                   try {
                     await navigator.share({
-                      title: `${seller.storeName || seller.displayName} — Boutique Officielle`,
-                      text: `Découvrez la boutique officielle ${seller.storeName || seller.displayName} sur l'application Azar Negh :`,
+                      title: `${seller.storeName || seller.displayName}`,
+                      text: `Boutique ${seller.storeName || seller.displayName} sur Azar Negh :`,
                       url: proLink,
                     });
                   } catch {
@@ -740,128 +620,12 @@ export function Seller() {
                   push(lang === "ar" ? "تم نسخ الرابط !" : "Lien copié !", "success");
                 }
               }}
-              style={{ justifyContent: "center", gap: 6, fontWeight: 700 }}
+              style={{ justifyContent: "center", gap: 6, fontWeight: 700, padding: "10px" }}
             >
               <Icon name="share" size={15} />
-              <span>{lang === "ar" ? "خيارات أكثر" : "Plus d'options"}</span>
+              <span>{lang === "ar" ? "مشاركة عبر..." : "Plus d'options"}</span>
             </Button>
           </div>
-        </div>
-      </Dialog>
-
-      {/* App Direct Launch / Install Dialog */}
-      <Dialog
-        open={appModalOpen}
-        onClose={() => setAppModalOpen(false)}
-        title={lang === "ar" ? "فتح في تطبيق Azar Negh" : "Ouvrir dans l'application Azar Negh"}
-      >
-        <div className="stack" style={{ gap: 16, padding: "8px 0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 12, borderBottom: "1px solid var(--line)" }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 14,
-                background: "linear-gradient(135deg, #22c55e, #15803d)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 6,
-                boxShadow: "0 4px 12px rgba(22, 163, 74, 0.3)",
-                flexShrink: 0,
-              }}
-            >
-              <img src="/brand/icon.svg" alt="Azar Neɣ" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>Azar Neɣ</div>
-              <div className="small muted">
-                {lang === "ar" ? "التطبيق الرسمي للتجارة والمتاجر" : "Application officielle e-commerce & boutiques"}
-              </div>
-            </div>
-          </div>
-
-          <p style={{ margin: 0, fontSize: "0.92rem", lineHeight: 1.5, color: "var(--ink-muted)" }}>
-            {lang === "ar"
-              ? `تصفح متجر « ${seller.storeName || seller.displayName} » في التطبيق مباشرة بدون متصفح، بسرعة أكبر وتجربة سلسة.`
-              : `Consultez la boutique « ${seller.storeName || seller.displayName} » directement dans l'application pour une expérience fluide, rapide et sans navigateur.`}
-          </p>
-
-          {/* Test / Launch App Actions */}
-          <div className="stack" style={{ gap: 10 }}>
-            {deferredPrompt ? (
-              <Button
-                variant="primary"
-                onClick={async () => {
-                  try {
-                    deferredPrompt.prompt();
-                    const choice = await deferredPrompt.userChoice;
-                    if (choice.outcome === "accepted") {
-                      setAppModalOpen(false);
-                      push(lang === "ar" ? "تم تثبيت التطبيق بنجاح !" : "Application installée !", "success");
-                    }
-                  } catch {
-                    // fallback
-                  }
-                }}
-                style={{ width: "100%", justifyContent: "center", padding: "12px 18px", fontWeight: 700 }}
-              >
-                <Icon name="arrow-right" size={16} style={{ transform: "rotate(90deg)" }} />
-                <span>{lang === "ar" ? "تثبيت وفتح التطبيق فوراً" : "Installer & Ouvrir l'application"}</span>
-              </Button>
-            ) : null}
-
-            <Button
-              variant="secondary"
-              onClick={() => {
-                const isAndroid = /android/i.test(navigator.userAgent);
-                if (isAndroid) {
-                  const intentTarget = seller.storeSlug ? `@${seller.storeSlug}` : seller.id;
-                  window.location.href = `intent://${window.location.host}/boutique/${intentTarget}#Intent;scheme=https;package=com.azarnegh.app;action=android.intent.action.VIEW;end;`;
-                } else {
-                  window.open(proLink, "_blank");
-                }
-              }}
-              style={{ width: "100%", justifyContent: "center", fontWeight: 700 }}
-            >
-              <Icon name="phone" size={15} />
-              <span>{lang === "ar" ? "اختبار فتح التطبيق المباشر" : "Tester l'ouverture dans l'app"}</span>
-            </Button>
-          </div>
-
-          {/* Guide for iPhone users if not installed */}
-          <div
-            style={{
-              background: "var(--surface-muted)",
-              borderRadius: "var(--radius-md)",
-              padding: "12px 14px",
-              fontSize: "0.85rem",
-              lineHeight: 1.45,
-              color: "var(--ink)",
-            }}
-          >
-            <strong>{lang === "ar" ? "طريقة التثبيت السريعة :" : "Pour un accès permanent en 1 clic :"}</strong>
-            <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-              <span>
-                {lang === "ar"
-                  ? "• في متصفح Safari (iPhone): اضغط مشاركة (📤) ثم «إضافة إلى الشاشة الرئيسية» (➕)."
-                  : "• Sur iPhone (Safari) : Appuyez sur Partager (📤) puis « Sur l'écran d'accueil » (➕)."}
-              </span>
-              <span>
-                {lang === "ar"
-                  ? "• في Google Chrome (Android): اضغط (⋮) ثم «تثبيت التطبيق»."
-                  : "• Sur Android (Chrome) : Ouvrez le menu (⋮) puis « Installer l'application »."}
-              </span>
-            </div>
-          </div>
-
-          <Button
-            variant="ghost"
-            onClick={() => setAppModalOpen(false)}
-            style={{ width: "100%", justifyContent: "center" }}
-          >
-            {lang === "ar" ? "متابعة التصفح على الويب" : "Continuer sur le navigateur"}
-          </Button>
         </div>
       </Dialog>
     </div>

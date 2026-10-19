@@ -17,6 +17,15 @@ const TABS = [
   { key: "fresh", label: "Nouveautés", labelAr: "جديد", to: "/annonces?sort=newest" },
 ];
 
+interface HomeCache {
+  listings: ListingSummary[];
+  total: number;
+  page: number;
+  timestamp: number;
+}
+
+let homeCache: HomeCache | null = null;
+
 export function Home() {
   const { t, lang } = useI18n();
   useDocumentTitle("");
@@ -25,21 +34,32 @@ export function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const meta = useAsync(() => api<MetaResponse>("/meta"), []);
-  const [homeListings, setHomeListings] = useState<ListingSummary[]>([]);
-  const [homeTotal, setHomeTotal] = useState(0);
-  const [homePage, setHomePage] = useState(1);
-  const [homeLoading, setHomeLoading] = useState(true);
+  const [homeListings, setHomeListings] = useState<ListingSummary[]>(() => homeCache?.listings ?? []);
+  const [homeTotal, setHomeTotal] = useState(() => homeCache?.total ?? 0);
+  const [homePage, setHomePage] = useState(() => homeCache?.page ?? 1);
+  const [homeLoading, setHomeLoading] = useState(() => !homeCache);
   const [homeLoadingMore, setHomeLoadingMore] = useState(false);
 
   useEffect(() => {
     let active = true;
-    setHomeLoading(true);
+    // If cached within the last 2 minutes, keep instant render without resetting scroll
+    if (homeCache && Date.now() - homeCache.timestamp < 120_000) {
+      setHomeLoading(false);
+      return;
+    }
+    setHomeLoading(!homeCache);
     api<{ listings: Paginated<ListingSummary> }>("/listings?sort=newest&perPage=8&page=1")
       .then((res) => {
         if (!active) return;
         setHomeListings(res.listings.items);
         setHomeTotal(res.listings.total);
         setHomePage(1);
+        homeCache = {
+          listings: res.listings.items,
+          total: res.listings.total,
+          page: 1,
+          timestamp: Date.now(),
+        };
       })
       .catch(() => {
         // silent
@@ -60,7 +80,16 @@ export function Home() {
       const res = await api<{ listings: Paginated<ListingSummary> }>(
         `/listings?sort=newest&perPage=8&page=${nextPage}`,
       );
-      setHomeListings((prev) => [...prev, ...res.listings.items]);
+      setHomeListings((prev) => {
+        const nextListings = [...prev, ...res.listings.items];
+        homeCache = {
+          listings: nextListings,
+          total: res.listings.total,
+          page: nextPage,
+          timestamp: Date.now(),
+        };
+        return nextListings;
+      });
       setHomePage(nextPage);
       setHomeTotal(res.listings.total);
     } catch {

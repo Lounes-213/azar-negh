@@ -363,7 +363,7 @@ export function ListingDetail() {
                   <span className="muted">·</span>
                   <span className="muted">
                     <Icon name="map-pin" size={12} />{" "}
-                    {lang === "ar" ? listing.wilaya.nameAr : listing.wilaya.nameFr}
+                    {lang === "ar" ? (listing.wilaya?.nameAr || "الجزائر") : (listing.wilaya?.nameFr || "Algérie")}
                   </span>
                 </div>
                 <p className="small muted mt-1">

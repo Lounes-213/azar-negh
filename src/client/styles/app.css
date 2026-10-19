@@ -2142,12 +2142,23 @@ ol {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(10, 18, 14, 0.5);
-  backdrop-filter: blur(2px);
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: var(--space-4);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100dvh;
+  background: rgba(10, 18, 14, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(20px, 12vh);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .dialog {
@@ -2155,10 +2166,24 @@ ol {
   max-width: 520px;
   background: var(--surface);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08);
   padding: var(--space-6);
-  max-height: 90vh;
+  max-height: 85dvh;
   overflow-y: auto;
+  position: relative;
+  margin: 0 auto;
+  animation: dialog-appear 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dialog-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .dialog-head {

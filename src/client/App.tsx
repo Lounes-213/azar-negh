@@ -109,7 +109,9 @@ export function App() {
           <Route path="annonces/:id" element={<ListingDetail />} />
           <Route path="vendeurs/:id" element={<Seller />} />
           <Route path="boutique/:id" element={<Seller />} />
+          <Route path="magasin/:id" element={<Seller />} />
           <Route path="store/:id" element={<Seller />} />
+          <Route path="@:id" element={<Seller />} />
           <Route path="connexion" element={<Login />} />
           <Route path="conditions" element={<Terms />} />
           <Route path="confidentialite" element={<Privacy />} />

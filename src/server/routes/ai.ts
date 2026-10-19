@@ -445,18 +445,18 @@ aiRoutes.post("/ai/chat", async (c) => {
 
 const aiAssistSchema = z.object({
   action: z.enum(["generate", "improve", "translate", "auto_fill"]),
-  title: z.string().max(120).optional(),
-  categoryName: z.string().max(80).optional(),
-  wilayaName: z.string().max(80).optional(),
-  priceDa: z.number().nonnegative().optional(),
-  condition: z.string().max(40).optional(),
-  itemType: z.string().max(40).optional(),
-  text: z.string().max(4000).optional(),
-  lang: z.enum(["fr", "ar"]).optional(),
-  targetLang: z.enum(["fr", "ar"]).optional(),
-  imageId: z.string().optional(),
-  imageBase64: z.string().max(7 * 1024 * 1024).optional(),
-  imageMimeType: z.string().max(50).optional(),
+  title: z.string().max(200).nullable().optional(),
+  categoryName: z.string().max(100).nullable().optional(),
+  wilayaName: z.string().max(100).nullable().optional(),
+  priceDa: z.union([z.number().nonnegative(), z.null()]).optional(),
+  condition: z.string().max(60).nullable().optional(),
+  itemType: z.string().max(60).nullable().optional(),
+  text: z.string().max(4000).nullable().optional(),
+  lang: z.enum(["fr", "ar"]).nullable().optional(),
+  targetLang: z.enum(["fr", "ar"]).nullable().optional(),
+  imageId: z.string().nullable().optional(),
+  imageBase64: z.string().max(7 * 1024 * 1024).nullable().optional(),
+  imageMimeType: z.string().max(50).nullable().optional(),
 });
 
 aiRoutes.post("/ai/assist", async (c) => {
@@ -520,7 +520,7 @@ aiRoutes.post("/ai/assist", async (c) => {
 
     const result = await autoFillListing(c.env, {
       itemType: input.itemType || "PRODUCT",
-      draftTitle: input.title,
+      draftTitle: input.title ?? undefined,
       image: imageData ? { mimeType, data: imageData } : undefined,
       categories,
       lang: input.lang || "ar",
@@ -535,12 +535,12 @@ aiRoutes.post("/ai/assist", async (c) => {
     }
     const text = await generateListingDescription(c.env, {
       title: input.title,
-      categoryName: input.categoryName,
-      wilayaName: input.wilayaName,
-      priceDa: input.priceDa,
-      condition: input.condition,
-      itemType: input.itemType,
-      lang: input.lang,
+      categoryName: input.categoryName ?? undefined,
+      wilayaName: input.wilayaName ?? undefined,
+      priceDa: input.priceDa ?? undefined,
+      condition: input.condition ?? undefined,
+      itemType: input.itemType ?? undefined,
+      lang: input.lang ?? undefined,
     });
     return c.json({ text });
   }
@@ -549,7 +549,7 @@ aiRoutes.post("/ai/assist", async (c) => {
     if (!input.text || input.text.trim().length < 5) {
       throw new HttpError(422, "TEXT_TOO_SHORT", "Le texte à améliorer est trop court.");
     }
-    const text = await improveDescriptionText(c.env, input.text, input.lang);
+    const text = await improveDescriptionText(c.env, input.text, input.lang ?? undefined);
     return c.json({ text });
   }
 
