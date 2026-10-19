@@ -37,27 +37,86 @@ if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
 }
 
 const scrollPositions = new Map<string, number>();
+let isRestoring = false;
+let lastKnownPathname = "";
 
-function saveScroll(key: string, pathname: string, y: number) {
-  scrollPositions.set(key, y);
-  scrollPositions.set(pathname, y);
-  try {
-    sessionStorage.setItem(`azar:scroll:${pathname}`, String(y));
-  } catch {
-    // ignore
+export function saveScroll(key: string, pathname: string, y: number) {
+  if (isRestoring) return;
+  if (y > 0) {
+    scrollPositions.set(key, y);
+    scrollPositions.set(pathname, y);
+    try {
+      sessionStorage.setItem(`azar:scroll:${pathname}`, String(y));
+      sessionStorage.setItem(`azar:scroll:${key}`, String(y));
+    } catch {
+      // ignore
+    }
   }
 }
 
-function getSavedScroll(key: string, pathname: string): number {
-  if (scrollPositions.has(key)) return scrollPositions.get(key)!;
-  if (scrollPositions.has(pathname)) return scrollPositions.get(pathname)!;
+export function getSavedScroll(key: string, pathname: string): number {
+  const inMemKey = scrollPositions.get(key);
+  if (inMemKey && inMemKey > 0) return inMemKey;
+  const inMemPath = scrollPositions.get(pathname);
+  if (inMemPath && inMemPath > 0) return inMemPath;
   try {
-    const val = sessionStorage.getItem(`azar:scroll:${pathname}`);
-    if (val !== null) return parseInt(val, 10);
+    const valKey = sessionStorage.getItem(`azar:scroll:${key}`);
+    if (valKey !== null) {
+      const parsed = parseInt(valKey, 10);
+      if (parsed > 0) return parsed;
+    }
+    const valPath = sessionStorage.getItem(`azar:scroll:${pathname}`);
+    if (valPath !== null) {
+      const parsed = parseInt(valPath, 10);
+      if (parsed > 0) return parsed;
+    }
   } catch {
     // ignore
   }
   return 0;
+}
+
+function restoreScrollTo(targetY: number) {
+  if (targetY <= 0) return;
+  isRestoring = true;
+
+  let frames = 0;
+  const maxFrames = 50; // up to ~800ms while DOM and images mount
+  let animationId: number;
+
+  const cancelOnInteraction = () => {
+    isRestoring = false;
+    cancelAnimationFrame(animationId);
+    window.removeEventListener("touchstart", cancelOnInteraction);
+    window.removeEventListener("wheel", cancelOnInteraction);
+    window.removeEventListener("pointerdown", cancelOnInteraction);
+  };
+
+  window.addEventListener("touchstart", cancelOnInteraction, { passive: true, once: true });
+  window.addEventListener("wheel", cancelOnInteraction, { passive: true, once: true });
+  window.addEventListener("pointerdown", cancelOnInteraction, { passive: true, once: true });
+
+  const step = () => {
+    frames++;
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const toScroll = Math.min(targetY, maxScroll);
+
+    if (toScroll > 0) {
+      window.scrollTo({ top: toScroll, left: 0, behavior: "instant" });
+    }
+
+    if (Math.abs(window.scrollY - targetY) <= 8 || frames >= maxFrames) {
+      isRestoring = false;
+      window.removeEventListener("touchstart", cancelOnInteraction);
+      window.removeEventListener("wheel", cancelOnInteraction);
+      window.removeEventListener("pointerdown", cancelOnInteraction);
+      return;
+    }
+
+    animationId = requestAnimationFrame(step);
+  };
+
+  animationId = requestAnimationFrame(step);
 }
 
 function SmartScrollRestoration() {
@@ -66,29 +125,40 @@ function SmartScrollRestoration() {
 
   useEffect(() => {
     const handleScroll = () => {
-      saveScroll(location.key, location.pathname, window.scrollY);
+      if (!isRestoring && window.scrollY > 0) {
+        saveScroll(location.key, location.pathname, window.scrollY);
+      }
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      saveScroll(location.key, location.pathname, window.scrollY);
+      if (!isRestoring && window.scrollY > 0) {
+        saveScroll(location.key, location.pathname, window.scrollY);
+      }
       window.removeEventListener("scroll", handleScroll);
     };
   }, [location.key, location.pathname]);
 
   useEffect(() => {
-    if (navType === "POP") {
+    const isReturningFromDetail =
+      lastKnownPathname.startsWith("/annonces/") &&
+      (location.pathname === "/" ||
+        location.pathname.startsWith("/annonces") ||
+        location.pathname.startsWith("/categories") ||
+        location.pathname.startsWith("/vendeurs") ||
+        location.pathname.startsWith("/boutique"));
+
+    const shouldRestore = navType === "POP" || isReturningFromDetail;
+
+    if (shouldRestore) {
       const savedY = getSavedScroll(location.key, location.pathname);
-      window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
-      });
-      const timer = setTimeout(() => {
-        window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
-      }, 50);
-      return () => clearTimeout(timer);
+      if (savedY > 0) {
+        restoreScrollTo(savedY);
+      }
     } else {
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
+
+    lastKnownPathname = location.pathname;
   }, [location.key, location.pathname, navType]);
 
   return null;

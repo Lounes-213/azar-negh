@@ -25,6 +25,7 @@ interface HomeCache {
 }
 
 let homeCache: HomeCache | null = null;
+let metaCache: MetaResponse | null = null;
 
 export function Home() {
   const { t, lang } = useI18n();
@@ -33,17 +34,23 @@ export function Home() {
   const [term, setTerm] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const meta = useAsync(() => api<MetaResponse>("/meta"), []);
+  const meta = useAsync(() => api<MetaResponse>("/meta"), [], metaCache);
   const [homeListings, setHomeListings] = useState<ListingSummary[]>(() => homeCache?.listings ?? []);
   const [homeTotal, setHomeTotal] = useState(() => homeCache?.total ?? 0);
   const [homePage, setHomePage] = useState(() => homeCache?.page ?? 1);
-  const [homeLoading, setHomeLoading] = useState(() => !homeCache);
+  const [homeLoading, setHomeLoading] = useState(() => !homeCache || homeCache.listings.length === 0);
   const [homeLoadingMore, setHomeLoadingMore] = useState(false);
 
   useEffect(() => {
+    if (meta.data) {
+      metaCache = meta.data;
+    }
+  }, [meta.data]);
+
+  useEffect(() => {
     let active = true;
-    // If cached within the last 2 minutes, keep instant render without resetting scroll
-    if (homeCache && Date.now() - homeCache.timestamp < 120_000) {
+    // If cached listings exist, preserve them completely to avoid resetting user scroll position
+    if (homeCache && homeCache.listings.length > 0) {
       setHomeLoading(false);
       return;
     }

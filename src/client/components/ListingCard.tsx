@@ -98,6 +98,13 @@ function ListingCardInner({
           tabIndex={-1}
           aria-hidden="true"
           className="ali-media-link"
+          onPointerDown={() => {
+            if (typeof window !== "undefined" && window.scrollY > 0) {
+              try {
+                sessionStorage.setItem(`azar:scroll:${window.location.pathname}`, String(window.scrollY));
+              } catch {}
+            }
+          }}
         >
           <img
             src={imageSrc}
@@ -195,7 +202,18 @@ function ListingCardInner({
         </div>
 
         {/* Product Title */}
-        <Link to={`/annonces/${listing.id}`} className="ali-product-title" title={listing.title}>
+        <Link
+          to={`/annonces/${listing.id}`}
+          className="ali-product-title"
+          title={listing.title}
+          onPointerDown={() => {
+            if (typeof window !== "undefined" && window.scrollY > 0) {
+              try {
+                sessionStorage.setItem(`azar:scroll:${window.location.pathname}`, String(window.scrollY));
+              } catch {}
+            }
+          }}
+        >
           {listing.title}
         </Link>
 

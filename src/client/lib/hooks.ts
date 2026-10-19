@@ -8,9 +8,13 @@ export interface AsyncState<T> {
   setData: (value: T) => void;
 }
 
-export function useAsync<T>(factory: () => Promise<T>, deps: unknown[]): AsyncState<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+export function useAsync<T>(
+  factory: () => Promise<T>,
+  deps: unknown[],
+  initialData: T | null = null,
+): AsyncState<T> {
+  const [data, setData] = useState<T | null>(initialData);
+  const [loading, setLoading] = useState(initialData === null);
   const [error, setError] = useState<unknown>(null);
   const [tick, setTick] = useState(0);
   const factoryRef = useRef(factory);
@@ -18,7 +22,7 @@ export function useAsync<T>(factory: () => Promise<T>, deps: unknown[]): AsyncSt
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    if (data === null) setLoading(true);
     setError(null);
     factoryRef
       .current()

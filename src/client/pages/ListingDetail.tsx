@@ -232,17 +232,67 @@ export function ListingDetail() {
 
   return (
     <div className="container page page-detail">
-      <nav className="breadcrumbs" aria-label="Fil d'Ariane">
-        <Link to="/">{t("nav.home")}</Link>
-        <Icon name="chevron-right" size={13} />
-        <Link to={`/categories/${listing.category.slug}`}>
-          {lang === "ar" ? listing.category.nameAr : listing.category.nameFr}
-        </Link>
-        <Icon name="chevron-right" size={13} />
-        <span className="truncate" style={{ maxWidth: 280 }}>
-          {listing.title}
-        </span>
-      </nav>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate("/");
+            }
+          }}
+          className="btn btn-secondary btn-sm"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontWeight: 700,
+            padding: "6px 14px",
+            borderRadius: "var(--radius-md)",
+            border: "1.5px solid var(--line)",
+            background: "var(--surface)",
+            cursor: "pointer",
+          }}
+          title={lang === "ar" ? "الرجوع للقائمة السابقة بنفس المكان" : "Retour à la position précédente"}
+        >
+          <Icon name={lang === "ar" ? "arrow-right" : "arrow-left"} size={15} />
+          <span>{lang === "ar" ? "رجوع" : "Retour"}</span>
+        </button>
+
+        <nav className="breadcrumbs" aria-label="Fil d'Ariane" style={{ margin: 0, flex: 1 }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate("/");
+              }
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              font: "inherit",
+              color: "inherit",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            {t("nav.home")}
+          </button>
+          <Icon name="chevron-right" size={13} />
+          <Link to={`/categories/${listing.category.slug}`}>
+            {lang === "ar" ? listing.category.nameAr : listing.category.nameFr}
+          </Link>
+          <Icon name="chevron-right" size={13} />
+          <span className="truncate" style={{ maxWidth: 260 }}>
+            {listing.title}
+          </span>
+        </nav>
+      </div>
 
       {ownerBanner() ? <div className="mb-4">{ownerBanner()}</div> : null}
 

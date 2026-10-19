@@ -15,6 +15,8 @@ interface SellerResponse {
   listings: Paginated<ListingSummary>;
 }
 
+const sellerCache = new Map<string, SellerResponse>();
+
 export function Seller() {
   const { id: rawId } = useParams();
   const id = rawId?.startsWith("@") ? rawId.slice(1) : rawId;
@@ -24,10 +26,18 @@ export function Seller() {
   const navigate = useNavigate();
 
   const [page, setPage] = useState(1);
+  const cachedSeller = id ? sellerCache.get(String(id)) ?? null : null;
   const state = useAsync(
     () => api<SellerResponse>(`/sellers/${encodeURIComponent(id ?? "")}?page=${page}&perPage=24`),
     [id, page],
+    cachedSeller,
   );
+
+  useEffect(() => {
+    if (state.data && id) {
+      sellerCache.set(String(id), state.data);
+    }
+  }, [state.data, id]);
 
   const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
   const [followersCount, setFollowersCount] = useState<number | null>(null);

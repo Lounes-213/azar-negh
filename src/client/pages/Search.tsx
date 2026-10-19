@@ -74,13 +74,20 @@ interface SearchCacheEntry {
 }
 
 const searchCache = new Map<string, SearchCacheEntry>();
+let searchMetaCache: MetaResponse | null = null;
 
 export function Search({ mode }: { mode: Mode }) {
   const { t, lang } = useI18n();
   const { slug } = useParams();
   const [params, setParams] = useSearchParams();
-  const meta = useAsync(() => api<MetaResponse>("/meta"), []);
+  const meta = useAsync(() => api<MetaResponse>("/meta"), [], searchMetaCache);
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    if (meta.data) {
+      searchMetaCache = meta.data;
+    }
+  }, [meta.data]);
 
   const categoryFromSlug =
     mode === "category" ? findCategoryBySlug(meta.data?.categories ?? [], slug) : undefined;
@@ -180,7 +187,7 @@ export function Search({ mode }: { mode: Mode }) {
 
   const loadInitial = () => {
     const cached = searchCache.get(baseFilterQuery);
-    if (cached && Date.now() - cached.timestamp < 120_000) {
+    if (cached && cached.items.length > 0) {
       setItems(cached.items);
       setCurrentPage(cached.currentPage);
       setTotalCount(cached.totalCount);
