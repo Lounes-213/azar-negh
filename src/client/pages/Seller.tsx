@@ -124,7 +124,10 @@ export function Seller() {
   // Update dynamic meta tags for clean social sharing
   useEffect(() => {
     const titleText = `${seller.storeName || seller.displayName} — Boutique Officielle | Azar Negh`;
-    const descText = `${seller.storeName || seller.displayName} (${lang === "ar" ? seller.wilaya.nameAr : seller.wilaya.nameFr}) sur l'application Azar Negh. Catalogue officiel des produits.`;
+    const wilayaLabel = lang === "ar"
+      ? (seller.wilaya?.nameAr || "الجزائر")
+      : (seller.wilaya?.nameFr || "Algérie");
+    const descText = `${seller.storeName || seller.displayName} (${wilayaLabel}) sur l'application Azar Negh. Catalogue officiel des produits.`;
     const imgUrl = seller.logoUrl || seller.bannerUrl || `${window.location.origin}/brand/icon-512.png`;
 
     const setMeta = (attr: string, key: string, content: string) => {
@@ -383,7 +386,7 @@ export function Seller() {
                 <Icon name="map-pin" size={14} />
                 <span>
                   {seller.commune ? `${seller.commune}, ` : ""}
-                  {lang === "ar" ? seller.wilaya.nameAr : seller.wilaya.nameFr}
+                  {lang === "ar" ? (seller.wilaya?.nameAr || "الجزائر") : (seller.wilaya?.nameFr || "Algérie")}
                 </span>
               </span>
               <span className="store-dot">·</span>
@@ -503,7 +506,7 @@ export function Seller() {
             </h3>
           </div>
           <a
-            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${seller.storeName || seller.displayName} ${seller.commune || ""} ${seller.wilaya.nameFr}`)}`}
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${seller.storeName || seller.displayName} ${seller.commune || ""} ${seller.wilaya?.nameFr || seller.wilaya?.nameAr || "Algérie"}`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-ghost btn-sm"
@@ -667,7 +670,7 @@ export function Seller() {
               <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{seller.storeName || seller.displayName}</div>
               <div className="small muted">
                 {seller.storeSlug ? `@${seller.storeSlug} · ` : ""}
-                {lang === "ar" ? seller.wilaya.nameAr : seller.wilaya.nameFr}
+                {lang === "ar" ? (seller.wilaya?.nameAr || "الجزائر") : (seller.wilaya?.nameFr || "Algérie")}
               </div>
             </div>
           </div>

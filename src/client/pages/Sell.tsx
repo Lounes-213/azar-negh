@@ -83,62 +83,6 @@ export function Sell() {
   }, [existing.data, loaded]);
 
   const [aiBusy, setAiBusy] = useState(false);
-  const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
-
-  const handleAiAutoFill = async () => {
-    const hasImage = images.length > 0;
-    const hasTitle = Boolean(title.trim());
-
-    if (!hasImage && !hasTitle) {
-      push(
-        lang === "ar"
-          ? "💡 يرجى إضافة صورة للمنتج أو كتابة كلمة في العنوان لتفعيل عصا الذكاء الاصطناعي."
-          : "💡 Ajoutez une photo ou écrivez quelques mots dans le titre pour activer la baguette magique IA.",
-        "default",
-      );
-      document.getElementById("sell-title")?.focus();
-      return;
-    }
-
-    setAiBusy(true);
-    try {
-      const res = await api<{
-        title: string;
-        categoryId: number;
-        condition: string;
-        description: string;
-        suggestedPriceDa?: number | null;
-      }>("/ai/assist", {
-        method: "POST",
-        body: JSON.stringify({
-          action: "auto_fill",
-          imageId: images[0]?.id,
-          title: title.trim() || undefined,
-          itemType,
-          lang: lang === "ar" ? "ar" : "fr",
-        }),
-      });
-
-      if (res.title && (!editing || !title.trim())) setTitle(res.title);
-      if (res.categoryId) setCategoryId(String(res.categoryId));
-      if (res.condition && itemType !== "SERVICE") setCondition(res.condition);
-      if (res.description) setDescription(res.description);
-      if (res.suggestedPriceDa && !editing) {
-        setSuggestedPrice(res.suggestedPriceDa);
-        if (!priceDa) setPriceDa(String(res.suggestedPriceDa));
-      }
-      push(
-        lang === "ar"
-          ? "✨ تم استخراج وتعبئة بيانات الإعلان بنجاح بواسطة عصا الذكاء الاصطناعي !"
-          : "✨ Informations remplies avec succès par la baguette magique IA !",
-        "success",
-      );
-    } catch (err) {
-      push(errorMessage(err), "error");
-    } finally {
-      setAiBusy(false);
-    }
-  };
 
   const categoryOptions = useMemo(() => {
     const options: { id: number; label: string; depth: number }[] = [];
@@ -191,8 +135,8 @@ export function Sell() {
     if (!title.trim()) {
       push(
         lang === "ar"
-          ? "💡 يرجى كتابة عنوان الإعلان أولاً لتتمكن عصا الذكاء الاصطناعي من صياغة الوصف."
-          : "💡 Veuillez d'abord renseigner le titre pour que la baguette IA puisse rédiger la description.",
+          ? "يرجى كتابة عنوان الإعلان أولاً لتتمكن عصا الذكاء الاصطناعي من صياغة الوصف."
+          : "Veuillez d'abord renseigner le titre pour que la baguette IA puisse rédiger la description.",
         "default",
       );
       document.getElementById("sell-title")?.focus();
@@ -622,10 +566,10 @@ export function Sell() {
               ) : null}
 
               <div>
-                <label className="field-label" style={{ fontWeight: 600, marginBottom: 8, display: "block" }}>
+                <label className="field-label" style={{ fontWeight: 600, marginBottom: 6, display: "block", fontSize: "0.86rem" }}>
                   {lang === "ar" ? "نوع العرض" : "Type d'offre"} <span style={{ color: "var(--danger)" }}>*</span>
                 </label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                   <button
                     type="button"
                     className={`btn btn-sm ${itemType === "PRODUCT" ? "btn-primary" : "btn-secondary"}`}
@@ -634,13 +578,16 @@ export function Sell() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: "10px 8px",
+                      gap: 4,
+                      padding: "6px 4px",
+                      minHeight: 34,
                       borderRadius: "var(--radius-md)",
-                      fontWeight: 600,
-                      fontSize: "0.88rem",
+                      fontWeight: 700,
+                      fontSize: "0.82rem",
                     }}
                   >
-                    <span>{lang === "ar" ? "منتج مادي" : "Produit physique"}</span>
+                    <Icon name="tag" size={13} />
+                    <span>{lang === "ar" ? "منتج" : "Produit"}</span>
                   </button>
                   <button
                     type="button"
@@ -650,12 +597,15 @@ export function Sell() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: "10px 8px",
+                      gap: 4,
+                      padding: "6px 4px",
+                      minHeight: 34,
                       borderRadius: "var(--radius-md)",
-                      fontWeight: 600,
-                      fontSize: "0.88rem",
+                      fontWeight: 700,
+                      fontSize: "0.82rem",
                     }}
                   >
+                    <Icon name="wrench" size={13} />
                     <span>{lang === "ar" ? "خدمة" : "Service"}</span>
                   </button>
                   <button
@@ -666,13 +616,16 @@ export function Sell() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: "10px 8px",
+                      gap: 4,
+                      padding: "6px 4px",
+                      minHeight: 34,
                       borderRadius: "var(--radius-md)",
-                      fontWeight: 600,
-                      fontSize: "0.88rem",
+                      fontWeight: 700,
+                      fontSize: "0.82rem",
                     }}
                   >
-                    <span>{lang === "ar" ? "منتج رقمي" : "Numérique"}</span>
+                    <Icon name="cpu" size={13} />
+                    <span>{lang === "ar" ? "رقمي" : "Digital"}</span>
                   </button>
                 </div>
               </div>
@@ -812,45 +765,10 @@ export function Sell() {
                   ) : null}
                 </div>
 
-                {itemType === "PRODUCT" && images.length === 0 ? (
-                  <div style={{ marginTop: 8, fontSize: "0.82rem", color: "var(--ink-muted)" }}>
-                    {lang === "ar"
-                      ? "💡 حمّل صورة واحدة على الأقل لتفعيل عصا الذكاء الاصطناعي (تتعرف على المنتج وتملأ الاسم، الفئة، الحالة، والوصف تلقائياً)!"
-                      : "💡 Téléversez au moins 1 photo pour activer la baguette IA (analyse le produit et pré-remplit le titre, catégorie, état et description) !"}
-                  </div>
-                ) : null}
               </div>
 
               <Field
-                label={
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 8 }}>
-                    <span>{lang === "ar" ? "عنوان الإعلان" : "Titre de l'annonce"} <span style={{ color: "var(--danger)" }}>*</span></span>
-                    {!editing ? (
-                      <button
-                        type="button"
-                        onClick={handleAiAutoFill}
-                        disabled={aiBusy}
-                        className="btn btn-xs"
-                        style={{
-                          background: "rgba(16, 185, 129, 0.12)",
-                          color: "var(--brand-700)",
-                          border: "1px solid var(--brand-300)",
-                          borderRadius: "var(--radius-pill)",
-                          padding: "2px 10px",
-                          fontSize: "0.76rem",
-                          fontWeight: 700,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                          cursor: aiBusy ? "wait" : "pointer",
-                        }}
-                      >
-                        {aiBusy ? <Spinner /> : <Icon name="sparkles" size={13} style={{ color: "var(--brand-600)" }} />}
-                        <span>{lang === "ar" ? "عصا الذكاء الاصطناعي ✨" : "Baguette Magique ✨"}</span>
-                      </button>
-                    ) : null}
-                  </div>
-                }
+                label={lang === "ar" ? "عنوان الإعلان" : "Titre de l'annonce"}
                 htmlFor="sell-title"
                 error={fields.title}
                 required
@@ -953,29 +871,6 @@ export function Sell() {
                   </Field>
                 ) : null}
               </div>
-
-              {suggestedPrice && !editing ? (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "var(--radius-md)",
-                    background: "rgba(16, 185, 129, 0.1)",
-                    border: "1px solid var(--brand-300)",
-                    fontSize: "0.88rem",
-                    color: "var(--brand-800)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <span style={{ fontSize: "1.1rem" }}>💡</span>
-                  <span>
-                    {lang === "ar"
-                      ? `تقدير مقترح من الذكاء الاصطناعي: ~${formatPrice(suggestedPrice)} دج. يرجى إدخال سعرك الحقيقي الفعلي في حقل السعر.`
-                      : `Estimation suggérée par l'IA : ~${formatPrice(suggestedPrice)} DA. Saisissez votre prix de vente réel vérifié.`}
-                  </span>
-                </div>
-              ) : null}
 
               <label className="checkbox">
                 <input

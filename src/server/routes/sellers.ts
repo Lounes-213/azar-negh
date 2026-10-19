@@ -121,8 +121,16 @@ sellerRoutes.get("/sellers/:id", async (c) => {
   const viewerId = c.get("user")?.id ?? "";
 
   const seller = await c.env.DB.prepare(
-    `SELECT u.id, u.created_at, u.status, u.avatar_url, p.display_name, p.logo_url, p.phone, p.phone_public,
-            p.whatsapp_public, p.wilaya_id, p.bio, w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
+    `SELECT u.id, u.created_at, u.status, u.avatar_url,
+            COALESCE(p.display_name, 'Vendeur') AS display_name,
+            p.logo_url,
+            COALESCE(p.phone, '') AS phone,
+            COALESCE(p.phone_public, 0) AS phone_public,
+            COALESCE(p.whatsapp_public, 0) AS whatsapp_public,
+            COALESCE(p.wilaya_id, 16) AS wilaya_id,
+            p.bio,
+            COALESCE(w.name_fr, 'Alger') AS wilaya_name_fr,
+            COALESCE(w.name_ar, 'الجزائر') AS wilaya_name_ar,
             p.store_name, p.store_slug, p.commune, p.address, p.latitude, p.longitude,
             p.opening_hours, p.banner_url, p.custom_sort_order,
             (SELECT COUNT(*) FROM store_follows WHERE seller_id = u.id) AS followers_count,
@@ -130,11 +138,14 @@ sellerRoutes.get("/sellers/:id", async (c) => {
             COALESCE((SELECT CAST(ROUND(AVG(rating)) AS INTEGER) FROM store_reviews WHERE store_seller_id = u.id), 5) AS avg_rating,
             (SELECT COUNT(*) FROM store_reviews WHERE store_seller_id = u.id) AS reviews_count
      FROM users u
-     JOIN seller_profiles p ON p.user_id = u.id
-     JOIN wilayas w ON w.id = p.wilaya_id
-     WHERE u.id = ? OR p.store_slug = ?`,
+     LEFT JOIN seller_profiles p ON p.user_id = u.id
+     LEFT JOIN wilayas w ON w.id = COALESCE(p.wilaya_id, 16)
+     WHERE u.id = ?
+        OR LOWER(p.store_slug) = LOWER(?)
+        OR LOWER(p.store_name) = LOWER(?)
+        OR u.id = (SELECT seller_id FROM listings WHERE id = ?)`,
   )
-    .bind(viewerId, idOrSlug, idOrSlug)
+    .bind(viewerId, idOrSlug, idOrSlug, idOrSlug, idOrSlug)
     .first<{
       id: string;
       created_at: string;
@@ -227,9 +238,9 @@ sellerRoutes.get("/sellers/:id", async (c) => {
       openingHours: seller.opening_hours,
       bannerUrl: seller.banner_url,
       wilaya: {
-        id: seller.wilaya_id,
-        nameFr: seller.wilaya_name_fr,
-        nameAr: seller.wilaya_name_ar,
+        id: seller.wilaya_id || 16,
+        nameFr: seller.wilaya_name_fr || "Alger",
+        nameAr: seller.wilaya_name_ar || "الجزائر",
       },
       phone: seller.phone_public === 1 ? seller.phone : null,
       whatsappPublic: seller.whatsapp_public === 1,

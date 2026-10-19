@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } from "react-router";
 import { Icon } from "./Icons";
 import { Avatar } from "./ui";
 import { Logo } from "./Logo";
@@ -32,11 +32,38 @@ function getGreeting(user: { displayName?: string | null } | null, lang: string)
   return firstName ? `${timeGreeting}, ${firstName}` : `${timeGreeting} 👋`;
 }
 
-function ScrollToTop() {
-  const { pathname } = useLocation();
+const scrollPositions = new Map<string, number>();
+
+function SmartScrollRestoration() {
+  const location = useLocation();
+  const navType = useNavigationType();
+
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-  }, [pathname]);
+    const handleScroll = () => {
+      scrollPositions.set(location.key, window.scrollY);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      scrollPositions.set(location.key, window.scrollY);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [location.key]);
+
+  useEffect(() => {
+    if (navType === "POP") {
+      const savedY = scrollPositions.get(location.key) ?? 0;
+      window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
+      const timer = setTimeout(() => {
+        if (Math.abs(window.scrollY - savedY) > 50) {
+          window.scrollTo({ top: savedY, left: 0, behavior: "instant" as ScrollBehavior });
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    } else {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+    }
+  }, [location.key, location.pathname, navType]);
+
   return null;
 }
 
@@ -87,7 +114,7 @@ export function Layout() {
 
   return (
     <div className="shell">
-      <ScrollToTop />
+      <SmartScrollRestoration />
       <a href="#main" className="skip-link">
         Aller au contenu
       </a>
