@@ -347,7 +347,7 @@ export function Layout() {
                 }}
               >
                 <span>Aẓar</span>
-                <span className="brand-negh">Negh</span>
+                <span className="brand-negh">Neɣ</span>
               </small>
             </span>
           </div>
@@ -446,7 +446,7 @@ export function Layout() {
             </div>
             <div className="footer-bottom">
               <span>
-                © {new Date().getFullYear()} Azar <span className="brand-negh">Negh</span>. {t("footer.rights")}
+                © {new Date().getFullYear()} Azar <span className="brand-negh">Neɣ</span>. {t("footer.rights")}
               </span>
               <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
                 <Link to="/conditions" className="muted" style={{ fontSize: "12px" }}>
@@ -455,7 +455,7 @@ export function Layout() {
                 <Link to="/confidentialite" className="muted" style={{ fontSize: "12px" }}>
                   {lang === "ar" ? "سياسة الخصوصية" : "Confidentialité"}
                 </Link>
-                <span>DZD · Azar <span className="brand-negh">Negh</span></span>
+                <span>DZD · Azar <span className="brand-negh">Neɣ</span></span>
               </div>
             </div>
           </div>

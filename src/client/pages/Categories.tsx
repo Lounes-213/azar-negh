@@ -10,7 +10,7 @@ import type { MetaResponse, Category } from "../../shared/types";
 export function Categories() {
   const { lang, t } = useI18n();
   const isAr = lang === "ar";
-  useDocumentTitle(isAr ? "جميع الفئات — Azar Negh" : "Toutes les catégories — Azar Negh");
+  useDocumentTitle(isAr ? "جميع الفئات — Azar Neɣ" : "Toutes les catégories — Azar Neɣ");
 
   const meta = useAsync(() => api<MetaResponse>("/meta"), []);
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,8 +70,8 @@ export function Categories() {
             </h1>
             <p className="muted" style={{ margin: 0, fontSize: "0.95rem" }}>
               {isAr
-                ? "استكشف كل الأقسام والتصنيفات الفرعية المتاحة في منصة Azar Negh."
-                : "Explorez l'ensemble des univers et sous-catégories disponibles sur Azar Negh."}
+                ? "استكشف كل الأقسام والتصنيفات الفرعية المتاحة في منصة Azar Neɣ."
+                : "Explorez l'ensemble des univers et sous-catégories disponibles sur Azar Neɣ."}
             </p>
           </div>
 

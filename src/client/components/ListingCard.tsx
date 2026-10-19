@@ -58,7 +58,7 @@ function ListingCardInner({
       try {
         await navigator.share({
           title: listing.title,
-          text: `${listing.title} — ${formatDa(listing.priceDa)} sur Azar Negh`,
+          text: `${listing.title} — ${formatDa(listing.priceDa)} sur Azar Neɣ`,
           url: shareUrl,
         });
         return;

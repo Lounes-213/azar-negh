@@ -786,7 +786,7 @@ function AiSection() {
             provider: prov,
             modelName: model,
             apiKey: keyMaskedOrRaw,
-            prompt: "Test rapide de connexion Azar Negh",
+            prompt: "Test rapide de connexion Azar Neɣ",
           }),
         },
       );

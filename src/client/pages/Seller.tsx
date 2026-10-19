@@ -68,16 +68,16 @@ export function Seller() {
     : `${typeof window !== "undefined" ? window.location.origin : ""}/boutique/${seller?.id ?? id ?? ""}`;
 
   const storeTitle = seller?.storeName || seller?.displayName || (lang === "ar" ? "متجر" : "Boutique");
-  useDocumentTitle(`${storeTitle} | Azar Negh`);
+  useDocumentTitle(`${storeTitle} | Azar Neɣ`);
 
   // Update dynamic meta tags for clean social sharing (always called in the same hook order)
   useEffect(() => {
     if (!seller) return;
-    const titleText = `${seller.storeName || seller.displayName} | Azar Negh`;
+    const titleText = `${seller.storeName || seller.displayName} | Azar Neɣ`;
     const wilayaLabel = lang === "ar"
       ? (seller.wilaya?.nameAr || "الجزائر")
       : (seller.wilaya?.nameFr || "Algérie");
-    const descText = `${seller.storeName || seller.displayName} (${wilayaLabel}) - Azar Negh`;
+    const descText = `${seller.storeName || seller.displayName} (${wilayaLabel}) - Azar Neɣ`;
     const imgUrl = seller.logoUrl || seller.bannerUrl || `${window.location.origin}/brand/icon-512.png`;
 
     const setMeta = (attr: string, key: string, content: string) => {
@@ -619,7 +619,7 @@ export function Seller() {
                   try {
                     await navigator.share({
                       title: `${seller.storeName || seller.displayName}`,
-                      text: `Boutique ${seller.storeName || seller.displayName} sur Azar Negh :`,
+                      text: `Boutique ${seller.storeName || seller.displayName} sur Azar Neɣ :`,
                       url: proLink,
                     });
                   } catch {
