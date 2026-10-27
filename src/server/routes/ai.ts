@@ -135,6 +135,9 @@ function extractKeywords(query?: string): string[] {
   return Array.from(expanded).slice(0, 10);
 }
 
+/** Upper bound on listings serialized into the prompt — every extra row is paid for on every message. */
+const MAX_CONTEXT_LISTINGS = 15;
+
 /**
  * Loads a compact, token-efficient serialization of approved listings for AI reasoning
  * and collects candidate product cards with images.
@@ -166,7 +169,7 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
            LEFT JOIN categories cat ON cat.id = l.category_id
            WHERE l.status = 'APPROVED' AND (${conditions.join(" OR ")})
            ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-           LIMIT 20`,
+           LIMIT ${MAX_CONTEXT_LISTINGS}`,
         )
         .bind(...params)
         .all<any>();
@@ -179,7 +182,7 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
       }
     }
 
-    // 2. ALWAYS append all other approved listings (up to 30) so the AI has full visibility of the platform inventory
+    // 2. Top listings fill the remaining budget so the AI still sees the wider inventory
     const generalRows = await db
       .prepare(
         `SELECT l.id, l.title, l.description, l.price_da, l.original_price_da, l.condition, l.item_type,
@@ -191,7 +194,7 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
          LEFT JOIN categories cat ON cat.id = l.category_id
          WHERE l.status = 'APPROVED'
          ORDER BY (COALESCE(l.order_clicks, 0) + COALESCE(l.call_clicks, 0) + l.view_count) DESC, l.published_at DESC
-         LIMIT 30`,
+         LIMIT ${MAX_CONTEXT_LISTINGS}`,
       )
       .all<any>();
 
@@ -206,7 +209,10 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
       return { contextText: "لا توجد منتجات مسجلة حالياً في قاعدة البيانات.", candidates: [] };
     }
 
-    const candidates: BotProductCard[] = allResults.map((r) => ({
+    // Keyword matches come first, so truncating keeps the most relevant listings
+    const trimmed = allResults.slice(0, MAX_CONTEXT_LISTINGS);
+
+    const candidates: BotProductCard[] = trimmed.map((r) => ({
       id: r.id,
       title: r.title,
       priceDa: r.price_da,
@@ -217,10 +223,10 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
       imageUrl: r.cover_id ? `/api/images/${r.cover_id}` : null,
     }));
 
-    const contextText = allResults
+    const contextText = trimmed
       .map(
         (r) =>
-          `- [${r.title}](/annonces/${r.id}) (ID: ${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} (${r.category_name_fr || ""}) | الحالة: ${r.condition || "مستعمل"}${r.description ? ` | تفاصيل: ${r.description.slice(0, 100).replace(/\r?\n/g, " ")}` : ""}`,
+          `- [${r.title}](/annonces/${r.id}) (ID: ${r.id}) | السعر: ${r.price_da} DA | الولاية: ${r.wilaya_name_ar || ""} (${r.wilaya_name_fr || ""}) | الفئة: ${r.category_name_ar || ""} (${r.category_name_fr || ""}) | الحالة: ${r.condition || "مستعمل"}${r.description ? ` | تفاصيل: ${r.description.slice(0, 80).replace(/\r?\n/g, " ")}` : ""}`,
       )
       .join("\n");
 
@@ -229,6 +235,12 @@ async function loadCatalogContext(db: D1Database, query?: string): Promise<Catal
     console.error("loadCatalogContext error:", err);
     return { contextText: "لا توجد منتجات مسجلة حالياً.", candidates: [] };
   }
+}
+
+function aiUnavailableMessage(lang?: "fr" | "ar"): string {
+  return lang === "ar"
+    ? "المساعد الذكي غير متاح حالياً: تعذّر الاتصال بمزوّد الذكاء الاصطناعي. يرجى إبلاغ الإدارة."
+    : "L'assistant IA est momentanément indisponible : impossible de joindre le fournisseur de modèle. Merci de prévenir l'administration.";
 }
 
 const chatSchema = z.object({
@@ -314,7 +326,7 @@ aiRoutes.post("/ai/chat", async (c) => {
   const catalogResult = await loadCatalogContext(c.env.DB, searchQuery);
 
   try {
-    const rawReply = await chatWithAzarBot(
+    const chat = await chatWithAzarBot(
       c.env,
       input.messages,
       catalogResult.contextText,
@@ -323,6 +335,16 @@ aiRoutes.post("/ai/chat", async (c) => {
       input.image,
       input.audio,
     );
+
+    if (chat.degraded) {
+      console.error(
+        `AI unavailable after ${chat.result.calls} calls in ${chat.result.elapsedMs}ms`,
+        JSON.stringify(chat.result.attempts.slice(0, 8)),
+      );
+      throw new HttpError(503, "AI_UNAVAILABLE", aiUnavailableMessage(input.lang));
+    }
+
+    const rawReply = chat.reply;
 
     // Extract product IDs if suggested by AI: [MATCHED_PRODUCTS: id1, id2, id3]
     let reply = rawReply;
@@ -432,14 +454,9 @@ aiRoutes.post("/ai/chat", async (c) => {
       products: matchedProducts.slice(0, 3), // Strictly max 3 products
     });
   } catch (err) {
+    if (err instanceof HttpError) throw err;
     console.error("chatWithAzarBot error:", err);
-    return c.json({
-      reply:
-        input.lang === "ar"
-          ? "مرحباً بك! أنا مساعدك آزار شات. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟"
-          : "Bonjour ! Je suis l'assistant Azar Chat. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?",
-      products: [],
-    });
+    throw new HttpError(503, "AI_UNAVAILABLE", aiUnavailableMessage(input.lang));
   }
 });
 

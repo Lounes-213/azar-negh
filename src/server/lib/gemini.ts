@@ -1,26 +1,12 @@
 import type { Env } from "../types";
 
-// Base64-encoded fallback keys pool (decoded at runtime) to prevent false-positive secret scanner alerts
-const DEFAULT_GEMINI_KEYS_B64 = [
-  "QVEuQWI4Uk42SUJ2UkJBRHc2dWhiaElQTy1yaDl2Y0JpNkNfSTdGdTAxUk5hUkRmSlBPSXc=",
-  "QVEuQWI4Uk42TGxFYU9oaGFtTFlJcWZqVTMxQUN1R25VR3k3WEx3WlI1Q1UwQmNkald6clE=",
-  "QVEuQWI4Uk42S2syM0RvbnowVWVzYmNPZmozaFZjdmhkRkF2NFkwWk1ZbXlGUFpQcGszTWc=",
-  "QVEuQWI4Uk42SVl6ZEx0ZzhsalRoOHd4aGlVaFZtT1h3UHlEZjlUcHhMd2pQVkdIWEZZQnc=",
-  "QVEuQWI4Uk42S2lzR1NQVUlHcms2STlhbjZ0SU1xb2xSRWxCODk2SzZ6S1lxdVM4NFlyOWc=",
-];
-
-function getDecodedDefaultKeys(): string[] {
-  try {
-    return DEFAULT_GEMINI_KEYS_B64.map((b) => (typeof atob === "function" ? atob(b) : Buffer.from(b, "base64").toString("utf-8")));
-  } catch {
-    return [];
-  }
-}
-
-let currentKeyIndex = 0;
+/** Hard ceiling on the whole failover sweep, and on any single provider call. */
+const AI_TOTAL_BUDGET_MS = 20_000;
+const AI_PER_REQUEST_MS = 10_000;
 
 /**
- * Extracts all configured Gemini API keys from environment or defaults to the 5 keys pool.
+ * Extracts all configured Gemini API keys from environment.
+ * Keys must come from `GEMINI_API_KEYS` / `GEMINI_API_KEY` (wrangler vars or secrets) — never from source.
  */
 function getGeminiKeys(env: Env): string[] {
   const list: string[] = [];
@@ -33,10 +19,7 @@ function getGeminiKeys(env: Env): string[] {
   if (env.GEMINI_API_KEY && !list.includes(env.GEMINI_API_KEY.trim())) {
     list.push(env.GEMINI_API_KEY.trim());
   }
-  if (list.length === 0) {
-    list.push(...getDecodedDefaultKeys());
-  }
-  return list;
+  return [...new Set(list)];
 }
 
 export type GeminiPart =
@@ -48,9 +31,6 @@ export interface GeminiContent {
   parts: GeminiPart[];
 }
 
-/**
- * Executes a Gemini request with model gemini-3.8-flash (and auto-failover to gemini-3.5-flash if 3.8 hits Google Free Tier 429 quota limits).
- */
 export interface DynamicAiConfig {
   provider: string;
   model: string;
@@ -84,7 +64,7 @@ export async function getAllActiveAiConfigs(env: Env): Promise<DynamicAiConfig[]
     // ai_config table query fallback
   }
 
-  // Always ensure default/fallback keys are merged into Gemini pool for high availability
+  // Merge env-configured keys into the Gemini pool for high availability
   const defaultKeys = getGeminiKeys(env);
   const geminiConfig = configs.find((c) => c.provider === "gemini");
   if (geminiConfig) {
@@ -115,181 +95,239 @@ export async function getActiveAiConfig(env: Env): Promise<DynamicAiConfig> {
   );
 }
 
+/** Model names tried after the configured one, in order. */
+const GEMINI_FALLBACK_MODELS = [
+  "gemini-flash-lite-latest",
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-flash-latest",
+];
+
+export interface AiAttempt {
+  provider: string;
+  model: string;
+  status: number;
+  reason: string;
+}
+
+export interface AiCallResult {
+  text: string | null;
+  provider?: string;
+  model?: string;
+  attempts: AiAttempt[];
+  calls: number;
+  elapsedMs: number;
+  timedOut: boolean;
+}
+
+function extractReason(body: string, status: number): string {
+  const match = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(body);
+  const raw = match?.[1] ?? body;
+  return raw.replace(/\s+/g, " ").trim().slice(0, 200) || `HTTP ${status}`;
+}
+
+/** True when Google says the quota is exhausted for the whole day/tier, not just this minute. */
+function isHardQuota(reason: string): boolean {
+  return /PerDay|FreeTier|daily|limit: \d+|exhausted/i.test(reason);
+}
+
 /**
- * Universal AI Caller supporting seamless failover across models, keys, and providers.
- * When a key or model hits quota (429), it automatically fails over to the next key or next provider.
+ * Universal AI caller with bounded failover across models, keys and providers.
+ *
+ * Failover is classified rather than blanket-retried: a model Google does not know is skipped
+ * immediately instead of being re-tried once per key, and a rejected key is dropped from the
+ * whole sweep. The sweep stops at AI_TOTAL_BUDGET_MS so a dead key pool degrades fast.
  */
+export async function callAiDetailed(
+  env: Env,
+  contents: GeminiContent[],
+  systemInstruction?: string,
+): Promise<AiCallResult> {
+  const startedAt = Date.now();
+  const deadline = startedAt + AI_TOTAL_BUDGET_MS;
+  const attempts: AiAttempt[] = [];
+  const deadKeys = new Set<string>();
+  let calls = 0;
+  let timedOut = false;
+
+  /** Per-call abort signal that never outlives the global sweep budget. */
+  const nextSignal = (): AbortSignal | null => {
+    const left = deadline - Date.now();
+    if (left <= 0) {
+      timedOut = true;
+      return null;
+    }
+    return AbortSignal.timeout(Math.min(AI_PER_REQUEST_MS, left));
+  };
+
+  const record = (provider: string, model: string, status: number, reason: string) => {
+    if (attempts.length < 40) attempts.push({ provider, model, status, reason });
+  };
+
+  const configs = await getAllActiveAiConfigs(env);
+
+  for (const config of configs) {
+    const usable = config.keys.filter((k) => k && !deadKeys.has(k));
+    if (usable.length === 0) continue;
+
+    // Rotate the start offset so concurrent users do not all hammer the same key
+    const startKeyIdx = Math.floor(Math.random() * usable.length);
+    const orderedKeys = [...usable.slice(startKeyIdx), ...usable.slice(0, startKeyIdx)];
+
+    const models =
+      config.provider === "gemini"
+        ? [...new Set([config.model, ...GEMINI_FALLBACK_MODELS].filter(Boolean))]
+        : [config.model];
+
+    for (const model of models) {
+      for (const key of orderedKeys) {
+        const signal = nextSignal();
+        if (!signal) break;
+        calls++;
+
+        const endpoint =
+          config.provider === "gemini"
+            ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+            : config.provider === "claude"
+              ? "https://api.anthropic.com/v1/messages"
+              : OPENAI_ENDPOINTS[config.provider] ?? "https://api.openai.com/v1/chat/completions";
+
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (config.provider === "gemini") headers["x-goog-api-key"] = key;
+        else if (config.provider === "claude") {
+          headers["x-api-key"] = key;
+          headers["anthropic-version"] = "2023-06-01";
+        } else headers["Authorization"] = `Bearer ${key}`;
+
+        const buildBody = (omitThinking: boolean) =>
+          buildRequestBody(config.provider, model, contents, systemInstruction, omitThinking);
+
+        let res: Response;
+        try {
+          res = await fetch(endpoint, { method: "POST", headers, body: buildBody(false), signal });
+          // Some Gemini models reject thinkingConfig outright — retry this model once without it
+          if (res.status === 400 && config.provider === "gemini") {
+            const retrySignal = nextSignal();
+            if (!retrySignal) break;
+            calls++;
+            res = await fetch(endpoint, {
+              method: "POST",
+              headers,
+              body: buildBody(true),
+              signal: retrySignal,
+            });
+          }
+        } catch (err) {
+          record(config.provider, model, 0, err instanceof Error ? err.name : "fetch failed");
+          continue;
+        }
+
+        if (res.ok) {
+          const payload = await res.json().catch(() => null);
+          const text = readReplyText(config.provider, payload);
+          if (text) {
+            return {
+              text,
+              provider: config.provider,
+              model,
+              attempts,
+              calls,
+              elapsedMs: Date.now() - startedAt,
+              timedOut,
+            };
+          }
+          record(config.provider, model, res.status, "empty or blocked candidate");
+          continue;
+        }
+
+        const errBody = await res.text().catch(() => "");
+        const reason = extractReason(errBody, res.status);
+        record(config.provider, model, res.status, reason);
+
+        if (res.status === 404 || res.status === 400) {
+          break; // the model itself rejects this request — other keys will not do better
+        }
+        if (res.status === 401 || (res.status === 403 && !isHardQuota(reason))) {
+          deadKeys.add(key);
+          continue;
+        }
+        if (res.status === 429 || isHardQuota(reason)) {
+          if (isHardQuota(reason)) break; // daily/free-tier quota: move to the next model
+          continue; // per-minute throttle: another key may still answer
+        }
+      }
+
+      if (timedOut) break;
+    }
+    if (timedOut) break;
+  }
+
+  return { text: null, attempts, calls, elapsedMs: Date.now() - startedAt, timedOut };
+}
+
+const OPENAI_ENDPOINTS: Record<string, string> = {
+  openai: "https://api.openai.com/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/chat/completions",
+  groq: "https://api.groq.com/openai/v1/chat/completions",
+};
+
+function textOnlyContents(contents: GeminiContent[]): { role: string; content: string }[] {
+  return contents.map((msg) => ({
+    role: msg.role === "model" ? "assistant" : "user",
+    content: msg.parts.map((p) => ("text" in p ? p.text : "")).join(" "),
+  }));
+}
+
+function buildRequestBody(
+  provider: string,
+  model: string,
+  contents: GeminiContent[],
+  systemInstruction?: string,
+  omitThinking = false,
+): string {
+  if (provider === "gemini") {
+    const generationConfig: any = {
+      temperature: 0.7,
+      maxOutputTokens: 1000,
+    };
+    if (!omitThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    const payload: any = { contents, generationConfig };
+    if (systemInstruction) payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+    return JSON.stringify(payload);
+  }
+
+  if (provider === "claude") {
+    return JSON.stringify({
+      model,
+      system: systemInstruction || undefined,
+      messages: textOnlyContents(contents),
+      max_tokens: 1000,
+    });
+  }
+
+  const messages: { role: string; content: string }[] = systemInstruction
+    ? [{ role: "system", content: systemInstruction }, ...textOnlyContents(contents)]
+    : textOnlyContents(contents);
+  return JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 1000 });
+}
+
+function readReplyText(provider: string, data: any): string | null {
+  const text =
+    provider === "gemini"
+      ? data?.candidates?.[0]?.content?.parts?.find((p: any) => typeof p?.text === "string")?.text
+      : provider === "claude"
+        ? data?.content?.[0]?.text
+        : data?.choices?.[0]?.message?.content;
+  return typeof text === "string" && text.trim() ? text.trim() : null;
+}
+
 async function callGemini(
   env: Env,
   contents: GeminiContent[],
   systemInstruction?: string,
 ): Promise<string | null> {
-  const configs = await getAllActiveAiConfigs(env);
-  if (configs.length === 0) return null;
-
-  for (const config of configs) {
-    const keys = config.keys;
-    if (keys.length === 0) continue;
-
-    // OpenAI / DeepSeek / Groq (OpenAI-compatible endpoints)
-    if (["openai", "deepseek", "groq"].includes(config.provider)) {
-      const endpointMap: Record<string, string> = {
-        openai: "https://api.openai.com/v1/chat/completions",
-        deepseek: "https://api.deepseek.com/chat/completions",
-        groq: "https://api.groq.com/openai/v1/chat/completions",
-      };
-      const endpoint = endpointMap[config.provider] || "https://api.openai.com/v1/chat/completions";
-      const startKeyOffset = Math.floor(Math.random() * keys.length);
-      for (let attempt = 0; attempt < keys.length; attempt++) {
-        const key = keys[(startKeyOffset + attempt) % keys.length];
-        if (!key) continue;
-        try {
-          const messages: any[] = [];
-          if (systemInstruction) {
-            messages.push({ role: "system", content: systemInstruction });
-          }
-          for (const msg of contents) {
-            const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
-            messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
-          }
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${key}`,
-            },
-            body: JSON.stringify({
-              model: config.model,
-              messages,
-              temperature: 0.7,
-              max_tokens: 1000,
-            }),
-          });
-          if (res.ok) {
-            const data = (await res.json()) as any;
-            const reply = data?.choices?.[0]?.message?.content;
-            if (reply && typeof reply === "string") return reply.trim();
-          }
-        } catch {
-          continue;
-        }
-      }
-      continue;
-    }
-
-    // Claude / Anthropic
-    if (config.provider === "claude") {
-      const startKeyOffset = Math.floor(Math.random() * keys.length);
-      for (let attempt = 0; attempt < keys.length; attempt++) {
-        const key = keys[(startKeyOffset + attempt) % keys.length];
-        if (!key) continue;
-        try {
-          const messages: any[] = [];
-          for (const msg of contents) {
-            const textParts = msg.parts.map((p) => ("text" in p ? p.text : "")).join(" ");
-            messages.push({ role: msg.role === "model" ? "assistant" : "user", content: textParts });
-          }
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": key,
-              "anthropic-version": "2023-06-01",
-            },
-            body: JSON.stringify({
-              model: config.model || "claude-3-5-sonnet-20241022",
-              system: systemInstruction || undefined,
-              messages,
-              max_tokens: 1000,
-            }),
-          });
-          if (res.ok) {
-            const data = (await res.json()) as any;
-            const reply = data?.content?.[0]?.text;
-            if (reply && typeof reply === "string") return reply.trim();
-          }
-        } catch {
-          continue;
-        }
-      }
-      continue;
-    }
-
-    // Google Gemini (with random uniform load balancing across keys and multi-model quota failover)
-    const modelsToTry = [
-      config.model,
-      "gemini-3.8-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-flash-lite-latest",
-      "gemini-3.1-flash-lite",
-      "gemini-3.5-flash",
-      "gemini-3.6-flash",
-      "gemini-flash-latest",
-    ];
-    const uniqueModels = [...new Set(modelsToTry.filter(Boolean))];
-
-    // Uniformly distribute request load across all keys for all users
-    const startKeyIdx = Math.floor(Math.random() * keys.length);
-
-    for (const model of uniqueModels) {
-      for (let attempt = 0; attempt < keys.length; attempt++) {
-        const keyIndex = (startKeyIdx + attempt) % keys.length;
-        const key = keys[keyIndex];
-        if (!key) continue;
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-          const payload: any = {
-            contents,
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1000,
-              thinkingConfig: {
-                thinkingBudget: 0,
-              },
-            },
-          };
-
-          if (systemInstruction) {
-            payload.systemInstruction = {
-              parts: [{ text: systemInstruction }],
-            };
-          }
-
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-
-          if (res.status === 429 || res.status === 403 || res.status === 503) {
-            const errData = ((await res.json().catch(() => null)) || {}) as any;
-            const errMsg = String(errData?.error?.message || "");
-            // If Google reports daily limit for this specific model, break to immediately try next model
-            if (errMsg.includes("limit: 20") || errMsg.includes("FreeTier") || errMsg.includes("PerDay")) {
-              break;
-            }
-            currentKeyIndex = (currentKeyIndex + 1) % keys.length;
-            continue;
-          }
-
-          if (!res.ok) {
-            continue;
-          }
-
-          const data = (await res.json()) as any;
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text && typeof text === "string") {
-            currentKeyIndex = (currentKeyIndex + attempt) % keys.length;
-            return text.trim();
-          }
-        } catch {
-          continue;
-        }
-      }
-    }
-  }
-
-  return null;
+  const result = await callAiDetailed(env, contents, systemInstruction);
+  return result.text;
 }
 
 export async function testAiProvider(
@@ -386,6 +424,13 @@ export interface UserPersona {
   favoriteCategories?: string[];
 }
 
+export interface AzarChatResult {
+  reply: string;
+  /** True when every provider/key/model combination failed — callers must not present `reply` as an answer. */
+  degraded: boolean;
+  result: AiCallResult;
+}
+
 /**
  * Intelligent shopping assistant chatbot for Azar Neɣ.
  * Has full visibility of approved database products, multimodal vision & audio, and strict safety boundaries.
@@ -398,7 +443,7 @@ export async function chatWithAzarBot(
   lang: "fr" | "ar" = "ar",
   image?: ChatImageInput,
   audio?: ChatAudioInput,
-): Promise<string> {
+): Promise<AzarChatResult> {
   const isAr = lang === "ar";
 
   const systemInstruction = `
@@ -533,14 +578,10 @@ ${catalogContext || "لا توجد منتجات مسجلة حالياً."}
     };
   });
 
-  const response = await callGemini(env, formattedContents, systemInstruction);
-  if (response) return response;
+  const result = await callAiDetailed(env, formattedContents, systemInstruction);
+  if (result.text) return { reply: result.text, degraded: false, result };
 
-  // Smart fallback if API is temporarily unavailable
-  if (isAr) {
-    return "مرحباً بك! أنا مساعدك آزار شات. كيف يمكنني مساعدتك اليوم في تصفح المنتجات أو العثور على أفضل الأسعار بالقرب منك؟";
-  }
-  return "Bonjour ! Je suis l'assistant Azar Chat. Comment puis-je vous aider à trouver les meilleures affaires et produits près de chez vous ?";
+  return { reply: "", degraded: true, result };
 }
 
 export interface GenerateDescriptionInput {
