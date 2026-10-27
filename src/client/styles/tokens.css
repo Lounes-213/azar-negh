@@ -155,9 +155,9 @@ html[lang="ar"] {
 }
 
 [data-theme="dark"] .tabbar {
-  background: var(--glass-bg) !important;
+  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
   border-top: 1px solid var(--line) !important;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
 [data-theme="dark"] .tabbar a {
@@ -168,8 +168,24 @@ html[lang="ar"] {
   color: var(--brand-300) !important;
 }
 
+/* --brand-700 is too dark to read on the redefined dark --brand-100 chip */
 [data-theme="dark"] .tabbar .tab-sell .tab-icon {
+  background: var(--brand-100) !important;
+  color: var(--brand-400) !important;
   border: none !important;
+}
+
+[data-theme="dark"] .tabbar .tab-sell:hover .tab-icon {
+  background: var(--brand-200) !important;
+}
+
+[data-theme="dark"] .tabbar .tab-sell.active .tab-icon {
+  background: var(--brand-600) !important;
+  color: #fff !important;
+}
+
+[data-theme="dark"] .tab-rail {
+  box-shadow: 0 0 12px rgba(43, 189, 98, 0.45);
 }
 
 [data-theme="dark"] .sidebar {

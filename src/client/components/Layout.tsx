@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useNavigationType } from "react-router";
 import { Icon } from "./Icons";
 import { Avatar } from "./ui";
@@ -16,6 +16,16 @@ function navClass({ isActive }: { isActive: boolean }) {
 
 function tabClass({ isActive }: { isActive: boolean }) {
   return isActive ? "active" : "";
+}
+
+/** Mirrors the NavLink matching below so the sliding rail lands on the tab React Router marks active. */
+const TAB_ROUTES = ["/", "/annonces", "/vendre", "/compte/favoris", "/compte"];
+
+function activeTabIndex(pathname: string): number {
+  const index = TAB_ROUTES.findIndex((to, i) =>
+    i === 0 ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`),
+  );
+  return index === -1 ? 0 : index;
 }
 
 function getGreeting(user: { displayName?: string | null } | null, lang: string): string {
@@ -462,28 +472,33 @@ export function Layout() {
         </footer>
       </div>
 
-      <nav className="tabbar" aria-label="Navigation mobile">
+      <nav
+        className="tabbar"
+        aria-label="Navigation mobile"
+        style={{ "--tab-i": activeTabIndex(location.pathname) } as CSSProperties}
+      >
+        <span className="tab-rail" aria-hidden="true" />
         <NavLink to="/" end className={tabClass}>
           <Icon name="home" size={22} />
-          <span>{t("nav.home")}</span>
+          <span className="tab-label">{t("nav.home")}</span>
         </NavLink>
         <NavLink to="/annonces" className={tabClass}>
           <Icon name="grid" size={22} />
-          <span>{t("nav.browse")}</span>
+          <span className="tab-label">{t("nav.browse")}</span>
         </NavLink>
-        <NavLink to="/vendre" className={`${tabClass} tab-sell`.trim()}>
+        <NavLink to="/vendre" className={({ isActive }) => `tab-sell${isActive ? " active" : ""}`}>
           <span className="tab-icon">
             <Icon name="plus" size={22} />
           </span>
-          <span>{t("nav.sell")}</span>
+          <span className="tab-label">{t("nav.sell")}</span>
         </NavLink>
         <NavLink to="/compte/favoris" className={tabClass}>
           <Icon name="heart" size={22} />
-          <span>{t("nav.favorites")}</span>
+          <span className="tab-label">{t("nav.favorites")}</span>
         </NavLink>
         <NavLink to="/compte" className={tabClass}>
           <Icon name="user" size={22} />
-          <span>{t("nav.account")}</span>
+          <span className="tab-label">{t("nav.account")}</span>
         </NavLink>
       </nav>
 
