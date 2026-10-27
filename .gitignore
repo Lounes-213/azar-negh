@@ -17,3 +17,5 @@ coverage/
 admin_panel/
 src/client/admin-portal/
 
+.vercel
+.env*
