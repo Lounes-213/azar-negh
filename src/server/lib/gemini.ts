@@ -257,8 +257,11 @@ export async function callAiDetailed(
           continue;
         }
         if (res.status === 429 || isHardQuota(reason)) {
-          if (isHardQuota(reason)) break; // daily/free-tier quota: move to the next model
-          continue; // per-minute throttle: another key may still answer
+          // Google's quota wall is per key (per project), so retiring the whole key pool here
+          // would abandon healthy keys after a single 429. Retire just this key; once every key
+          // is retired, `usable` is empty and the remaining models are skipped without a fetch.
+          deadKeys.add(key);
+          continue;
         }
       }
 
