@@ -128,7 +128,12 @@ function extractReason(body: string, status: number): string {
 
 /** True when Google says the quota is exhausted for the whole day/tier, not just this minute. */
 function isHardQuota(reason: string): boolean {
-  return /PerDay|FreeTier|daily|limit: \d+|exhausted/i.test(reason);
+  // Google's free-tier wall reads "You exceeded your current quota, please check your plan and
+  // billing details" — none of the older markers match it, which made the sweep re-probe every key
+  // against a model that could never answer.
+  return /PerDay|FreeTier|daily|limit: \d+|exhausted|RESOURCE_EXHAUSTED|exceeded your current quota|check your plan and billing/i.test(
+    reason,
+  );
 }
 
 /**
