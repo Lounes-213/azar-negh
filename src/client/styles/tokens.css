@@ -155,7 +155,7 @@ html[lang="ar"] {
 }
 
 [data-theme="dark"] .tabbar {
-  background: color-mix(in srgb, var(--surface) 88%, transparent) !important;
+  background: var(--surface) !important;
   border-top: 1px solid var(--line) !important;
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5) !important;
 }

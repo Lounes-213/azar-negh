@@ -28,6 +28,44 @@ function activeTabIndex(pathname: string): number {
   return index === -1 ? 0 : index;
 }
 
+/**
+ * Retreats the bar while the page travels down and brings it back on the way up.
+ * Toggles the class straight on the node so a direction flip never re-renders the shell.
+ * `resetKey` re-shows it on navigation, so a new page never starts chrome-less.
+ */
+function useAutoHideOnScroll(resetKey: string) {
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!window.matchMedia("(max-width: 960px)").matches) return;
+
+    let lastY = window.scrollY;
+    let queued = false;
+
+    const set = (hidden: boolean) => ref.current?.classList.toggle("tabbar-hidden", hidden);
+    set(false);
+
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const y = window.scrollY;
+        // Sub-8px jitter is finger bounce at the ends of the scroll, not a direction change.
+        if (Math.abs(y - lastY) < 8) return;
+        if (y > lastY && y > 96) set(true);
+        else if (y < lastY) set(false);
+        lastY = y;
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [resetKey]);
+
+  return ref;
+}
+
 function getGreeting(user: { displayName?: string | null } | null, lang: string): string {
   const hour = new Date().getHours();
   const isEvening = hour >= 18 || hour < 5;
@@ -188,6 +226,7 @@ export function Layout() {
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
   const menuOpen = menuOpenFor === location.pathname;
   const [locationOpen, setLocationOpen] = useState(false);
+  const tabbarRef = useAutoHideOnScroll(location.pathname);
 
   useEffect(() => {
     const handleOpenLoc = () => setLocationOpen(true);
@@ -473,6 +512,7 @@ export function Layout() {
       </div>
 
       <nav
+        ref={tabbarRef}
         className="tabbar"
         aria-label="Navigation mobile"
         style={{ "--tab-i": activeTabIndex(location.pathname) } as CSSProperties}

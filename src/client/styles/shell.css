@@ -1341,7 +1341,7 @@
     padding: 9px 10px 11px;
   }
 
-  /* ---- "Asif" tabbar — near-invisible glass + sliding tricolour rail ---- */
+  /* ---- "Asif" tabbar — solid surface + sliding tricolour rail ---- */
   .tabbar {
     display: flex;
     position: fixed;
@@ -1349,11 +1349,15 @@
     inset-inline: 0;
     height: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
     padding: 0 0 env(safe-area-inset-bottom);
-    background: color-mix(in srgb, var(--surface) 84%, transparent);
+    background: var(--surface);
     border-top: 1px solid var(--line);
     z-index: 70;
-    backdrop-filter: blur(18px) saturate(1.5);
-    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    transition: transform 0.32s var(--ease);
+  }
+
+  /* The bar height already includes the safe-area padding, so 100% clears the viewport. */
+  .tabbar.tabbar-hidden {
+    transform: translateY(100%);
   }
 
   /* Amazigh tricolour marker; --tab-i comes from the active route in Layout.tsx */
@@ -1444,6 +1448,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .tabbar,
     .tab-rail,
     .tabbar .tab-label,
     .tabbar .tab-sell .tab-icon {
