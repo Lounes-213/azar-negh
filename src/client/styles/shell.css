@@ -1243,6 +1243,7 @@
     background: rgba(255, 255, 255, 0.97);
     border-top: 1px solid var(--line);
     backdrop-filter: blur(14px);
+    transition: transform 0.32s var(--ease);
     z-index: 65;
   }
 
@@ -1355,9 +1356,15 @@
     transition: transform 0.32s var(--ease);
   }
 
-  /* The bar height already includes the safe-area padding, so 100% clears the viewport. */
-  .tabbar.tabbar-hidden {
+  /* Both fixed bottom layers retreat together — the flag is set on <html> by useAutoHideOnScroll.
+     The bar's own height already includes the safe-area padding, so 100% clears the viewport;
+     .mobile-cta additionally has to cross the strip the tab bar used to occupy. */
+  .chrome-hidden .tabbar {
     transform: translateY(100%);
+  }
+
+  .chrome-hidden .mobile-cta {
+    transform: translateY(calc(100% + var(--tabbar-height) + env(safe-area-inset-bottom)));
   }
 
   /* Amazigh tricolour marker; --tab-i comes from the active route in Layout.tsx */
@@ -1449,6 +1456,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .tabbar,
+    .mobile-cta,
     .tab-rail,
     .tabbar .tab-label,
     .tabbar .tab-sell .tab-icon {

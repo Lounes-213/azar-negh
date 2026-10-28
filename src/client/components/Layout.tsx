@@ -29,20 +29,20 @@ function activeTabIndex(pathname: string): number {
 }
 
 /**
- * Retreats the bar while the page travels down and brings it back on the way up.
- * Toggles the class straight on the node so a direction flip never re-renders the shell.
- * `resetKey` re-shows it on navigation, so a new page never starts chrome-less.
+ * Retreats the bottom chrome while the page travels down and brings it back on the way up.
+ * The flag lives on `<html>` because two fixed layers have to move as one: the tab bar and the
+ * `.mobile-cta` contact strip. Toggling a class never re-renders the shell.
+ * `resetKey` re-shows them on navigation, so a new page never starts chrome-less.
  */
 function useAutoHideOnScroll(resetKey: string) {
-  const ref = useRef<HTMLElement>(null);
-
   useEffect(() => {
     if (!window.matchMedia("(max-width: 960px)").matches) return;
 
+    const root = document.documentElement;
     let lastY = window.scrollY;
     let queued = false;
 
-    const set = (hidden: boolean) => ref.current?.classList.toggle("tabbar-hidden", hidden);
+    const set = (hidden: boolean) => root.classList.toggle("chrome-hidden", hidden);
     set(false);
 
     const onScroll = () => {
@@ -60,10 +60,11 @@ function useAutoHideOnScroll(resetKey: string) {
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      set(false);
+    };
   }, [resetKey]);
-
-  return ref;
 }
 
 function getGreeting(user: { displayName?: string | null } | null, lang: string): string {
@@ -226,7 +227,7 @@ export function Layout() {
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
   const menuOpen = menuOpenFor === location.pathname;
   const [locationOpen, setLocationOpen] = useState(false);
-  const tabbarRef = useAutoHideOnScroll(location.pathname);
+  useAutoHideOnScroll(location.pathname);
 
   useEffect(() => {
     const handleOpenLoc = () => setLocationOpen(true);
@@ -512,7 +513,6 @@ export function Layout() {
       </div>
 
       <nav
-        ref={tabbarRef}
         className="tabbar"
         aria-label="Navigation mobile"
         style={{ "--tab-i": activeTabIndex(location.pathname) } as CSSProperties}
