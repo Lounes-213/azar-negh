@@ -31,6 +31,13 @@ interface Message {
 
 const CHAT_STORAGE_KEY = "azar_bot_chat_history_v2";
 
+/** Mirrors `chatSchema` in `src/server/routes/ai.ts` — a replay that breaks either cap 422s the whole thread. */
+const MAX_SENT_MESSAGES = 50;
+const MAX_SENT_CONTENT = 4000;
+
+/** A POST that never answers would leave `loading` stuck, which deadens both the send and the mic button. */
+const AI_REQUEST_TIMEOUT_MS = 45_000;
+
 /**
  * Fast client-side image downscaling for Gemini Vision AI.
  * Downscales images to max 850px dimension and compresses to JPEG 0.82.
@@ -941,13 +948,19 @@ export function AzarBotWidget() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    // Aborting from the timer below must not look like the Stop button, which returns silently.
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, AI_REQUEST_TIMEOUT_MS);
+
     try {
       const persona = getLocalUserPersona();
       const payload: any = {
-        messages: nextMessages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
+        messages: nextMessages
+          .slice(-MAX_SENT_MESSAGES)
+          .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_SENT_CONTENT) })),
         userPersona: persona,
         lang: isAr ? "ar" : "fr",
       };
@@ -982,18 +995,23 @@ export function AzarBotWidget() {
 
       setMessages((prev) => [...prev, botMsg]);
     } catch (err: any) {
-      if (err?.name === "AbortError" || controller.signal.aborted) {
+      if (!timedOut && (err?.name === "AbortError" || controller.signal.aborted)) {
         // User aborted request manually via Stop button
         return;
       }
       const errorMsg: Message = {
         id: `err_${Date.now()}`,
         role: "model",
-        content: errorMessage(err),
+        content: timedOut
+          ? isAr
+            ? "انتهت مهلة الانتظار. تحقق من اتصالك ثم أعد المحاولة."
+            : "La réponse a dépassé le délai d'attente. Vérifiez votre connexion et relancez la question."
+          : errorMessage(err),
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
+      clearTimeout(timeoutId);
       abortControllerRef.current = null;
       setLoading(false);
     }
