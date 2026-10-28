@@ -5,6 +5,7 @@ import { EmptyState, SkeletonStack, Spinner } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { HeroCarousel } from "../components/HeroCarousel";
 import { SearchSuggestions } from "../components/SearchSuggestions";
+import { CategoryAvatar } from "../components/CategoryAvatar";
 import { api } from "../lib/api";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
@@ -235,7 +236,7 @@ export function Home() {
         ) : (
           <div className="cat-rail">
             <Link to="/annonces" className="cat-card" aria-current="page">
-              <span className="cat-thumb">
+              <span className="cat-thumb cat-thumb--all">
                 <Icon name="grid" size={22} />
               </span>
               <strong>{t("common.allM")}</strong>
@@ -243,7 +244,7 @@ export function Home() {
             {meta.data?.categories.slice(0, 12).map((category) => (
               <Link key={category.id} to={`/categories/${category.slug}`} className="cat-card">
                 <span className="cat-thumb">
-                  <Icon name={category.icon as IconName} size={22} />
+                  <CategoryAvatar slug={category.slug} icon={category.icon} />
                 </span>
                 <strong>{lang === "ar" ? category.nameAr : category.nameFr}</strong>
                 <small>

@@ -12,6 +12,7 @@ import { Icon } from "../components/Icons";
 import { Avatar, EmptyState, Field, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { ListingCard } from "../components/ListingCard";
+import { CategoryAvatar, categoryArtwork } from "../components/CategoryAvatar";
 import { api, errorMessage } from "../lib/api";
 
 interface MatchingStore {
@@ -46,18 +47,20 @@ function findCategoryBySlug(
 function flattenCategories(
   categories: Category[],
   lang?: "fr" | "ar",
-): { id: number; label: string; depth: number }[] {
-  const result: { id: number; label: string; depth: number }[] = [];
+): { id: number; label: string; slug: string; depth: number }[] {
+  const result: { id: number; label: string; slug: string; depth: number }[] = [];
   for (const category of categories) {
     result.push({
       id: category.id,
       label: lang === "ar" ? category.nameAr : category.nameFr,
+      slug: category.slug,
       depth: 0,
     });
     for (const child of category.children ?? []) {
       result.push({
         id: child.id,
         label: lang === "ar" ? child.nameAr : child.nameFr,
+        slug: child.slug,
         depth: 1,
       });
     }
@@ -345,10 +348,23 @@ export function Search({ mode }: { mode: Mode }) {
       ...categoryOptions.map((opt) => ({
         value: String(opt.id),
         label: opt.depth > 0 ? `— ${opt.label}` : opt.label,
+        image: categoryArtwork(opt.slug),
       })),
     ],
     [categoryOptions, t],
   );
+
+  /* The active-filter chip shows the category's artwork, so it needs the record itself —
+     including sub-categories, which the previous parent-only lookup skipped. */
+  const activeCategoryChip = useMemo(() => {
+    if (!currentCategory) return undefined;
+    for (const category of meta.data?.categories ?? []) {
+      if (String(category.id) === currentCategory) return category;
+      const child = category.children?.find((item) => String(item.id) === currentCategory);
+      if (child) return child;
+    }
+    return undefined;
+  }, [currentCategory, meta.data]);
 
   const wilayaFilterOptions = useMemo(
     () => [
@@ -387,7 +403,12 @@ export function Search({ mode }: { mode: Mode }) {
     <div className="container page">
       <div className="page-head">
         <div>
-          <h1>{title}</h1>
+          <h1 className={categoryFromSlug ? "page-head-cat" : undefined}>
+            {categoryFromSlug ? (
+              <CategoryAvatar slug={categoryFromSlug.slug} icon={categoryFromSlug.icon} size={30} />
+            ) : null}
+            {title}
+          </h1>
           <p>
             {initialLoading
               ? t("common.loading")
@@ -601,7 +622,16 @@ export function Search({ mode }: { mode: Mode }) {
                     setParams(next);
                   }}
                 >
-                  <span>{meta.data?.categories.find((c) => String(c.id) === currentCategory)?.[lang === "ar" ? "nameAr" : "nameFr"] || currentCategory}</span>
+                  {activeCategoryChip ? (
+                    <CategoryAvatar slug={activeCategoryChip.slug} icon={activeCategoryChip.icon} size={16} />
+                  ) : null}
+                  <span>
+                    {activeCategoryChip
+                      ? lang === "ar"
+                        ? activeCategoryChip.nameAr
+                        : activeCategoryChip.nameFr
+                      : currentCategory}
+                  </span>
                   <Icon name="x" size={13} />
                 </button>
               ) : null}

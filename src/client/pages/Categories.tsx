@@ -3,7 +3,8 @@ import { Link } from "react-router";
 import { api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
-import { Icon, type IconName } from "../components/Icons";
+import { Icon } from "../components/Icons";
+import { CategoryAvatar } from "../components/CategoryAvatar";
 import { Spinner, EmptyState } from "../components/ui";
 import type { MetaResponse, Category } from "../../shared/types";
 
@@ -169,20 +170,7 @@ export function Categories() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div
-                      style={{
-                        width: 46,
-                        height: 46,
-                        borderRadius: "var(--radius-md)",
-                        background: "rgba(16, 185, 129, 0.12)",
-                        color: "#10b981",
-                        display: "grid",
-                        placeItems: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon name={parent.icon as IconName} size={24} />
-                    </div>
+                    <CategoryAvatar slug={parent.slug} icon={parent.icon} size={46} />
                     <div>
                       <h2
                         style={{
@@ -251,20 +239,7 @@ export function Categories() {
                             transition: "background 0.15s ease, border-color 0.15s ease, transform 0.15s ease",
                           }}
                         >
-                          <div
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: "8px",
-                              background: "rgba(16, 185, 129, 0.08)",
-                              color: "var(--brand-700)",
-                              display: "grid",
-                              placeItems: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Icon name={sub.icon as IconName} size={17} />
-                          </div>
+                          <CategoryAvatar slug={sub.slug} icon={sub.icon} size={32} />
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div
                               style={{

@@ -4,6 +4,7 @@ import type { ItemType, ListingDetail, MetaResponse } from "../../shared/types";
 import { Alert, Button, Dialog, Field, Input, Spinner, Textarea, useToast } from "../components/ui";
 import { CustomSelect } from "../components/CustomSelect";
 import { Icon } from "../components/Icons";
+import { categoryArtwork } from "../components/CategoryAvatar";
 import { api, errorMessage, fieldErrors } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
@@ -85,17 +86,19 @@ export function Sell() {
   const [aiBusy, setAiBusy] = useState(false);
 
   const categoryOptions = useMemo(() => {
-    const options: { id: number; label: string; depth: number }[] = [];
+    const options: { id: number; label: string; slug: string; depth: number }[] = [];
     for (const category of meta.data?.categories ?? []) {
       options.push({
         id: category.id,
         label: lang === "ar" ? category.nameAr : category.nameFr,
+        slug: category.slug,
         depth: 0,
       });
       for (const child of category.children ?? []) {
         options.push({
           id: child.id,
           label: lang === "ar" ? child.nameAr : child.nameFr,
+          slug: child.slug,
           depth: 1,
         });
       }
@@ -108,6 +111,7 @@ export function Sell() {
       categoryOptions.map((option) => ({
         value: option.id,
         label: option.depth > 0 ? `— ${option.label}` : option.label,
+        image: categoryArtwork(option.slug),
       })),
     [categoryOptions],
   );

@@ -118,12 +118,12 @@ listingRoutes.get("/listings/suggestions", async (c) => {
         cover_id: string | null;
       }>(),
     c.env.DB.prepare(
-      `SELECT id, slug, name_fr, name_ar FROM categories
+      `SELECT id, slug, name_fr, name_ar, icon FROM categories
        WHERE is_active = 1 AND (name_fr LIKE ? OR name_ar LIKE ?)
        LIMIT 3`,
     )
       .bind(pattern, pattern)
-      .all<{ id: number; slug: string; name_fr: string; name_ar: string }>(),
+      .all<{ id: number; slug: string; name_fr: string; name_ar: string; icon: string }>(),
     c.env.DB.prepare(
       `SELECT u.id, u.avatar_url, p.display_name, p.logo_url, p.store_name, p.store_slug,
               p.commune, p.wilaya_id, w.name_fr AS wilaya_name_fr, w.name_ar AS wilaya_name_ar,
@@ -166,6 +166,7 @@ listingRoutes.get("/listings/suggestions", async (c) => {
       slug: cat.slug,
       nameFr: cat.name_fr,
       nameAr: cat.name_ar,
+      icon: cat.icon,
     })),
     stores: (stores.results ?? []).map((row) => ({
       id: row.id,

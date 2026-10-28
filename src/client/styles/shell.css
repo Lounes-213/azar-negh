@@ -600,11 +600,51 @@
 .cat-thumb {
   display: grid;
   place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
   color: currentColor;
+}
+
+/* The artwork is a full-bleed disc, so the image *is* the circle and the chip around it is
+   only a hairline frame. `100%` lets each surface set its own diameter; `size` on the
+   component overrides it for the inline contexts (badges, suggestion rows) that have no chip. */
+.cat-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
+.cat-avatar-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  flex: none;
 }
 
 .cat-card:hover .cat-thumb {
   color: var(--brand-600);
+}
+
+/* Raster discs can't be recoloured like an icon, so the selected state is drawn around them. */
+.cat-card:hover .cat-avatar,
+.cat-card[aria-current="page"] .cat-avatar {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--brand-500);
+}
+
+/* "Toutes les catégories" has no artwork, so it wears the disc itself. Two classes to beat
+   the single-class `.cat-thumb` surface rule that the mobile block sets further down. */
+.cat-thumb.cat-thumb--all {
+  border-radius: 50%;
+  background: var(--brand-500);
+  border-color: transparent;
+  color: #fff;
 }
 
 .cat-card strong {

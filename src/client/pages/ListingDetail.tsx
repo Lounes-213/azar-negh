@@ -18,6 +18,7 @@ import {
   useToast,
 } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
+import { CategoryAvatar } from "../components/CategoryAvatar";
 import { api, errorMessage } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useAsync, useDocumentTitle } from "../lib/hooks";
@@ -342,7 +343,10 @@ export function ListingDetail() {
             <StatusBadge status={listing.status} />
             <Badge tone="badge-brand">{t(`cond.${listing.condition}`)}</Badge>
             {listing.category ? (
-              <Badge>{lang === "ar" ? listing.category.nameAr : listing.category.nameFr}</Badge>
+              <Badge>
+                <CategoryAvatar slug={listing.category.slug} size={15} />
+                {lang === "ar" ? listing.category.nameAr : listing.category.nameFr}
+              </Badge>
             ) : null}
           </div>
           <h1 className="detail-title">{listing.title}</h1>

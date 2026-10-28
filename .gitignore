@@ -19,3 +19,6 @@ src/client/admin-portal/
 
 .vercel
 .env*
+
+# 1024px ImageGen source renders; only the trimmed 192px discs in public/categories are committed
+vibe_images/

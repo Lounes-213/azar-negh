@@ -7,6 +7,8 @@ export interface SelectOption {
   label: string;
   sublabel?: string;
   badge?: string;
+  /** Leading disc artwork (category icons). Omitted for the text-only lists. */
+  image?: string | null;
 }
 
 export interface CustomSelectProps {
@@ -130,6 +132,16 @@ export function CustomSelect({
         <span className={`custom-select-label ${!selectedOption ? "is-placeholder" : ""}`}>
           {selectedOption ? (
             <span className="custom-select-text">
+              {selectedOption.image ? (
+                <img
+                  className="custom-select-thumb"
+                  src={selectedOption.image}
+                  width={22}
+                  height={22}
+                  alt=""
+                  aria-hidden="true"
+                />
+              ) : null}
               <span>{selectedOption.label}</span>
               {selectedOption.sublabel ? (
                 <small className="custom-select-sublabel">({selectedOption.sublabel})</small>
@@ -199,6 +211,16 @@ export function CustomSelect({
                     className={`custom-select-item ${isSelected ? "is-selected" : ""}`}
                   >
                     <span className="custom-select-item-text">
+                      {opt.image ? (
+                        <img
+                          className="custom-select-thumb"
+                          src={opt.image}
+                          width={20}
+                          height={20}
+                          alt=""
+                          aria-hidden="true"
+                        />
+                      ) : null}
                       <span className="custom-select-item-label">{opt.label}</span>
                       {opt.sublabel ? (
                         <small className="custom-select-item-sublabel">{opt.sublabel}</small>

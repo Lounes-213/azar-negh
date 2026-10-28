@@ -425,6 +425,13 @@ ol {
   white-space: nowrap;
 }
 
+/* Leading disc artwork in a select row — category pickers. */
+.custom-select-thumb {
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
 .custom-select-sublabel {
   color: var(--muted);
   font-size: 0.85em;
@@ -935,6 +942,13 @@ ol {
 
 .page-head h1 {
   font-size: var(--text-2xl);
+}
+
+/* Category page title: the disc sits on the text baseline like a wordmark. */
+.page-head-cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .page-head p {

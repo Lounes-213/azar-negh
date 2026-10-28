@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Icon } from "./Icons";
+import { CategoryAvatar } from "./CategoryAvatar";
 import { api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { formatDa } from "../lib/format";
@@ -19,6 +20,7 @@ export interface SuggestionCategory {
   slug: string;
   nameFr: string;
   nameAr: string;
+  icon?: string;
 }
 
 export interface SuggestionStore {
@@ -193,7 +195,7 @@ export function SearchSuggestions({
               }}
             >
               <span className="search-suggestion-icon">
-                <Icon name="grid" size={14} />
+                <CategoryAvatar slug={cat.slug} icon={cat.icon} size={20} />
               </span>
               <span className="search-suggestion-label">
                 {lang === "ar" ? cat.nameAr : cat.nameFr}
