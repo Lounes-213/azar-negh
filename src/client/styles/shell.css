@@ -1356,15 +1356,17 @@
     transition: transform 0.32s var(--ease);
   }
 
-  /* Both fixed bottom layers retreat together — the flag is set on <html> by useAutoHideOnScroll.
-     The bar's own height already includes the safe-area padding, so 100% clears the viewport;
-     .mobile-cta additionally has to cross the strip the tab bar used to occupy. */
+  /* Both fixed bottom layers react to the flag set on <html> by useAutoHideOnScroll — but not
+     the same way. The bar's own height already includes the safe-area padding, so 100% clears the
+     viewport. The CTA strip only has to fall into the strip the tab bar vacated, and stays put
+     there: `bottom` is already tab-bar + safe area, so shifting it by the tab-bar height alone
+     leaves it flush against the screen edge, clear of the home indicator. */
   .chrome-hidden .tabbar {
     transform: translateY(100%);
   }
 
   .chrome-hidden .mobile-cta {
-    transform: translateY(calc(100% + var(--tabbar-height) + env(safe-area-inset-bottom)));
+    transform: translateY(var(--tabbar-height));
   }
 
   /* Amazigh tricolour marker; --tab-i comes from the active route in Layout.tsx */

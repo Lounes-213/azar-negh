@@ -29,10 +29,10 @@ function activeTabIndex(pathname: string): number {
 }
 
 /**
- * Retreats the bottom chrome while the page travels down and brings it back on the way up.
- * The flag lives on `<html>` because two fixed layers have to move as one: the tab bar and the
- * `.mobile-cta` contact strip. Toggling a class never re-renders the shell.
- * `resetKey` re-shows them on navigation, so a new page never starts chrome-less.
+ * Retreats the tab bar while the page travels down and brings it back on the way up.
+ * The flag lives on `<html>` because the `.mobile-cta` contact strip has to move with it —
+ * it drops into the vacated strip and stays reachable there. Toggling a class never re-renders
+ * the shell, and `resetKey` re-shows both on navigation so a new page never starts chrome-less.
  */
 function useAutoHideOnScroll(resetKey: string) {
   useEffect(() => {
