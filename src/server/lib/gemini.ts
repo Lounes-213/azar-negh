@@ -1,8 +1,13 @@
 import type { Env } from "../types";
 
-/** Hard ceiling on the whole failover sweep, and on any single provider call. */
+/**
+ * Hard ceiling on the whole failover sweep, and on any single provider call.
+ * A cold Worker isolate pays DNS+TCP+TLS to Google on every first call, which measures out at
+ * 7-10s in production — so the per-call cap needs real headroom over that, otherwise a healthy
+ * answer is aborted and the sweep spends its budget retrying a model that was actually fine.
+ */
 const AI_TOTAL_BUDGET_MS = 20_000;
-const AI_PER_REQUEST_MS = 10_000;
+const AI_PER_REQUEST_MS = 14_000;
 
 /**
  * Extracts all configured Gemini API keys from environment.
@@ -185,6 +190,7 @@ export async function callAiDetailed(
         : [config.model];
 
     for (const model of models) {
+      let modelSick = false;
       for (const key of orderedKeys) {
         const signal = nextSignal();
         if (!signal) break;
@@ -223,7 +229,12 @@ export async function callAiDetailed(
             });
           }
         } catch (err) {
-          record(config.provider, model, 0, err instanceof Error ? err.name : "fetch failed");
+          const name = err instanceof Error ? err.name : "fetch failed";
+          record(config.provider, model, 0, name);
+          // A request that never answered says nothing about the key, so keep it — but a model
+          // that already failed Google-side will most likely stall on every remaining key too,
+          // and one stall is half the sweep budget. Try a different model instead.
+          if (name === "TimeoutError" && modelSick) break;
           continue;
         }
 
@@ -262,6 +273,10 @@ export async function callAiDetailed(
           // is retired, `usable` is empty and the remaining models are skipped without a fetch.
           deadKeys.add(key);
           continue;
+        }
+        if (res.status >= 500) {
+          modelSick = true; // Google-side failure — see the timeout branch below
+          break;
         }
       }
 
